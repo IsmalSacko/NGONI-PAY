@@ -11,14 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clients', function (Blueprint $table) {
+        Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
-            $table->string('email')->unique()->nullable();
-            $table->string('phone', 20)->nullable();
-            $table->text('notes')->nullable();
+
+            $table->enum('plan', ['free', 'basic', 'pro'])->default('free');
+
+            $table->date('starts_at');
+            $table->date('ends_at')->nullable();
+
+            $table->boolean('is_active')->default(true);
+
             $table->timestamps();
+
+            // Un business = une seule subscription
+            $table->unique('business_id');
         });
     }
 
@@ -27,6 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clients');
+        Schema::dropIfExists('subscriptions');
     }
 };

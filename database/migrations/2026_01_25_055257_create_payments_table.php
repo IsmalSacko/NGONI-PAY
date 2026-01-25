@@ -16,7 +16,8 @@ return new class extends Migration
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
             $table->foreignId('client_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->decimal('amount', 3)->default('XOF');
+            $table->decimal('amount', 15, 2);
+            $table->string('currency', 3)->default('XOF');
             $table->enum('method', ['cash', 'orange_money', 'moov_money', 'wave']);
 
             $table->string('transaction_ref')->unique();
