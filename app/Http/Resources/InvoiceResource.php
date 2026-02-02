@@ -15,6 +15,25 @@ class InvoiceResource extends JsonResource
             'pdf_path' => $this->pdf_path,
             'sent_via' => $this->sent_via,
             'created_at' => $this->created_at,
+            // Include related payment details
+            'payment' =>  [
+                'id' => $this->payment->id,
+                'amount' => $this->payment->amount,
+                'currency' => $this->payment->currency,
+                'method' => $this->payment->method,
+                'status' => $this->payment->status,
+                'paid_at' => $this->payment->paid_at,
+
+                // Include related client details
+                'client' => $this->payment->client ?
+                    [
+                        'id' => $this->payment->client->id,
+                        'name' => $this->payment->client->name,
+                        'email' => $this->payment->client->email,
+                        'phone' => $this->payment->client->phone,
+                        'address' => $this->payment->client->address,
+                    ] : null,
+            ],
         ];
     }
 }

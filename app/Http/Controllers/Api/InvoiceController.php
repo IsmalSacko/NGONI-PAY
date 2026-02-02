@@ -11,6 +11,10 @@ class InvoiceController extends Controller
 {
     public function show(Payment $payment)
     {
-        return new InvoiceResource($payment->invoice);
+        $invoice = $payment->invoice()
+            ->with(['payment.client'])
+            ->firstOrFail();
+
+        return new InvoiceResource($invoice);
     }
 }

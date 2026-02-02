@@ -14,11 +14,14 @@ return new class extends Migration
         Schema::create('clients', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
-            $table->string('email')->unique()->nullable();
-            $table->string('phone', 20)->nullable();
+            $table->string('phone', 20);
+            $table->string('name')->nullable();
+            $table->string('email')->nullable()->unique();
             $table->text('notes')->nullable();
             $table->timestamps();
+
+            // 🔐 unicité métier pour le businessid et le phone
+            $table->unique(['business_id', 'phone']);
         });
     }
 

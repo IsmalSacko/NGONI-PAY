@@ -16,6 +16,12 @@ class PaymentResource extends JsonResource
             'status' => $this->status,
             'paid_at' => $this->paid_at,
             'transaction_ref' => $this->transaction_ref,
+            'client' => [
+                'id' => optional($this->client)->id,
+                'name' => optional($this->client)->name,
+                'phone' => optional($this->client)->phone,
+                'email' => optional($this->client)->email,
+            ],
         ];
     }
 }

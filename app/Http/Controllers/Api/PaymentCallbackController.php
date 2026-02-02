@@ -50,7 +50,7 @@ class PaymentCallbackController extends Controller
             $payment->invoice()->firstOrCreate([
                 'payment_id' => $payment->id,
             ], [
-                'invoice_number' => 'INV-' . now()->format('Ymd') . '-' . $payment->id,
+                'invoice_number' => 'NGONI-FACTURE' . now()->format('Ymd') . '-' . $payment->id,
                 'total_amount' => $payment->amount,
                 'sent_via' => 'none',
             ]);
@@ -94,9 +94,40 @@ class PaymentCallbackController extends Controller
         ]);
 
         $payment->invoice()->create([
-            'invoice_number' => 'INV-' . now()->format('Ymd') . '-' . $payment->id,
+            'invoice_number' => 'NGONI-FACTURE' . now()->format('Ymd') . '-' . $payment->id,
             'total_amount' => $payment->amount,
             'sent_via' => 'none',
+        ]);
+    }
+
+    // Validation du callback (à implémenter selon le provider)
+    public function validatePayment(Payment $payment)
+    {
+        if ($payment->status !== 'pending') {
+            return response()->json([
+                'message' => 'Paiement déjà traité',
+                'status' => $payment->status,
+            ]);
+        }
+
+        $payment->update([
+            'status' => 'success',
+            'paid_at' => now(),
+        ]);
+
+        $payment->invoice()->firstOrCreate(
+            ['payment_id' => $payment->id],
+            [
+                'invoice_number' => 'NGONI-FACTURE' . now()->format('Ymd') . '-' . $payment->id,
+                'total_amount' => $payment->amount,
+                'sent_via' => 'none', // ✅ valeur autorisée
+            ]
+        );
+
+
+        return response()->json([
+            'message' => 'Paiement validé manuellement',
+            'payment_status' => $payment->status,
         ]);
     }
 }

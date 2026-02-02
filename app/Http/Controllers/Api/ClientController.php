@@ -36,7 +36,7 @@ class ClientController extends Controller
         $client = Client::create([
             'business_id' => $business->id,
             'name'  => $request->name,
-            'phone' => $request->phone,
+            'phone' => $this->normalizePhone($request->phone),
             'email' => $request->email,
             'notes' => $request->notes,
         ]);
@@ -53,6 +53,23 @@ class ClientController extends Controller
         $this->ensureSameBusiness($business, $client);
 
         return new ClientResource($client);
+    }
+
+    public function findByPhone(Request $request, Business $business)
+    {
+        $phone = $request->query('phone');
+
+        if (! $phone) {
+            return response()->json(['data' => null]);
+        }
+
+        $client = Client::where('business_id', $business->id)
+            ->where('phone', $phone) // ✅ MATCH EXACT
+            ->first();
+
+        return response()->json([
+            'data' => $client,
+        ]);
     }
 
     /**
@@ -129,4 +146,29 @@ class ClientController extends Controller
             abort(404);
         }
     }
+
+    private function normalizePhone(string $phone): string
+    {
+        // Supprimer espaces
+        $phone = str_replace(' ', '', $phone);
+
+        // Si déjà au format +223XXXXXXXX
+        if (str_starts_with($phone, '+223')) {
+            return $phone;
+        }
+
+        // Si envoyé sans indicatif (8 chiffres)
+        if (preg_match('/^\d{8}$/', $phone)) {
+            return '+223' . $phone;
+        }
+
+        // Si envoyé comme 223XXXXXXXX
+        if (preg_match('/^223\d{8}$/', $phone)) {
+            return '+' . $phone;
+        }
+
+        // Sinon, on retourne tel quel (ou on peut lever une erreur)
+        return $phone;
+    }
+
 }

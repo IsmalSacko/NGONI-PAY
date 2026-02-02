@@ -6,18 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
+
 use App\Models\User;
+use App\Services\PhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $req)
+
+
+    public function register(RegisterRequest $req, PhoneService $phoneService)
     {
+        $phone = $phoneService->normalize($req->phone);
         $user = User::create([
             ...$req->validated(),
+            'phone' => $phone,
             'password' => Hash::make($req->password),
             'role' => 'owner',
+
         ]);
 
         $token = $user->createToken('api')->plainTextToken;
@@ -27,9 +34,10 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function login(LoginRequest $req)
+    public function login(LoginRequest $req, PhoneService $phoneService)
     {
-        $user = User::where('phone', $req->phone)->first();
+        $phone = $phoneService->normalize($req->phone);
+        $user = User::where('phone', $phone)->first();
 
         if (!$user || !Hash::check($req->password, $user->password)) {
             return response()->json(['message' => 'Identifiants invalides.'], 401);
@@ -48,8 +56,13 @@ class AuthController extends Controller
         return new UserResource($req->user());
     }
 
-    public function updateProfile(Request $req)
+    public function updateProfile(Request $req, PhoneService $phoneService)
     {
+        if ($req->has('phone')) {
+            $req->merge([
+                'phone' => $phoneService->normalize($req->phone),
+            ]);
+        }
         $user = $req->user();
         $user->update($req->only(['name', 'email', 'phone']));
 

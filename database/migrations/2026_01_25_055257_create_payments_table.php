@@ -1,39 +1,35 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+return new class extends Migration {
+public function up(): void
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('payments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('business_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('client_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->decimal('amount', 15, 2);
-            $table->string('currency', 3)->default('XOF');
-            $table->enum('method', ['cash', 'orange_money', 'moov_money', 'wave']);
+Schema::create('payments', function (Blueprint $table) {
+$table->id();
 
-            $table->string('transaction_ref')->unique();
-            $table->enum('status', ['pending', 'success', 'failed'])->default('pending');
-            $table->timestamp('paid_at')->nullable();
-            $table->timestamps();
+$table->foreignId('business_id')->constrained()->cascadeOnDelete();
+$table->foreignId('client_id')->constrained()->cascadeOnDelete();
+$table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
-            $table->index(['business_id', 'status']);
-        });
-    }
+$table->decimal('amount', 15, 2);
+$table->string('currency', 3)->default('XOF');
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('payments');
-    }
+$table->enum('method', ['cash', 'orange_money', 'moov_money', 'wave']);
+
+$table->string('transaction_ref')->unique();
+$table->enum('status', ['pending', 'success', 'failed'])->default('pending');
+$table->timestamp('paid_at')->nullable();
+
+$table->timestamps();
+
+$table->index(['business_id', 'status']);
+});
+}
+
+public function down(): void
+{
+Schema::dropIfExists('payments');
+}
 };

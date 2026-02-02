@@ -14,9 +14,13 @@ class StorePaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'client_id' => 'required|exists:clients,id',
+            // OPTION 1
+            'phone' => 'required_without:client_id|string|max:20',
+            'name' => 'nullable|string|max:255',
+            'client_id' => 'nullable|exists:clients,id',
             'amount' => 'required|numeric|min:0',
-            'currency' => 'required|string|size:3',
+            'currency' => 'nullable|string|size:3',
+
             'method' => 'required|in:cash,orange_money,moov_money,wave',
         ];
     }

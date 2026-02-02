@@ -30,7 +30,10 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 // Business User (Staff) routes
 Route::middleware('auth:sanctum')->group(function () {
-
+    Route::get('/businesses/{business}/stats', [BusinessController::class, 'stats']);
+    Route::get('/businesses/{business}/stats/daily', [BusinessController::class, 'dailyStats']);
+    Route::get('/businesses/{business}/stats/weekly', [BusinessController::class, 'stats']);
+    Route::get('/businesses/{business}/stats/monthly', [BusinessController::class, 'stats']);
     Route::get('/businesses/{business}/staff', [BusinessUserController::class, 'index']);
     Route::post('/businesses/{business}/staff', [BusinessUserController::class, 'store']);
     Route::put('/businesses/{business}/staff/{user}', [BusinessUserController::class, 'update']);
@@ -38,7 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 // Client routes
 Route::middleware('auth:sanctum')->group(function () {
-
+    Route::get('/businesses/{business}/clients/find',  [ClientController::class, 'findByPhone']);
     Route::get('/businesses/{business}/clients', [ClientController::class, 'index']);
     Route::post('/businesses/{business}/clients', [ClientController::class, 'store']);
     Route::get('/businesses/{business}/clients/{client}', [ClientController::class, 'show']);
@@ -70,9 +73,8 @@ Route::post(
     '/payments/callback',
     [PaymentCallbackController::class, 'handle']
 );
-Route::post('/callback-test', function (\Illuminate\Http\Request $request) {
-    return response()->json([
-        'message' => 'Callback route OK',
-        'data' => $request->all(),
-    ]);
-});
+// Payment Validation Temporary Route
+Route::post(
+    '/payments/{payment}/validate',
+    [PaymentCallbackController::class, 'validatePayment']
+);
