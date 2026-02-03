@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'paydunya' => [
+    'base_url' => env('PAYDUNYA_BASE_URL', 'https://app.paydunya.com/sandbox-api'),
+    'master_key' => env('PAYDUNYA_MASTER_KEY'),
+    'public_key' => env('PAYDUNYA_PUBLIC_KEY'),
+    'private_key' => env('PAYDUNYA_PRIVATE_KEY'),
+    'token' => env('PAYDUNYA_TOKEN'),
+    'webhook_secret' => env('PAYDUNYA_WEBHOOK_SECRET'),
+    ],
+
 ];

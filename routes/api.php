@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\PayDunyaTestController;
 
 // Auth routes
 Route::prefix('auth')->group(function () {
@@ -66,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/businesses/{business}/payments', [PaymentController::class, 'index']);
     Route::post('/businesses/{business}/payments', [PaymentController::class, 'store']);
     Route::get('/businesses/{business}/payments/{payment}', [PaymentController::class, 'show']);
+    Route::post('/businesses/{business}/paydunya/test-invoice', [PayDunyaTestController::class, 'create']);
 });
 
 // Payment Callback (Mobile Money) - No auth

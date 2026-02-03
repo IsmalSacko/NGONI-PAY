@@ -12,10 +12,11 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Requests\Payment\StorePaymentRequest;
+use App\Services\Payments\PayDunyaClient;
 
 class PaymentController extends Controller
 {
-    public function store(StorePaymentRequest $request, Business $business)
+    public function store(StorePaymentRequest $request, Business $business,PayDunyaClient $payDunyaCli)
     {
         // Client existant
         if ($request->filled('client_id')) {
@@ -42,7 +43,7 @@ class PaymentController extends Controller
                 'method' => ["Le champ 'method' est requis."],
             ]);
         }
-
+         $provider = $method === 'cash' ? null : 'paydunya';
         $payment = Payment::create([
             'business_id' => $business->id,
             'client_id' => $client->id,
@@ -50,9 +51,34 @@ class PaymentController extends Controller
             'amount' => $request->amount,
             'currency' => $request->currency ?? 'XOF',
             'method' => $method,
+            'provider' => $provider,
             'transaction_ref' => (string) Str::uuid(),
             'status' => 'pending',
         ]);
+
+               if ($method !== 'cash') {
+            $response = $payDunyaCli->createInvoice($payment, $client);
+
+            if (! $response['successful']) {
+                Log::warning('PayDunya invoice creation failed', [
+                    'payment_id' => $payment->id,
+                    'status' => $response['status'],
+                    'response' => $response['data'],
+                ]);
+
+                throw ValidationException::withMessages([
+                    'payment' => ['Impossible de créer la facture PayDunya pour le moment.'],
+                ]);
+            }
+
+            $payment->update([
+                'provider_reference' => data_get($response['data'], 'token')
+                    ?? data_get($response['data'], 'response_code'),
+                'provider_checkout_url' => data_get($response['data'], 'invoice_url')
+                    ?? data_get($response['data'], 'redirect_url')
+                    ?? data_get($response['data'], 'response_text'),
+            ]);
+        }
 
         return new PaymentResource($payment->load('client'));
     }
