@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Requests\Payment\StorePaymentRequest;
-use App\Services\Payments\PayDunyaClient;
+use App\services\Payments\PayDunyaClient;
 
 class PaymentController extends Controller
 {
@@ -67,8 +67,14 @@ class PaymentController extends Controller
                 ]);
 
                 throw ValidationException::withMessages([
-                    'payment' => ['Impossible de créer la facture PayDunya pour le moment.'],
+                    'payment' => [
+                        data_get($response, 'data.message')
+                        ?? data_get($response, 'data.response_text')
+                            ?? data_get($response, 'data.response_code')
+                            ?? 'Impossible de créer la facture PayDunya pour le moment.',
+                    ],
                 ]);
+
             }
 
             $payment->update([

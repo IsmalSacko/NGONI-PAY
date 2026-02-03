@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
-use App\Services\Payments\PayDunyaClient;
+use App\services\Payments\PayDunyaClient;
 
 class PayDunyaTestController extends Controller
 {
