@@ -10,8 +10,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // PostgreSQL syntax to drop NOT NULL without requiring doctrine/dbal.
-        DB::statement('ALTER TABLE users ALTER COLUMN email DROP NOT NULL');
+        // MySQL/MariaDB syntax to drop NOT NULL without requiring doctrine/dbal.
+        DB::statement('ALTER TABLE users MODIFY email VARCHAR(255) NULL');
     }
 
     /**
@@ -19,6 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement('ALTER TABLE users ALTER COLUMN email SET NOT NULL');
+        DB::statement('ALTER TABLE users MODIFY email VARCHAR(255) NOT NULL');
     }
 };
