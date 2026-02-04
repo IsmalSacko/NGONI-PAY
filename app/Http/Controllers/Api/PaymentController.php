@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Business;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Requests\Payment\StorePaymentRequest;
-use App\services\Payments\PayDunyaClient;
+use App\Services\Payments\PayDunyaClient;
 
 class PaymentController extends Controller
 {
@@ -43,7 +44,38 @@ class PaymentController extends Controller
                 'method' => ["Le champ 'method' est requis."],
             ]);
         }
-         $provider = $method === 'cash' ? null : 'paydunya';
+        $subscription = $business->subscription;
+        $isFreePlan = $subscription && $subscription->plan === 'free';
+        $provider = ($method === 'cash' || $isFreePlan) ? null : 'paydunya';
+
+        // Aucun abonnement actif
+        if (! $subscription || ! $subscription->is_active) {
+            abort(403, 'Aucun abonnement actif');
+        }
+
+        // FREE → pas de PayDunya (paiement enregistré comme offline)
+
+        // BASIC → max 5 paiements PayDunya / mois
+        if ($subscription->plan === 'basic' && $method !== 'cash') {
+
+            $usedThisMonth = Payment::where('business_id', $business->id)
+                ->where('purpose', 'sale')
+                ->where('provider', 'paydunya')
+                ->where('status', 'success')
+                ->whereBetween('paid_at', [
+                    Carbon::now()->startOfMonth(),
+                    Carbon::now()->endOfMonth(),
+                ])
+                ->count();
+
+            if ($usedThisMonth >= 5) {
+                return response()->json([
+                    'message' => 'Limite mensuelle atteinte (5 paiements PayDunya)',
+                    'code' => 'PAYMENT_LIMIT_REACHED',
+                ], 403);
+            }
+        }
+
         $payment = Payment::create([
             'business_id' => $business->id,
             'client_id' => $client->id,
@@ -53,10 +85,11 @@ class PaymentController extends Controller
             'method' => $method,
             'provider' => $provider,
             'transaction_ref' => (string) Str::uuid(),
-            'status' => 'pending',
+            'status' => $provider === null ? 'success' : 'pending',
+            'paid_at' => $provider === null ? now() : null,
         ]);
 
-               if ($method !== 'cash') {
+               if ($provider === 'paydunya') {
             $response = $payDunyaCli->createInvoice($payment, $client);
 
             if (! $response['successful']) {
@@ -84,6 +117,15 @@ class PaymentController extends Controller
                     ?? data_get($response['data'], 'redirect_url')
                     ?? data_get($response['data'], 'response_text'),
             ]);
+        } else {
+            $payment->invoice()->firstOrCreate(
+                ['payment_id' => $payment->id],
+                [
+                    'invoice_number' => 'NGONI-FACTURE-' . now()->format('Ymd') . '-' . $payment->id,
+                    'total_amount' => $payment->amount,
+                    'sent_via' => 'none',
+                ]
+            );
         }
 
         return new PaymentResource($payment->load('client'));

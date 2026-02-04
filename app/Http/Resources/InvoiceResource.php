@@ -23,6 +23,10 @@ class InvoiceResource extends JsonResource
                 'method' => $this->payment->method,
                 'status' => $this->payment->status,
                 'paid_at' => $this->payment->paid_at,
+                'purpose' => $this->payment->purpose,
+                'subscription_plan' => $this->payment->purpose === 'subscription'
+                    ? $this->planFromAmount($this->payment->amount)
+                    : null,
 
                 // Include related client details
                 'client' => $this->payment->client ?
@@ -35,5 +39,16 @@ class InvoiceResource extends JsonResource
                     ] : null,
             ],
         ];
+    }
+
+    private function planFromAmount($amount): string
+    {
+        $value = (int) round((float) $amount);
+
+        return match ($value) {
+            5000 => 'basic',
+            15000 => 'pro',
+            default => 'free',
+        };
     }
 }
