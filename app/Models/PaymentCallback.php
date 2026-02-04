@@ -15,11 +15,13 @@ class PaymentCallback extends Model
         'payload',
         'signature',
         'received_at',
+        'starts_at',
     ];
 
     protected $casts = [
         'payload' => 'array',
         'received_at' => 'datetime',
+        'starts_at' => 'date',
     ];
 
     public function payment()

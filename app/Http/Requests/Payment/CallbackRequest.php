@@ -16,8 +16,8 @@ class CallbackRequest extends FormRequest
         return [
             'transaction_ref' => 'nullable|string',
             'status' => 'nullable|in:success,failed,pending,completed',
-            'provider' => 'required|in:orange_money,moov_money,wave,paydunya',
-            'payload' => 'required|array',
+            'provider' => 'nullable|in:orange_money,moov_money,wave,paydunya',
+            'payload' => 'nullable|array',
             'signature' => 'nullable|string',
         ];
     }

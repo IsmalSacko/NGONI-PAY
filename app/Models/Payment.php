@@ -21,6 +21,7 @@ class Payment extends Model
         'provider_checkout_url',
         'transaction_ref',
         'status',
+        'purpose',
         'paid_at',
     ];
 

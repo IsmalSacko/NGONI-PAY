@@ -75,8 +75,3 @@ Route::post(
     '/payments/callback',
     [PaymentCallbackController::class, 'handle']
 );
-// Payment Validation Temporary Route
-Route::post(
-    '/payments/{payment}/validate',
-    [PaymentCallbackController::class, 'validatePayment']
-);

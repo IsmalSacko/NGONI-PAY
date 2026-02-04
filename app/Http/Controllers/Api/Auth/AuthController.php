@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
@@ -64,7 +65,31 @@ class AuthController extends Controller
             ]);
         }
         $user = $req->user();
-        $user->update($req->only(['name', 'email', 'phone']));
+        $data = $req->only(['name', 'email', 'phone']);
+
+        if ($req->boolean('remove_avatar')) {
+            if ($user->avatar_url) {
+                $path = parse_url($user->avatar_url, PHP_URL_PATH);
+                if ($path) {
+                    $relative = str_replace('/storage/', '', $path);
+                    if ($relative) {
+                        Storage::disk('public')->delete($relative);
+                    }
+                }
+            }
+            $data['avatar_url'] = null;
+        }
+
+        if ($req->hasFile('avatar')) {
+            $req->validate([
+                'avatar' => 'image|max:2048',
+            ]);
+
+            $path = $req->file('avatar')->storePublicly('avatars', 'public');
+            $data['avatar_url'] = url(Storage::url($path));
+        }
+
+        $user->update($data);
 
         return new UserResource($user);
     }

@@ -3,7 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Business;
+use App\Models\Client;
+use App\Models\Payment;
 use App\Models\Subscription;
+use App\Services\Payments\PayDunyaClient;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SubscriptionResource;
@@ -16,20 +22,149 @@ class SubscriptionController extends Controller
     {
         $this->authorizeManager($business, $request);
 
-        return new SubscriptionResource($business->subscription);
+        $subscription = $business->subscription;
+        $now = Carbon::now();
+
+        if (! $subscription) {
+            $subscription = Subscription::create([
+                'business_id' => $business->id,
+                'plan' => 'free',
+                'is_active' => true,
+                'starts_at' => $now,
+                'ends_at' => $now->copy()->addMonth(),
+            ]);
+            return new SubscriptionResource($subscription);
+        }
+
+        if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->lt($now)) {
+            $subscription->update([
+                'plan' => 'free',
+                'is_active' => true,
+                'starts_at' => $now,
+                'ends_at' => $now->copy()->addMonth(),
+            ]);
+        }
+
+        return new SubscriptionResource($subscription->fresh());
     }
 
-    public function store(StoreSubscriptionRequest $request, Business $business)
+    public function store(StoreSubscriptionRequest $request, Business $business, PayDunyaClient $payDunyaCli)
     {
         $this->authorizeManager($business, $request);
+        // Pour le cas d'un abonnement gratuit (1 mois renouvelable)
+            if ($request->plan === 'free') {
+            $subscription = Subscription::updateOrCreate(
+                ['business_id' => $business->id],
+                [
+                    'plan' => 'free',
+                    'is_active' => true,
+                    'starts_at' => now(),
+                    'ends_at' => now()->addMonth(),
+                ]
+            );
+            return new SubscriptionResource($subscription);
+        }
+        // Pour le basic/ pro
+        $mount = $this->planPrice($request->plan);
+        $method = $request->input('method');
 
-        $subscription = Subscription::create([
-            'business_id' => $business->id,
-            ...$request->validated(),
-            'is_active' => true,
+        if(! $method){
+            throw ValidationException::withMessages(
+                ['method' => 'Le mode de paiement est requis.']
+            );
+        }
+        $owner = $business->owner;
+        $clientName = $business->name ?: ($owner?->name ?? 'Abonnement');
+        $clientPhone = $business->phone ?: ($owner?->phone ?? 'SUBSCRIPTION-' . $business->id);
+
+        $client = Client::firstOrCreate(
+            [
+                'business_id' => $business->id,
+                'phone' => $clientPhone,
+            ],
+            [
+                'name' => $clientName,
+                // Email unique globalement : éviter d'écraser si déjà utilisé ailleurs
+                'email' => null,
+            ]
+        );
+
+        $payment = Payment::create([
+                'business_id' => $business->id,
+                'client_id' => $client->id,
+                'user_id' => $request->user()->id,
+                'amount' => $mount,
+                'currency' => 'XOF',
+                'method' => $method,
+                'provider' => $method === 'cash' ? null : 'paydunya',
+                'purpose' => 'subscription',
+                'status' => $method === 'cash' ? 'success' : 'pending',
+                'transaction_ref' => (string) Str::uuid(), // Générer une référence unique
+            ]);
+        // 🔹 CASH → activation immédiate
+        if ($method === 'cash') {
+            $this->activateSubscription($business, $request->plan);
+
+            return response()->json([
+                'message' => 'Abonnement activé (paiement cash)',
+                'subscription' => $business->fresh()->subscription,
+            ]);
+        }
+        // 🔹 MOBILE → PayDunya
+        $response = $payDunyaCli->createInvoiceForSubscription($payment, $business);
+
+        if (! $response['successful']) {
+            throw ValidationException::withMessages([
+                'payment' => ['Impossible de lancer le paiement abonnement'],
+            ]);
+        }
+
+        $payment->update([
+            'provider_reference' => data_get($response['data'], 'token')
+                ?? data_get($response['data'], 'response_code'),
+            'provider_checkout_url' => data_get($response['data'], 'invoice_url')
+                ?? data_get($response['data'], 'redirect_url')
+                ?? data_get($response['data'], 'response_text'),
         ]);
 
-        return new SubscriptionResource($subscription);
+        return response()->json([
+            'payment_id' => $payment->id,
+            'checkout_url' => $payment->provider_checkout_url,
+        ]);
+
+
+    }
+
+    private function activateSubscription(Business $business, string $plan): void
+    {
+        $endsAt = now()->addMonth();
+        if ($plan === 'pro') {
+            $endsAt = now()->addMonth();
+        } elseif ($plan === 'basic') {
+            $endsAt = now()->addMonth();
+        } elseif ($plan === 'free') {
+            $endsAt = now()->addMonth();
+        }
+
+        Subscription::updateOrCreate(
+            ['business_id' => $business->id],
+            [
+                'plan' => $plan,
+                'is_active' => true,
+                'starts_at' => now(),
+                'ends_at' => $endsAt,
+            ]
+        );
+    }
+
+    // Fonction pour retourner le prix en fonction du plan
+    private function planPrice(string $plan): int
+    {
+        return match ($plan) {
+            'basic' => 5000,
+            'pro'   => 15000,
+            default => 0,
+        };
     }
 
     public function update(UpdateSubscriptionRequest $request, Business $business, Subscription $subscription)
