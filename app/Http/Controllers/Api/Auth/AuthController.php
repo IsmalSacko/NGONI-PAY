@@ -12,6 +12,7 @@ use App\Services\PhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -65,7 +66,7 @@ class AuthController extends Controller
             ]);
         }
         $user = $req->user();
-        $data = $req->only(['name', 'email', 'phone']);
+        $data = $req->only(['name', 'email', 'phone', 'avatar_url']);
 
         if ($req->boolean('remove_avatar')) {
             if ($user->avatar_url) {
@@ -87,6 +88,39 @@ class AuthController extends Controller
 
             $path = $req->file('avatar')->storePublicly('avatars', 'public');
             $data['avatar_url'] = url(Storage::url($path));
+        }
+        // If no file is sent, allow base64 or a direct URL string from the client
+        if (!$req->hasFile('avatar') && $req->filled('avatar_base64')) {
+            $req->validate([
+                'avatar_base64' => 'string',
+            ]);
+
+            $input = $req->input('avatar_base64');
+            $ext = 'jpg';
+            $dataPart = $input;
+
+            if (preg_match('/^data:image\\/(\\w+);base64,/', $input, $matches)) {
+                $ext = strtolower($matches[1]);
+                $dataPart = substr($input, strpos($input, ',') + 1);
+            }
+
+            $decoded = base64_decode($dataPart, true);
+            if ($decoded === false) {
+                return response()->json([
+                    'message' => 'avatar_base64 invalide.',
+                ], 422);
+            }
+
+            $filename = 'avatars/' . Str::uuid() . '.' . $ext;
+            Storage::disk('public')->put($filename, $decoded);
+            $data['avatar_url'] = url(Storage::url($filename));
+        }
+
+        if (!$req->hasFile('avatar') && !$req->filled('avatar_base64') && $req->filled('avatar_url')) {
+            $req->validate([
+                'avatar_url' => 'url',
+            ]);
+            $data['avatar_url'] = $req->input('avatar_url');
         }
 
         $user->update($data);
