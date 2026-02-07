@@ -31,18 +31,29 @@ class SubscriptionController extends Controller
                 'plan' => 'free',
                 'is_active' => true,
                 'starts_at' => $now,
-                'ends_at' => $now->copy()->addMonth(),
+                'ends_at' => $now->copy()->addDays(7),
             ]);
             return new SubscriptionResource($subscription);
         }
 
         if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->lt($now)) {
-            $subscription->update([
-                'plan' => 'free',
-                'is_active' => true,
-                'starts_at' => $now,
-                'ends_at' => $now->copy()->addMonth(),
-            ]);
+            if ($subscription->plan !== 'free') {
+                $subscription->update([
+                    'plan' => 'free',
+                    'is_active' => true,
+                    'starts_at' => $now,
+                    'ends_at' => $now->copy()->addDays(7),
+                ]);
+            }
+        }
+
+        if ($subscription->plan === 'free' && $subscription->ends_at) {
+            $trialMax = $now->copy()->addDays(7);
+            if (Carbon::parse($subscription->ends_at)->gt($trialMax)) {
+                $subscription->update([
+                    'ends_at' => $trialMax,
+                ]);
+            }
         }
 
         return new SubscriptionResource($subscription->fresh());
@@ -51,7 +62,7 @@ class SubscriptionController extends Controller
     public function store(StoreSubscriptionRequest $request, Business $business, PayDunyaClient $payDunyaCli)
     {
         $this->authorizeManager($business, $request);
-        // Pour le cas d'un abonnement gratuit (1 mois renouvelable)
+        // Pour le cas d'un abonnement gratuit (essai 7 jours)
             if ($request->plan === 'free') {
             $subscription = Subscription::updateOrCreate(
                 ['business_id' => $business->id],
@@ -59,7 +70,7 @@ class SubscriptionController extends Controller
                     'plan' => 'free',
                     'is_active' => true,
                     'starts_at' => now(),
-                    'ends_at' => now()->addMonth(),
+                    'ends_at' => now()->addDays(7),
                 ]
             );
             return new SubscriptionResource($subscription);
@@ -143,7 +154,7 @@ class SubscriptionController extends Controller
         } elseif ($plan === 'basic') {
             $endsAt = now()->addMonth();
         } elseif ($plan === 'free') {
-            $endsAt = now()->addMonth();
+            $endsAt = now()->addDays(7);
         }
 
         Subscription::updateOrCreate(
@@ -191,6 +202,6 @@ class SubscriptionController extends Controller
             ->wherePivot('role', 'manager')
             ->exists();
 
-        if (! $isManager) abort(403);
+        if (! $isManager) abort(403, "Accès interdit: cette entreprise ne vous appartient pas.");
     }
 }
