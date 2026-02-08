@@ -127,6 +127,32 @@ class AuthController extends Controller
 
         return new UserResource($user);
     }
+    public function changePassword(Request $req)
+    {
+        $req->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = $req->user();
+        if (!Hash::check($req->current_password, $user->password)) {
+            return response()->json(['message' => 'Mot de passe actuel incorrect.'], 422);
+        }
+
+        $user->password = Hash::make($req->new_password);
+        $user->save();
+
+        return response()->json(['message' => 'Mot de passe mis à jour.'], 200);
+    }
+
+    public function destroy(Request $req)
+    {
+        $user = $req->user();
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json(['message' => 'Compte supprimé.'], 200);
+    }
 
     public function logout(Request $req)
     {
@@ -136,3 +162,5 @@ class AuthController extends Controller
         return response()->json(['message' => 'Déconnecté avec succès.'], 200);
     }
 }
+
+
