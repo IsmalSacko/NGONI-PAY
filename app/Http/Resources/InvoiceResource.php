@@ -27,6 +27,12 @@ class InvoiceResource extends JsonResource
                 'subscription_plan' => $this->payment->purpose === 'subscription'
                     ? $this->planFromAmount($this->payment->amount)
                     : null,
+                'business' => $this->payment->business
+                    ? [
+                        'id' => $this->payment->business->id,
+                        'name' => $this->payment->business->name,
+                    ]
+                    : null,
 
                 // Include related client details
                 'client' => $this->payment->client ?

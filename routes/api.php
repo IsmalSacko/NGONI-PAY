@@ -22,6 +22,8 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::patch('/update-profile', [AuthController::class, 'updateProfile']);
+        Route::post('/change-password', [AuthController::class, 'changePassword']);
+        Route::delete('/delete', [AuthController::class, 'destroy']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
@@ -76,3 +78,4 @@ Route::post(
     '/payments/callback',
     [PaymentCallbackController::class, 'handle']
 );
+
