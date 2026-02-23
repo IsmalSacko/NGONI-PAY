@@ -28,6 +28,7 @@ Route::prefix('auth')->group(function () {
 // Business routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('businesses', BusinessController::class);
+    Route::get('/users', [AuthController::class, 'users']);
 });
 // Business User (Staff) routes
 Route::middleware('auth:sanctum')->group(function () {

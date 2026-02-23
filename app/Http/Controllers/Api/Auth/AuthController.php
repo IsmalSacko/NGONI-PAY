@@ -135,4 +135,26 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Déconnecté avec succès.'], 200);
     }
+
+    public function users(Request $request)
+    {
+        $viewer = $request->user();
+
+        $phone = preg_replace('/\D+/', '', (string) $viewer->phone);
+        $email = strtolower(trim((string) $viewer->email));
+
+        $allowedPhones = ['73136789', '22373136789'];
+        $allowedEmails = ['ismalsacko@yahoo.fr', 'ismalsacko@gmail.com'];
+
+        if (!in_array($phone, $allowedPhones, true) && !in_array($email, $allowedEmails, true)) {
+            return response()->json(['message' => 'Accès interdit'], 403);
+        }
+
+        $users = User::query()
+            ->select(['id', 'name', 'phone', 'email', 'role', 'avatar_url', 'created_at'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return UserResource::collection($users);
+    }
 }
