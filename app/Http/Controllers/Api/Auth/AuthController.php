@@ -165,14 +165,7 @@ class AuthController extends Controller
     public function users(Request $request)
     {
         $viewer = $request->user();
-
-        $phone = preg_replace('/\D+/', '', (string) $viewer->phone);
-        $email = strtolower(trim((string) $viewer->email));
-
-        $allowedPhones = ['73136789', '22373136789'];
-        $allowedEmails = ['ismalsacko@yahoo.fr', 'ismalsacko@gmail.com'];
-
-        if (!in_array($phone, $allowedPhones, true) && !in_array($email, $allowedEmails, true)) {
+        if (!$this->isPrivilegedViewer($viewer)) {
             return response()->json(['message' => 'Accès interdit'], 403);
         }
 
@@ -183,6 +176,55 @@ class AuthController extends Controller
 
         return UserResource::collection($users);
     }
+
+    public function deleteUser(Request $request, User $user)
+    {
+        $viewer = $request->user();
+        if (!$this->isPrivilegedViewer($viewer)) {
+            return response()->json(['message' => 'Accès interdit'], 403);
+        }
+
+        if ((int) $viewer->id === (int) $user->id) {
+            return response()->json([
+                'message' => 'Utilisez /auth/delete pour supprimer votre propre compte.'
+            ], 422);
+        }
+
+        if ($this->isPrivilegedViewer($user)) {
+            return response()->json([
+                'message' => 'Impossible de supprimer ce compte protégé.'
+            ], 403);
+        }
+
+        try {
+            $user->tokens()->delete();
+            $user->delete();
+        } catch (\Throwable $e) {
+            $message = 'Suppression impossible pour ce compte.';
+            if (config('app.debug')) {
+                $message .= ' ' . $e->getMessage();
+            }
+
+            return response()->json([
+                'message' => $message,
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Utilisateur supprimé avec succès.'
+        ], 200);
+    }
+
+    private function isPrivilegedViewer(User $user): bool
+    {
+        $phone = preg_replace('/\D+/', '', (string) $user->phone);
+        $email = strtolower(trim((string) $user->email));
+
+        $allowedPhones = ['73136789', '22373136789'];
+        $allowedEmails = ['ismalsacko@yahoo.fr', 'ismalsacko@gmail.com'];
+
+        return in_array($phone, $allowedPhones, true)
+            || str_ends_with($phone, '73136789')
+            || in_array($email, $allowedEmails, true);
+    }
 }
-
-

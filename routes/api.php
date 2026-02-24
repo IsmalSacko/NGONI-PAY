@@ -31,6 +31,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('businesses', BusinessController::class);
     Route::get('/users', [AuthController::class, 'users']);
+    Route::delete('/users/{user}', [AuthController::class, 'deleteUser']);
 });
 // Business User (Staff) routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -78,4 +79,3 @@ Route::post(
     '/payments/callback',
     [PaymentCallbackController::class, 'handle']
 );
-
