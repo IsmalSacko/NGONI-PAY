@@ -145,6 +145,35 @@ class AuthController extends Controller
         return response()->json(['message' => 'Mot de passe mis à jour.'], 200);
     }
 
+    public function forgotPassword(Request $req, PhoneService $phoneService)
+    {
+        $req->validate([
+            'phone' => 'required|string',
+            'email' => 'nullable|email',
+            'new_password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $phone = $phoneService->normalize($req->phone);
+        $user = User::where('phone', $phone)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Compte introuvable.'], 404);
+        }
+
+        if ($req->filled('email')) {
+            $inputEmail = strtolower(trim((string) $req->email));
+            $userEmail = strtolower(trim((string) $user->email));
+            if ($inputEmail !== $userEmail) {
+                return response()->json(['message' => 'Email non valide pour ce compte.'], 422);
+            }
+        }
+
+        $user->password = Hash::make($req->new_password);
+        $user->save();
+
+        return response()->json(['message' => 'Mot de passe réinitialisé avec succès.'], 200);
+    }
+
     public function destroy(Request $req)
     {
         $user = $req->user();
