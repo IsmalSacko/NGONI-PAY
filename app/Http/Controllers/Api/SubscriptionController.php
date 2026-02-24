@@ -42,13 +42,15 @@ class SubscriptionController extends Controller
                     'plan' => 'free',
                     'is_active' => true,
                     'starts_at' => $now,
-                    'ends_at' => $now->copy()->addDays(7),
+                    // Downgrade vers Free sans relancer une nouvelle période d'essai.
+                    'ends_at' => $now,
                 ]);
             }
         }
 
         if ($subscription->plan === 'free' && $subscription->ends_at) {
-            $trialMax = $now->copy()->addDays(7);
+            // L'essai Free ne doit jamais dépasser 7 jours à partir de starts_at.
+            $trialMax = Carbon::parse($subscription->starts_at)->copy()->addDays(7);
             if (Carbon::parse($subscription->ends_at)->gt($trialMax)) {
                 $subscription->update([
                     'ends_at' => $trialMax,
@@ -62,18 +64,39 @@ class SubscriptionController extends Controller
     public function store(StoreSubscriptionRequest $request, Business $business, PayDunyaClient $payDunyaCli)
     {
         $this->authorizeManager($business, $request);
-        // Pour le cas d'un abonnement gratuit (essai 7 jours)
-            if ($request->plan === 'free') {
-            $subscription = Subscription::updateOrCreate(
-                ['business_id' => $business->id],
-                [
+        // Pour le cas d'un abonnement gratuit: essai unique, non renouvelable.
+        if ($request->plan === 'free') {
+            $existing = Subscription::where('business_id', $business->id)->first();
+
+            if (! $existing) {
+                $subscription = Subscription::create([
+                    'business_id' => $business->id,
                     'plan' => 'free',
                     'is_active' => true,
                     'starts_at' => now(),
                     'ends_at' => now()->addDays(7),
-                ]
-            );
-            return new SubscriptionResource($subscription);
+                ]);
+
+                return new SubscriptionResource($subscription);
+            }
+
+            // Si l'essai est déjà passé, on bascule/maintient en Free expiré (sans prolongation).
+            $now = now();
+            $currentEnd = $existing->ends_at ? Carbon::parse($existing->ends_at) : null;
+            $isFreeTrialStillRunning = $existing->plan === 'free' && $currentEnd && $currentEnd->isAfter($now);
+
+            if ($isFreeTrialStillRunning) {
+                return new SubscriptionResource($existing);
+            }
+
+            $existing->update([
+                'plan' => 'free',
+                'is_active' => true,
+                'starts_at' => $now,
+                'ends_at' => $now, // aucune nouvelle semaine d'essai
+            ]);
+
+            return new SubscriptionResource($existing->fresh());
         }
         // Pour le basic/ pro
         $mount = $this->planPrice($request->plan);

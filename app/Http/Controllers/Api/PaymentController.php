@@ -45,13 +45,38 @@ class PaymentController extends Controller
             ]);
         }
         $subscription = $business->subscription;
-        $isFreePlan = $subscription && $subscription->plan === 'free';
-        $provider = ($method === 'cash' || $isFreePlan) ? null : 'paydunya';
 
         // Aucun abonnement actif
         if (! $subscription || ! $subscription->is_active) {
             abort(403, 'Aucun abonnement actif');
         }
+
+        // Si abonnement expiré, rétrograder immédiatement en Free sans relancer d'essai.
+        if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->endOfDay()->lt(Carbon::now())) {
+            if ($subscription->plan !== 'free') {
+                $subscription->update([
+                    'plan' => 'free',
+                    'is_active' => true,
+                    'starts_at' => now(),
+                    'ends_at' => now(),
+                ]);
+                $subscription->refresh();
+            }
+        }
+
+        $isFreePlan = $subscription->plan === 'free';
+        $isFreeTrialExpired = $isFreePlan
+            && $subscription->ends_at
+            && Carbon::parse($subscription->ends_at)->endOfDay()->lt(Carbon::now());
+
+        if ($isFreeTrialExpired && $method !== 'cash') {
+            return response()->json([
+                'message' => 'Période d’essai Free expirée. Passez au plan Basic ou Pro pour les paiements en ligne.',
+                'code' => 'FREE_TRIAL_EXPIRED',
+            ], 403);
+        }
+
+        $provider = ($method === 'cash' || $isFreePlan) ? null : 'paydunya';
 
         // FREE → pas de PayDunya (paiement enregistré comme offline)
 
