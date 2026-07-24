@@ -19,6 +19,9 @@ class PaymentController extends Controller
 {
     public function store(StorePaymentRequest $request, Business $business,PayDunyaClient $payDunyaCli)
     {
+        // Sécurité : seul le propriétaire ou un membre du staff peut encaisser.
+        $this->authorizeMember($business, $request);
+
         // Client existant
         if ($request->filled('client_id')) {
             $client = Client::where('business_id', $business->id)
@@ -222,6 +225,27 @@ class PaymentController extends Controller
     private function authorizeOwner(Business $business, Request $request): void
     {
         if ($business->owner_id !== $request->user()->id) {
+            abort(403, 'Accès interdit');
+        }
+    }
+
+    /**
+     * Autorise le propriétaire OU n'importe quel membre du staff (manager/vendeur).
+     * Utilisé pour l'encaissement : un vendeur doit pouvoir enregistrer un paiement.
+     */
+    private function authorizeMember(Business $business, Request $request): void
+    {
+        $user = $request->user();
+
+        if ($business->owner_id === $user->id) {
+            return;
+        }
+
+        $isMember = $business->staff()
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if (! $isMember) {
             abort(403, 'Accès interdit');
         }
     }
