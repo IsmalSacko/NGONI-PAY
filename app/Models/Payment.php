@@ -23,10 +23,14 @@ class Payment extends Model
         'status',
         'purpose',
         'paid_at',
+        'cancelled_at',
+        'cancelled_by',
+        'cancel_reason',
     ];
 
     protected $casts = [
         'paid_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     /* ================= RELATIONS ================= */

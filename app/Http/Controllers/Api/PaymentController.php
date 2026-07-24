@@ -182,9 +182,67 @@ class PaymentController extends Controller
         return new PaymentResource($payment);
     }
 
+    /**
+     * Annule un paiement enregistré par erreur (soft cancel).
+     * Réservé au propriétaire ou à un manager. Le paiement n'est pas supprimé :
+     * il passe au statut 'cancelled' (exclu des totaux, mais tracé).
+     */
+    public function cancel(Request $request, Business $business, Payment $payment)
+    {
+        $this->authorizeManager($business, $request);
+
+        if ($payment->business_id !== $business->id) {
+            abort(404);
+        }
+
+        if ($payment->status === 'cancelled') {
+            return response()->json(['message' => 'Ce paiement est déjà annulé.'], 422);
+        }
+
+        // Ne pas annuler un paiement d'abonnement (gestion séparée).
+        if ($payment->purpose === 'subscription') {
+            return response()->json(
+                ['message' => "Un paiement d'abonnement ne peut pas être annulé ici."],
+                422
+            );
+        }
+
+        $payment->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancelled_by' => $request->user()->id,
+            'cancel_reason' => $request->input('reason'),
+        ]);
+
+        $payment->load(['client:id,name,phone']);
+
+        return new PaymentResource($payment);
+    }
+
     private function authorizeOwner(Business $business, Request $request): void
     {
         if ($business->owner_id !== $request->user()->id) {
+            abort(403, 'Accès interdit');
+        }
+    }
+
+    /**
+     * Autorise le propriétaire OU un manager du business.
+     */
+    private function authorizeManager(Business $business, Request $request): void
+    {
+        $user = $request->user();
+
+        if ($business->owner_id === $user->id) {
+            return;
+        }
+
+        $isManager = $business->staff()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->exists();
+
+        if (! $isManager) {
             abort(403, 'Accès interdit');
         }
     }
