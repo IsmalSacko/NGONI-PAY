@@ -31,20 +31,30 @@ Artisan::command('subscriptions:fix-free-trials', function () {
     $this->info("Free trial subscriptions fixed: {$fixed}");
 })->purpose('Fix free plan trials to 7 days from starts_at');
 
-Artisan::command('user:make-admin {email}', function (string $email) {
-    $user = User::where('email', $email)->first();
+Artisan::command('user:make-admin {identifier}', function (string $identifier) {
+    // Accepte un email, un téléphone (chiffres, avec ou sans indicatif) ou un id.
+    $digits = preg_replace('/\D+/', '', $identifier);
+
+    $user = User::query()
+        ->where('email', $identifier)
+        ->when($digits !== '', fn ($q) => $q
+            ->orWhere('phone', $identifier)
+            ->orWhereRaw("REPLACE(REPLACE(phone,'+',''),' ','') LIKE ?", ['%' . $digits])
+        )
+        ->when(ctype_digit($identifier), fn ($q) => $q->orWhere('id', (int) $identifier))
+        ->first();
 
     if (! $user) {
-        $this->error("Aucun utilisateur avec l'email : {$email}");
+        $this->error("Aucun utilisateur trouvé pour : {$identifier}");
         return 1;
     }
 
     $user->role = User::ROLE_SYSTEM_ADMIN;
     $user->save();
 
-    $this->info("{$user->name} ({$email}) est maintenant system_admin.");
+    $this->info("#{$user->id} {$user->name} ({$user->email} / {$user->phone}) est maintenant system_admin.");
     return 0;
-})->purpose('Promouvoir un utilisateur en super-administrateur (system_admin)');
+})->purpose('Promouvoir un utilisateur en super-administrateur (email, téléphone ou id)');
 
 Artisan::command('user:revoke-admin {email}', function (string $email) {
     $user = User::where('email', $email)->first();

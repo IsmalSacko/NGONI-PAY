@@ -246,19 +246,7 @@ class AuthController extends Controller
 
     private function isPrivilegedViewer(User $user): bool
     {
-        // Le rôle system_admin donne un accès total.
-        if ($user->isSystemAdmin()) {
-            return true;
-        }
-
-        $phone = preg_replace('/\D+/', '', (string) $user->phone);
-        $email = strtolower(trim((string) $user->email));
-
-        $allowedPhones = ['73136789', '22373136789'];
-        $allowedEmails = ['ismalsacko@yahoo.fr', 'ismalsacko@gmail.com'];
-
-        return in_array($phone, $allowedPhones, true)
-            || str_ends_with($phone, '73136789')
-            || in_array($email, $allowedEmails, true);
+        // Accès réservé aux super-administrateurs (rôle system_admin).
+        return $user->isSystemAdmin();
     }
 }
