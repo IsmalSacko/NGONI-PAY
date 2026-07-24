@@ -109,7 +109,7 @@ class ClientController extends Controller
     {
         $user = $request->user();
 
-        if ($business->owner_id === $user->id) {
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) {
             return;
         }
 
@@ -126,7 +126,7 @@ class ClientController extends Controller
     {
         $user = $request->user();
 
-        if ($business->owner_id === $user->id) {
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) {
             return;
         }
 

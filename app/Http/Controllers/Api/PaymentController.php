@@ -161,8 +161,8 @@ class PaymentController extends Controller
 
     public function index(Request $request, Business $business)
     {
-        // 🔐 Vérifie que l'utilisateur est propriétaire / autorisé
-        $this->authorizeOwner($business, $request);
+        // 🔐 Propriétaire ou manager (cohérent avec l'annulation).
+        $this->authorizeManager($business, $request);
 
         $payments = Payment::with('client')
             ->where('business_id', $business->id)
@@ -224,7 +224,11 @@ class PaymentController extends Controller
 
     private function authorizeOwner(Business $business, Request $request): void
     {
-        if ($business->owner_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($user->isSystemAdmin()) {
+            return;
+        }
+        if ($business->owner_id !== $user->id) {
             abort(403, 'Accès interdit');
         }
     }
@@ -237,7 +241,7 @@ class PaymentController extends Controller
     {
         $user = $request->user();
 
-        if ($business->owner_id === $user->id) {
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) {
             return;
         }
 
@@ -257,7 +261,7 @@ class PaymentController extends Controller
     {
         $user = $request->user();
 
-        if ($business->owner_id === $user->id) {
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) {
             return;
         }
 

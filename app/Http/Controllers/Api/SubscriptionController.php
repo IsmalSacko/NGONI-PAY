@@ -224,7 +224,7 @@ class SubscriptionController extends Controller
     {
         $user = $request->user();
 
-        if ($business->owner_id === $user->id) return;
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) return;
 
         $isManager = $business->staff()
             ->where('user_id', $user->id)

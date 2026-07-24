@@ -89,7 +89,7 @@ class BusinessController extends Controller
 
     public function stats(Business $business, Request $request)
     {
-        $this->authorizeOwner($business, $request);
+        $this->authorizeManager($business, $request);
 
         return response()->json([
             'data' => [
@@ -140,7 +140,7 @@ class BusinessController extends Controller
 
     public function dailyStats(Business $business, Request $request)
     {
-        $this->authorizeOwner($business, $request);
+        $this->authorizeManager($business, $request);
 
         $days = (int) $request->query('days', 7);
 
@@ -180,7 +180,7 @@ class BusinessController extends Controller
     */
     public function weeklyStats(Business $business, Request $request)
     {
-        $this->authorizeOwner($business, $request);
+        $this->authorizeManager($business, $request);
 
         $weeks = (int) $request->query('weeks', 4);
 
@@ -206,7 +206,32 @@ class BusinessController extends Controller
      */
     private function authorizeOwner(Business $business, Request $request): void
     {
-        if ($business->owner_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($user->isSystemAdmin()) {
+            return;
+        }
+        if ($business->owner_id !== $user->id) {
+            abort(403, 'Accès interdit');
+        }
+    }
+
+    /**
+     * Propriétaire, manager du business, ou super-administrateur.
+     */
+    private function authorizeManager(Business $business, Request $request): void
+    {
+        $user = $request->user();
+
+        if ($user->isSystemAdmin() || $business->owner_id === $user->id) {
+            return;
+        }
+
+        $isManager = $business->staff()
+            ->where('user_id', $user->id)
+            ->wherePivot('role', 'manager')
+            ->exists();
+
+        if (! $isManager) {
             abort(403, 'Accès interdit');
         }
     }

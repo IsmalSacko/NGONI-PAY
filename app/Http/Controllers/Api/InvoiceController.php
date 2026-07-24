@@ -16,9 +16,10 @@ class InvoiceController extends Controller
         $business = $payment->business;
         $user = $request->user();
 
-        $isMember = $business
-            && ($business->owner_id === $user->id
-                || $business->staff()->where('user_id', $user->id)->exists());
+        $isMember = $user->isSystemAdmin()
+            || ($business
+                && ($business->owner_id === $user->id
+                    || $business->staff()->where('user_id', $user->id)->exists()));
 
         if (! $isMember) {
             abort(403, 'Accès interdit');
