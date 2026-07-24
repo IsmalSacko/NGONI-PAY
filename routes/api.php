@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\PayDunyaTestController;
+use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
 
 // Auth routes
 Route::prefix('auth')->group(function () {
@@ -59,6 +60,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/businesses/{business}/subscription', [SubscriptionController::class, 'show']);
     Route::post('/businesses/{business}/subscription', [SubscriptionController::class, 'store']);
     Route::put('/businesses/{business}/subscription/{subscription}', [SubscriptionController::class, 'update']);
+});
+
+// Admin routes (system_admin uniquement)
+Route::middleware(['auth:sanctum', 'role:system_admin'])->prefix('admin')->group(function () {
+    Route::get('/businesses', [AdminSubscriptionController::class, 'index']);
+    Route::post('/businesses/{business}/subscription', [AdminSubscriptionController::class, 'grant']);
+    Route::delete('/businesses/{business}/subscription', [AdminSubscriptionController::class, 'revoke']);
 });
 
 // Invoice routes

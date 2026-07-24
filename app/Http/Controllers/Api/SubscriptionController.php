@@ -36,6 +36,12 @@ class SubscriptionController extends Controller
             return new SubscriptionResource($subscription);
         }
 
+        // Abonnement accordé manuellement par un admin : ne jamais le rétrograder
+        // ni recadrer automatiquement (ends_at NULL = à vie).
+        if ($subscription->is_manual) {
+            return new SubscriptionResource($subscription);
+        }
+
         if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->lt($now)) {
             if ($subscription->plan !== 'free') {
                 $subscription->update([

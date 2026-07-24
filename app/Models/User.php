@@ -13,6 +13,19 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens;
 
+    // Rôles applicatifs (colonne `role`).
+    public const ROLE_OWNER = 'owner';
+    public const ROLE_STAFF = 'staff';
+    public const ROLE_SYSTEM_ADMIN = 'system_admin';
+
+    /**
+     * Super-administrateur : accès total, ignore toute restriction d'abonnement.
+     */
+    public function isSystemAdmin(): bool
+    {
+        return $this->role === self::ROLE_SYSTEM_ADMIN;
+    }
+
     /**
      * The attributes that are mass assignable.
      *
