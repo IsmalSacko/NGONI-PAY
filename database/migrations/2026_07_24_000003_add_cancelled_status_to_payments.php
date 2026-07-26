@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -8,11 +9,21 @@ return new class extends Migration
 {
     /**
      * Ajoute le statut 'cancelled' aux paiements (annulation d'un paiement
-     * enregistré par erreur). Compatible MySQL/MariaDB (ENUM) et PostgreSQL (CHECK).
+     * enregistré par erreur). Compatible MySQL/MariaDB (ENUM), PostgreSQL
+     * (CHECK) et SQLite (tests : la contrainte CHECK n'est pas modifiable en
+     * place, on repasse la colonne en varchar simple).
      */
     public function up(): void
     {
         $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            Schema::table('payments', function (Blueprint $table) {
+                $table->string('status')->default('pending')->change();
+            });
+
+            return;
+        }
 
         if ($driver === 'pgsql') {
             DB::statement("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check");
@@ -33,6 +44,10 @@ return new class extends Migration
 
         // Repasser les 'cancelled' en 'failed' avant de retirer la valeur.
         DB::table('payments')->where('status', 'cancelled')->update(['status' => 'failed']);
+
+        if ($driver === 'sqlite') {
+            return;
+        }
 
         if ($driver === 'pgsql') {
             DB::statement("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check");

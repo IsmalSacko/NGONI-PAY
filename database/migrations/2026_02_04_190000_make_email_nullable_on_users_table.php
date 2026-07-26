@@ -1,24 +1,30 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Rend l'email facultatif (inscription par téléphone).
+     *
+     * Le schema builder gère `change()` nativement sur MySQL, PostgreSQL et
+     * SQLite. La version précédente utilisait `ALTER TABLE ... MODIFY`, une
+     * syntaxe propre à MySQL, qui faisait échouer la migration sur Postgres
+     * (le SGBD de dev) comme sur SQLite (celui des tests).
      */
     public function up(): void
     {
-        // MySQL/MariaDB syntax to drop NOT NULL without requiring doctrine/dbal.
-        DB::statement('ALTER TABLE users MODIFY email VARCHAR(255) NULL');
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('email')->nullable()->change();
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        DB::statement('ALTER TABLE users MODIFY email VARCHAR(255) NOT NULL');
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('email')->nullable(false)->change();
+        });
     }
 };
