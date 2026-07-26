@@ -20,6 +20,7 @@ class Payment extends Model
         'provider_reference',
         'provider_checkout_url',
         'transaction_ref',
+        'idempotency_key',
         'status',
         'purpose',
         'paid_at',

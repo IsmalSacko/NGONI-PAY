@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Business;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,21 @@ class PaymentController extends Controller
     {
         // Sécurité : seul le propriétaire ou un membre du staff peut encaisser.
         $this->authorizeMember($business, $request);
+
+        // Idempotence : le client mobile rejoue la même requête quand la réponse
+        // s'est perdue (réseau instable, file hors ligne). Si ce paiement a déjà
+        // été enregistré, on renvoie l'existant au lieu d'en créer un second.
+        // Le contrôle passe AVANT les quotas d'abonnement : un rejeu ne doit pas
+        // être refusé par une limite que la création initiale a déjà consommée.
+        $idempotencyKey = $this->idempotencyKey($request);
+
+        if ($idempotencyKey !== null) {
+            $existing = $this->findByIdempotencyKey($business, $idempotencyKey);
+
+            if ($existing) {
+                return new PaymentResource($existing->load('client'));
+            }
+        }
 
         // Client existant
         if ($request->filled('client_id')) {
@@ -104,18 +120,33 @@ class PaymentController extends Controller
             }
         }
 
-        $payment = Payment::create([
-            'business_id' => $business->id,
-            'client_id' => $client->id,
-            'user_id' => $request->user()->id,
-            'amount' => $request->amount,
-            'currency' => $request->currency ?? 'XOF',
-            'method' => $method,
-            'provider' => $provider,
-            'transaction_ref' => (string) Str::uuid(),
-            'status' => $provider === null ? 'success' : 'pending',
-            'paid_at' => $provider === null ? now() : null,
-        ]);
+        try {
+            $payment = Payment::create([
+                'business_id' => $business->id,
+                'client_id' => $client->id,
+                'user_id' => $request->user()->id,
+                'amount' => $request->amount,
+                'currency' => $request->currency ?? 'XOF',
+                'method' => $method,
+                'provider' => $provider,
+                'transaction_ref' => (string) Str::uuid(),
+                'idempotency_key' => $idempotencyKey,
+                'status' => $provider === null ? 'success' : 'pending',
+                'paid_at' => $provider === null ? now() : null,
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            // Deux requêtes portant la même clé sont arrivées en parallèle : la
+            // contrainte unique a tranché. On renvoie le paiement gagnant.
+            $existing = $idempotencyKey !== null
+                ? $this->findByIdempotencyKey($business, $idempotencyKey)
+                : null;
+
+            if (! $existing) {
+                throw $e;
+            }
+
+            return new PaymentResource($existing->load('client'));
+        }
 
                if ($provider === 'paydunya') {
             $response = $payDunyaCli->createInvoice($payment, $client);
@@ -237,6 +268,37 @@ class PaymentController extends Controller
      * Autorise le propriétaire OU n'importe quel membre du staff (manager/vendeur).
      * Utilisé pour l'encaissement : un vendeur doit pouvoir enregistrer un paiement.
      */
+    /**
+     * Clé d'idempotence de la requête, ou null si le client n'en fournit pas.
+     *
+     * On refuse une clé trop longue plutôt que de la tronquer : tronquer
+     * pourrait faire collisionner deux paiements distincts, donc en faire
+     * disparaître un.
+     */
+    private function idempotencyKey(Request $request): ?string
+    {
+        $key = trim((string) $request->header('Idempotency-Key', ''));
+
+        if ($key === '') {
+            return null;
+        }
+
+        if (mb_strlen($key) > 128) {
+            throw ValidationException::withMessages([
+                'idempotency_key' => ['La clé d’idempotence ne peut pas dépasser 128 caractères.'],
+            ]);
+        }
+
+        return $key;
+    }
+
+    private function findByIdempotencyKey(Business $business, string $key): ?Payment
+    {
+        return Payment::where('business_id', $business->id)
+            ->where('idempotency_key', $key)
+            ->first();
+    }
+
     private function authorizeMember(Business $business, Request $request): void
     {
         $user = $request->user();
