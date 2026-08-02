@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'admin.only' => \App\Http\Middleware\EnsureIsSystemAdmin::class,
         ]);
 
         $middleware->api([
@@ -26,8 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        // API ONLY : jamais de redirection login
-        $middleware->redirectGuestsTo(fn() => null);
+        // API : jamais de redirection login (401 JSON géré dans withExceptions).
+        // Web (panneau admin) : redirection propre vers /login.
+        $middleware->redirectGuestsTo(fn(Request $request) => $request->is('api/*') ? null : route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
