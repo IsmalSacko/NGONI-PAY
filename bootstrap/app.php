@@ -30,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // API : jamais de redirection login (401 JSON géré dans withExceptions).
         // Web (panneau admin) : redirection propre vers /login.
         $middleware->redirectGuestsTo(fn(Request $request) => $request->is('api/*') ? null : route('login'));
+
+        // App derrière un reverse-proxy interne qui termine le TLS (X-Forwarded-Proto).
+        // Sans ça, url()/asset() génèrent du http:// sur un site servi en https:// (mixed content).
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 
