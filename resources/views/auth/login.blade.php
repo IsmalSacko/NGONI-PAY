@@ -17,7 +17,7 @@
                 </span>
                 <input id="login" name="login" type="text" value="{{ old('login') }}" required autofocus
                        placeholder="admin@ngonipay.com"
-                       class="block w-full rounded-lg border border-slate-300 pl-10 pr-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400
+                       class="block w-full rounded-lg border border-slate-300 pl-10 pr-3 py-2.5 text-base sm:text-sm text-slate-900 placeholder:text-slate-400
                               focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
             </div>
         </div>
@@ -32,7 +32,7 @@
                 </span>
                 <input id="password" name="password" type="password" required
                        placeholder="••••••••"
-                       class="block w-full rounded-lg border border-slate-300 pl-10 pr-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400
+                       class="block w-full rounded-lg border border-slate-300 pl-10 pr-3 py-2.5 text-base sm:text-sm text-slate-900 placeholder:text-slate-400
                               focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition">
             </div>
         </div>

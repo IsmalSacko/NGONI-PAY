@@ -48,7 +48,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 mb-1">Plan</label>
-                        <select wire:model="plan" class="w-full rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                        <select wire:model="plan" class="w-full rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
                             <option value="free">Free</option>
                             <option value="basic">Basic</option>
                             <option value="pro">Pro</option>
@@ -57,7 +57,7 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-500 mb-1">Date de fin</label>
                         <input type="date" wire:model="endsAt" @disabled($lifetime)
-                               class="w-full rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20 disabled:bg-slate-50">
+                               class="w-full rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20 disabled:bg-slate-50">
                     </div>
                 </div>
                 <label class="flex items-center gap-2 text-sm text-slate-600">
@@ -66,7 +66,7 @@
                 </label>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 mb-1">Note admin</label>
-                    <input type="text" wire:model="adminNote" class="w-full rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                    <input type="text" wire:model="adminNote" class="w-full rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3 pt-1">
                     <button type="submit" class="rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:from-violet-500 hover:to-indigo-500 transition">
@@ -86,11 +86,11 @@
         <form wire:submit="addStaff" class="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
             <div class="flex-1">
                 <label class="block text-xs font-medium text-slate-500 mb-1">Téléphone ou email</label>
-                <input type="text" wire:model="staffPhone" class="w-full rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                <input type="text" wire:model="staffPhone" class="w-full rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
             </div>
             <div>
                 <label class="block text-xs font-medium text-slate-500 mb-1">Rôle</label>
-                <select wire:model="staffRole" class="w-full sm:w-auto rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                <select wire:model="staffRole" class="w-full sm:w-auto rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
                     <option value="seller">Seller</option>
                     <option value="manager">Manager</option>
                 </select>

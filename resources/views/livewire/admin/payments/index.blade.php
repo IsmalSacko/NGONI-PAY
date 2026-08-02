@@ -7,21 +7,21 @@
     @endif
 
     <div class="mb-4 flex flex-wrap gap-3">
-        <select wire:model.live="status" class="rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+        <select wire:model.live="status" class="rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
             <option value="">Tous les statuts</option>
             <option value="pending">En attente</option>
             <option value="success">Réussi</option>
             <option value="failed">Échoué</option>
             <option value="cancelled">Annulé</option>
         </select>
-        <select wire:model.live="method" class="rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+        <select wire:model.live="method" class="rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
             <option value="">Toutes les méthodes</option>
             <option value="cash">Cash</option>
             <option value="orange_money">Orange Money</option>
             <option value="moov_money">Moov Money</option>
             <option value="wave">Wave</option>
         </select>
-        <input type="date" wire:model.live="date" class="rounded-lg border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+        <input type="date" wire:model.live="date" class="rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
