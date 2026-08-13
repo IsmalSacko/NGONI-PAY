@@ -18,6 +18,7 @@ class BusinessController extends Controller
     public function index(Request $request)
     {
         $businesses = Business::where('owner_id', $request->user()->id)
+            ->where('is_active', true)
             ->latest()
             ->paginate(10);
 
