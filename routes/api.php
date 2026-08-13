@@ -30,6 +30,8 @@ Route::prefix('auth')->group(function () {
 });
 // Business routes
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/businesses/deactivated', [BusinessController::class, 'deactivated']);
+    Route::patch('/businesses/{business}/reactivate', [BusinessController::class, 'reactivate']);
     Route::apiResource('businesses', BusinessController::class);
     Route::get('/users', [AuthController::class, 'users']);
     Route::delete('/users/{user}', [AuthController::class, 'deleteUser']);

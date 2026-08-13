@@ -57,3 +57,58 @@ test('un business désactivé ne revient jamais dans la liste après rechargemen
     expect($ids)->toContain($active->id)
         ->and($ids)->toHaveCount(1);
 });
+
+test('un owner peut lister ses business désactivés', function () {
+    $deactivated = Business::create([
+        'owner_id' => $this->owner->id,
+        'name' => 'Business supprimé',
+        'type' => 'shop',
+        'is_active' => false,
+    ]);
+
+    $active = Business::create([
+        'owner_id' => $this->owner->id,
+        'name' => 'Business actif',
+        'type' => 'shop',
+        'is_active' => true,
+    ]);
+
+    $response = $this->getJson('/api/businesses/deactivated');
+
+    $ids = collect($response->json('data'))->pluck('id');
+    expect($ids)->toContain($deactivated->id)
+        ->and($ids)->not->toContain($active->id);
+});
+
+test('un owner peut réactiver un business désactivé et il revient dans la liste', function () {
+    $business = Business::create([
+        'owner_id' => $this->owner->id,
+        'name' => 'Business supprimé par erreur',
+        'type' => 'shop',
+        'is_active' => false,
+    ]);
+
+    $this->patchJson("/api/businesses/{$business->id}/reactivate")->assertSuccessful();
+
+    expect($business->fresh()->is_active)->toBeTrue();
+
+    $ids = collect($this->getJson('/api/businesses')->json('data'))->pluck('id');
+    expect($ids)->toContain($business->id);
+
+    $deactivatedIds = collect($this->getJson('/api/businesses/deactivated')->json('data'))->pluck('id');
+    expect($deactivatedIds)->not->toContain($business->id);
+});
+
+test('un owner ne peut pas réactiver le business d\'un autre owner', function () {
+    $otherOwner = User::factory()->create(['role' => 'owner']);
+    $business = Business::create([
+        'owner_id' => $otherOwner->id,
+        'name' => 'Business d\'un autre',
+        'type' => 'shop',
+        'is_active' => false,
+    ]);
+
+    $this->patchJson("/api/businesses/{$business->id}/reactivate")->assertForbidden();
+
+    expect($business->fresh()->is_active)->toBeFalse();
+});

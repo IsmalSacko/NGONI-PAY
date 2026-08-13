@@ -85,6 +85,31 @@ class BusinessController extends Controller
     }
 
     /**
+     * Liste des businesses désactivés (supprimés) de l'utilisateur connecté
+     */
+    public function deactivated(Request $request)
+    {
+        $businesses = Business::where('owner_id', $request->user()->id)
+            ->where('is_active', false)
+            ->latest()
+            ->paginate(10);
+
+        return BusinessResource::collection($businesses);
+    }
+
+    /**
+     * Réactive un business précédemment désactivé (supprimé)
+     */
+    public function reactivate(Business $business, Request $request)
+    {
+        $this->authorizeOwner($business, $request);
+
+        $business->update(['is_active' => true]);
+
+        return new BusinessResource($business);
+    }
+
+    /**
      * Statistiques du business
      */
 
