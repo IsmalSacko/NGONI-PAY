@@ -89,3 +89,10 @@ Route::post(
     '/payments/callback',
     [PaymentCallbackController::class, 'handle']
 );
+
+// Version de l'app mobile - No auth (appelé avant/sans connexion)
+Route::get('/app-version', function () {
+    return response()->json([
+        'latest_version' => config('mobile.latest_version'),
+    ]);
+});
