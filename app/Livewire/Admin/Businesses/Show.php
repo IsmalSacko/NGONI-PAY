@@ -36,6 +36,22 @@ class Show extends Component
         $this->business->update(['is_active' => ! $this->business->is_active]);
     }
 
+    /**
+     * Suppression définitive (hard delete). Contrairement à la désactivation
+     * logique (is_active = false), ceci efface réellement la ligne et, par
+     * cascade en base, son staff, ses clients, ses paiements et son
+     * abonnement. Irréversible.
+     */
+    public function forceDelete()
+    {
+        $name = $this->business->name;
+        $this->business->delete();
+
+        session()->flash('status', "Entreprise \"$name\" supprimée définitivement.");
+
+        return $this->redirect(route('admin.businesses.index'), navigate: true);
+    }
+
     public function addStaff(): void
     {
         $this->validate([

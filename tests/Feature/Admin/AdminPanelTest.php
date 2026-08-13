@@ -3,6 +3,8 @@
 use App\Livewire\Admin\Businesses\Show as BusinessesShow;
 use App\Livewire\Admin\Users\Index as UsersIndex;
 use App\Models\Business;
+use App\Models\Client;
+use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +51,46 @@ test('un system_admin peut désactiver puis réactiver une entreprise', function
         ->call('toggleActive');
 
     expect($business->fresh()->is_active)->toBeFalse();
+});
+
+test('un system_admin peut supprimer définitivement une entreprise et ses données liées', function () {
+    $admin = makeAdmin();
+    $business = makeBusinessWithOwner();
+
+    Subscription::create([
+        'business_id' => $business->id,
+        'plan' => 'pro',
+        'starts_at' => now(),
+        'ends_at' => null,
+        'is_active' => true,
+    ]);
+
+    $client = Client::create([
+        'business_id' => $business->id,
+        'name' => 'Client Test',
+        'phone' => '+22374444444',
+    ]);
+
+    Payment::create([
+        'business_id' => $business->id,
+        'client_id' => $client->id,
+        'user_id' => $admin->id,
+        'amount' => 1000,
+        'currency' => 'XOF',
+        'method' => 'cash',
+        'status' => 'success',
+        'transaction_ref' => 'ref-force-delete-test',
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(BusinessesShow::class, ['business' => $business])
+        ->call('forceDelete')
+        ->assertRedirect(route('admin.businesses.index'));
+
+    expect(Business::find($business->id))->toBeNull()
+        ->and(Subscription::where('business_id', $business->id)->exists())->toBeFalse()
+        ->and(Client::where('business_id', $business->id)->exists())->toBeFalse()
+        ->and(Payment::where('business_id', $business->id)->exists())->toBeFalse();
 });
 
 test('grantSubscription force un plan manuel identique à AdminSubscriptionController::grant', function () {

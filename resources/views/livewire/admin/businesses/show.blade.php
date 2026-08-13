@@ -25,8 +25,13 @@
                     </dd>
                 </div>
             </dl>
-            <button wire:click="toggleActive" class="mt-4 text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <button wire:click="toggleActive" class="mt-4 block text-sm text-indigo-600 hover:text-indigo-700 font-medium">
                 {{ $business->is_active ? 'Désactiver cette entreprise' : 'Activer cette entreprise' }}
+            </button>
+            <button wire:click="forceDelete"
+                    wire:confirm="Supprimer DÉFINITIVEMENT « {{ $business->name }} » ? Ceci efface aussi tous ses paiements, clients, staff et abonnement. Action irréversible."
+                    class="mt-2 block text-sm text-red-600 hover:text-red-700 font-medium">
+                Supprimer définitivement
             </button>
         </div>
 
