@@ -43,6 +43,7 @@
                         ['pattern' => 'admin.businesses.*', 'route' => 'admin.businesses.index', 'label' => 'Entreprises', 'icon' => 'M4 21V7l8-4 8 4v14M9 21v-6h6v6M4 21h16'],
                         ['pattern' => 'admin.subscriptions.*', 'route' => 'admin.subscriptions.index', 'label' => 'Abonnements', 'icon' => 'M5 5h14v14H5V5Zm3 4h8M8 12h8M8 15h5'],
                         ['pattern' => 'admin.payments.*', 'route' => 'admin.payments.index', 'label' => 'Paiements', 'icon' => 'M2 8h20M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M2 8l2-4h16l2 4M6 15h4'],
+                        ['pattern' => 'admin.campaigns.*', 'route' => 'admin.campaigns.index', 'label' => 'Campagnes', 'icon' => 'M3 8l9 6 9-6M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z'],
                     ];
                 @endphp
 

@@ -82,4 +82,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function campaignSends()
+    {
+        return $this->hasMany(CampaignSend::class);
+    }
 }

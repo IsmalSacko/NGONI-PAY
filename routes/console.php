@@ -2,9 +2,19 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\CampaignMailer;
 use Carbon\Carbon;
+
+// Envoie les campagnes récurrentes (voir panneau admin > Campagnes) dont la
+// date de prochain envoi est passée — ne cible que les utilisateurs qui n'ont
+// pas encore reçu la campagne (ex. nouvelles inscriptions).
+Schedule::call(fn () => app(CampaignMailer::class)->runDueCampaigns())
+    ->hourly()
+    ->name('campaigns:run-due')
+    ->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

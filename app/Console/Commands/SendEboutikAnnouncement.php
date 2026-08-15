@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Mail\EboutikAnnouncementMail;
+use App\Models\Campaign;
 use App\Models\User;
+use App\Services\CampaignMailer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 
@@ -15,16 +17,12 @@ class SendEboutikAnnouncement extends Command
 
     protected $description = 'Envoie l\'annonce E-BOUTIK à tous les utilisateurs Ngoni Pay ayant un e-mail';
 
-    public function handle(): int
+    public function handle(CampaignMailer $mailer): int
     {
-        $recipients = User::query()
-            ->whereNotNull('email')
-            ->where('email', '!=', '')
-            ->orderBy('id')
-            ->get(['id', 'name', 'email']);
+        $campaign = Campaign::where('key', 'eboutik-announcement')->firstOrFail();
 
         if ($testEmail = $this->option('test')) {
-            $user = $recipients->firstWhere('email', $testEmail)
+            $user = User::where('email', $testEmail)->first()
                 ?? new User(['name' => 'Test', 'email' => $testEmail]);
 
             $this->info("Envoi de test à {$testEmail}...");
@@ -33,6 +31,8 @@ class SendEboutikAnnouncement extends Command
 
             return self::SUCCESS;
         }
+
+        $recipients = $mailer->recipientsQuery()->orderBy('id')->get();
 
         $this->info("{$recipients->count()} destinataire(s) trouvé(s).");
 
@@ -48,29 +48,9 @@ class SendEboutikAnnouncement extends Command
             return self::SUCCESS;
         }
 
-        $sent = 0;
-        $failed = 0;
-
-        $bar = $this->output->createProgressBar($recipients->count());
-        $bar->start();
-
-        foreach ($recipients as $user) {
-            try {
-                Mail::to($user->email)->send(new EboutikAnnouncementMail($user));
-                $sent++;
-            } catch (\Throwable $e) {
-                $failed++;
-                $this->newLine();
-                $this->error("Échec pour {$user->email} : {$e->getMessage()}");
-            }
-
-            $bar->advance();
-            usleep(300_000);
-        }
-
-        $bar->finish();
-        $this->newLine(2);
-        $this->info("Terminé. {$sent} envoyé(s), {$failed} échec(s).");
+        $this->info('Envoi en cours...');
+        $result = $mailer->sendTo($campaign, $recipients);
+        $this->info("Terminé. {$result['sent']} envoyé(s), {$result['failed']} échec(s).");
 
         return self::SUCCESS;
     }
