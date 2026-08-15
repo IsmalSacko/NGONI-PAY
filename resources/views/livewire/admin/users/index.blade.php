@@ -45,7 +45,7 @@
                                 <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">Désactivé</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-slate-500">{{ $user->created_at->format('d/m/Y') }}</td>
+                        <td class="px-4 py-3 text-slate-500">{{ $user->created_at?->format('d/m/Y') ?? '—' }}</td>
                         <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
                             <button wire:click="toggleActive({{ $user->id }})" class="text-slate-500 hover:text-indigo-600 text-sm font-medium">
                                 {{ $user->is_active ? 'Désactiver' : 'Activer' }}

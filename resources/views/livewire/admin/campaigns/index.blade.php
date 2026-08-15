@@ -85,9 +85,9 @@
             <tbody class="divide-y divide-slate-100">
                 @forelse ($users as $user)
                     @php($lastSend = $user->campaignSends->first())
-                    <tr class="hover:bg-slate-50/60">
+                    <tr wire:key="campaign-user-{{ $user->id }}" class="hover:bg-slate-50/60">
                         <td class="px-4 py-3">
-                            <input type="checkbox" value="{{ $user->id }}" wire:model="selected" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <input type="checkbox" value="{{ $user->id }}" wire:model.live="selected" wire:key="checkbox-{{ $user->id }}" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                         </td>
                         <td class="px-4 py-3 font-medium text-slate-900">{{ $user->name }}</td>
                         <td class="px-4 py-3 text-slate-600">{{ $user->email }}</td>
