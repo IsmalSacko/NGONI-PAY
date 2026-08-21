@@ -20,6 +20,8 @@ class SubscriptionRequestResource extends JsonResource
             'amount_due' => (float) $this->amount_due,
             'currency' => $this->currency,
             'months' => $this->months,
+            'cycle' => $this->cycle?->value,
+            'cycle_label' => $this->cycle?->label(),
             'note' => $this->note,
             'contact_phone' => $this->contact_phone,
             // Chemin brut inutile côté client : seule l'URL sert à l'afficher.

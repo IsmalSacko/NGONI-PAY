@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
 use App\Models\Business;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -31,21 +33,28 @@ use Illuminate\Validation\ValidationException;
 class SubscriptionRequestService
 {
     /**
-     * Prix mensuel d'un plan, en francs CFA.
+     * Devise de facturation de l'éditeur.
      *
-     * L'abonnement est facturé par l'éditeur, dans sa monnaie, quelle que soit
-     * celle dans laquelle le business tient ses comptes.
+     * L'abonnement est vendu par NGONI PAY, dans sa monnaie, quelle que soit
+     * celle dans laquelle le business tient ses comptes. Elle reste portée par
+     * chaque tarif : c'est lui qui la fixe.
      */
-    public const PRICES = [
-        'basic' => 5000,
-        'pro' => 15000,
-    ];
-
     public const CURRENCY = 'XOF';
 
-    public static function priceFor(string $plan): int
+    /**
+     * Plan payant de ce code, ou `null`.
+     *
+     * Les prix vivaient dans le code, à trois endroits. Ils sont désormais tenus
+     * par l'exploitant depuis la console — un ajustement ne demande plus de
+     * déploiement.
+     */
+    public function planFor(string $code): ?SubscriptionPlan
     {
-        return self::PRICES[strtolower(trim($plan))] ?? 0;
+        return SubscriptionPlan::query()
+            ->with('prices')
+            ->active()
+            ->where('code', strtolower(trim($code)))
+            ->first();
     }
 
     /**
@@ -61,17 +70,27 @@ class SubscriptionRequestService
         string $plan,
         ?User $requestedBy = null,
         ?string $method = null,
-        int $months = 1,
+        BillingCycle $cycle = BillingCycle::Monthly,
         ?string $note = null,
         ?string $contactPhone = null,
         $proof = null,
         ?string $proofNote = null,
     ): SubscriptionRequest {
-        $plan = strtolower(trim($plan));
+        $modele = $this->planFor($plan);
 
-        if (! array_key_exists($plan, self::PRICES)) {
+        if ($modele === null || $modele->isFree()) {
             throw ValidationException::withMessages([
                 'plan' => ["Seuls les plans payants font l'objet d'une demande."],
+            ]);
+        }
+
+        $tarif = $modele->priceFor($cycle);
+
+        if ($tarif === null) {
+            throw ValidationException::withMessages([
+                'cycle' => [
+                    'Cette durée n\'est pas proposée pour le plan ' . $modele->name . '.',
+                ],
             ]);
         }
 
@@ -91,13 +110,14 @@ class SubscriptionRequestService
         return SubscriptionRequest::create([
             'business_id' => $business->id,
             'requested_by_user_id' => $requestedBy?->id,
-            'plan' => $plan,
+            'plan' => $modele->code,
             'method' => $method,
-            // Le montant est figé au dépôt : un tarif qui change entre-temps ne
-            // doit pas transformer ce qui a été demandé.
-            'amount_due' => self::priceFor($plan) * max(1, $months),
-            'currency' => self::CURRENCY,
-            'months' => max(1, $months),
+            // Le montant est figé au dépôt : un tarif que l'exploitant ajuste
+            // entre-temps ne doit pas transformer ce qui a été demandé.
+            'amount_due' => $tarif->amount,
+            'currency' => $tarif->currency,
+            'cycle' => $cycle->value,
+            'months' => $tarif->months(),
             'note' => $note,
             'contact_phone' => $contactPhone,
             'proof_path' => $this->storeProof($proof),

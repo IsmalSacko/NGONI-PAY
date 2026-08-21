@@ -109,6 +109,12 @@ class SubscriptionController extends Controller
         // seul que l'argent est arrivé : « espèces » activait le plan sur simple
         // déclaration. Toute souscription payante devient donc une demande, que
         // l'exploitant approuve quand il a constaté le paiement.
+        //
+        // Le paiement en ligne reste possible, mais il est en pause faute de clés
+        // de production : voir `services.paydunya.subscriptions_enabled`. Quand il
+        // sera rallumé, le mobile money repassera par le fournisseur, dont le
+        // rappel active le plan sans intervention ({@see PaymentCallbackController})
+        // — les espèces continueront de passer par une demande.
         $demande = $this->requests->submit(
             business: $business,
             plan: (string) $request->plan,

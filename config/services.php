@@ -36,6 +36,20 @@ return [
     ],
 
     'paydunya' => [
+    /*
+     * Paiement en ligne des abonnements.
+     *
+     * En pause : l'éditeur n'a pas encore ses clés de production, et une
+     * souscription lancée sans elles échouerait chez le commerçant. Toute
+     * souscription payante passe donc par une demande validée à la main
+     * ({@see \App\Services\SubscriptionRequestService}).
+     *
+     * Le code du parcours est conservé — {@see \App\Services\Payments\PayDunyaClient::createInvoiceForSubscription}
+     * — et se rallume en passant PAYDUNYA_SUBSCRIPTIONS=true, sans rien
+     * réécrire. La validation manuelle reste alors possible pour les espèces.
+     */
+    'subscriptions_enabled' => env('PAYDUNYA_SUBSCRIPTIONS', false),
+
     'base_url' => env('PAYDUNYA_BASE_URL', 'https://app.paydunya.com/sandbox-api'),
     'master_key' => env('PAYDUNYA_MASTER_KEY'),
     'public_key' => env('PAYDUNYA_PUBLIC_KEY'),

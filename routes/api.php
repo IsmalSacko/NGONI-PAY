@@ -13,12 +13,18 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SubscriptionPlanController;
 use App\Http\Controllers\Api\SubscriptionRequestController;
 use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
 
 // Catalogue public des pays : l'inscription et la connexion en ont besoin
 // avant toute session, pour l'indicatif du numéro et la devise proposée.
 Route::get('/countries', [CountryController::class, 'index']);
+
+// Catalogue public des plans d'abonnement et de leurs tarifs : l'écran des
+// offres s'affiche avant toute session, et un prix ajusté depuis la console vaut
+// aussitôt pour tous les téléphones.
+Route::get('/subscription-plans', [SubscriptionPlanController::class, 'index']);
 
 // Auth routes
 Route::prefix('auth')->group(function () {

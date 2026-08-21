@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ class SubscriptionRequest extends Model
         'amount_due',
         'currency',
         'months',
+        'cycle',
         'note',
         'contact_phone',
         'proof_path',
@@ -38,6 +40,7 @@ class SubscriptionRequest extends Model
     {
         return [
             'status' => SubscriptionRequestStatus::class,
+            'cycle' => BillingCycle::class,
             'amount_due' => 'decimal:2',
             'months' => 'integer',
             'decided_at' => 'datetime',

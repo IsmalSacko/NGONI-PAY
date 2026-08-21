@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\BillingCycle;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Subscription\StoreSubscriptionRequestRequest;
 use App\Http\Resources\SubscriptionRequestResource;
@@ -46,7 +47,8 @@ class SubscriptionRequestController extends Controller
             plan: $request->string('plan')->toString(),
             requestedBy: $request->user(),
             method: $request->input('method'),
-            months: (int) $request->input('months', 1),
+            cycle: BillingCycle::tryFrom((string) $request->input('cycle'))
+                ?? BillingCycle::Monthly,
             note: $request->input('note'),
             contactPhone: $request->input('contact_phone'),
             proof: $request->file('proof'),

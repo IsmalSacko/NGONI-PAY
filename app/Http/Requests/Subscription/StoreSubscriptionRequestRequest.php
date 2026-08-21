@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Subscription;
 
-use App\Services\SubscriptionRequestService;
+use App\Enums\BillingCycle;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -22,9 +22,14 @@ class StoreSubscriptionRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => ['required', Rule::in(array_keys(SubscriptionRequestService::PRICES))],
+            // Le plan est validé contre le catalogue tenu par l'exploitant : il
+            // peut en ouvrir ou en fermer sans qu'on touche au code.
+            'plan' => [
+                'required',
+                Rule::exists('subscription_plans', 'code')->where('is_active', true),
+            ],
+            'cycle' => ['sometimes', Rule::enum(BillingCycle::class)],
             'method' => ['sometimes', 'nullable', 'in:cash,orange_money,moov_money,wave,bank_transfer'],
-            'months' => ['sometimes', 'integer', 'min:1', 'max:12'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
             'contact_phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             // Photo du reçu ou capture du SMS de confirmation.
@@ -39,6 +44,7 @@ class StoreSubscriptionRequestRequest extends FormRequest
     {
         return [
             'plan' => 'plan',
+            'cycle' => 'durée',
             'proof' => 'preuve de paiement',
             'contact_phone' => 'numéro à rappeler',
         ];
