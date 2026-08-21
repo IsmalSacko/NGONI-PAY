@@ -28,7 +28,7 @@
                             </p>
 
                             <div style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#334155;">
-                                {!! nl2br(e($message)) !!}
+                                {!! nl2br(e($annonce)) !!}
                             </div>
 
                             <table role="presentation" cellpadding="0" cellspacing="0">

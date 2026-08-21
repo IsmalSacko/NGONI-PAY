@@ -41,7 +41,11 @@ class AppUpdateMail extends Mailable
             view: 'emails.app-update',
             with: [
                 'prenom' => trim(explode(' ', trim($this->user->name))[0] ?? ''),
-                'message' => $this->campaign->message,
+                // Surtout pas `message` : Laravel injecte lui-même un
+                // Illuminate\Mail\Message sous ce nom dans toute vue de
+                // courriel, et il écrase la valeur passée ici. La vue affichait
+                // alors l'objet au lieu du texte, et l'envoi échouait.
+                'annonce' => $this->campaign->message,
                 'version' => $this->campaign->version,
                 // Le lien passe par la page publique : c'est elle qui porte les
                 // balises Open Graph si le destinataire le repartage.

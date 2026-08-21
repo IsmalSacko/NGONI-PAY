@@ -250,3 +250,43 @@ it('sert le lien de téléchargement avec la version courante', function () {
         ->assertJsonStructure(['latest_version', 'store_url', 'minimum_version'])
         ->assertJsonPath('store_url', url('/telecharger'));
 });
+
+/**
+ * Tous les tests ci-dessus emploient Mail::fake(), qui n'assemble jamais le
+ * courriel : la vue Blade n'est pas rendue, et une erreur dedans passe
+ * inaperçue. C'est ainsi que 55 envois ont échoué en production alors que la
+ * suite était verte. La variable s'appelait `message`, or Laravel injecte de
+ * lui-même un Illuminate\Mail\Message sous ce nom dans toute vue de courriel,
+ * écrasant la valeur passée. Ce test rend le courriel pour de vrai.
+ */
+it('rend le courriel d’annonce, texte compris', function () {
+    $destinataire = User::factory()->create([
+        'name' => 'Awa Diarra',
+        'phone' => '+22370445566',
+        'email' => 'awa@example.com',
+    ]);
+
+    $campagne = Campaign::create([
+        'key' => 'app-update-rendu',
+        'name' => 'Rendu',
+        'type' => Campaign::TYPE_APP_UPDATE,
+        'subject' => 'Nouvelle version',
+        'message' => "Choisissez votre pays.\nEt votre devise.",
+        'version' => '1.0.12',
+        'store_url' => 'https://ngonipay.ismael-dev.com/telecharger',
+        'audience' => Campaign::AUDIENCE_ALL,
+        'status' => Campaign::STATUS_SENT,
+    ]);
+
+    $html = (new AppUpdateMail($destinataire, $campagne))->render();
+
+    expect($html)
+        ->toContain('Choisissez votre pays.')
+        ->toContain('Et votre devise.')
+        ->toContain('1.0.12')
+        ->toContain('https://ngonipay.ismael-dev.com/telecharger')
+        // Le prénom seul : « Bonjour Awa », pas « Bonjour Awa Diarra ».
+        ->toContain('Awa')
+        // Trace de la collision : l'objet rendu au lieu du texte.
+        ->not->toContain('Illuminate\Mail\Message');
+});
