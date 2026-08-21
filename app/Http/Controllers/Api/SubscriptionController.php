@@ -140,18 +140,29 @@ class SubscriptionController extends Controller
                 'currency' => 'XOF',
                 'method' => $method,
                 'provider' => $method === 'cash' ? null : 'paydunya',
-                'purpose' => 'subscription',
-                'status' => $method === 'cash' ? 'success' : 'pending',
+                'purpose' => Payment::PURPOSE_SUBSCRIPTION,
+                // Un abonnement n'est encaissé que lorsque l'argent est arrivé :
+                // le fournisseur le confirme par rappel, ou un administrateur le
+                // constate. Jamais sur la seule déclaration du demandeur.
+                'status' => 'pending',
                 'transaction_ref' => (string) Str::uuid(), // Générer une référence unique
             ]);
-        // 🔹 CASH → activation immédiate
-        if ($method === 'cash') {
-            $this->activateSubscription($business, $request->plan);
 
+        // 🔹 ESPÈCES → demande à valider, pas activation
+        //
+        // Le plan était activé sur-le-champ dès que « cash » était choisi :
+        // n'importe quel utilisateur s'accordait un mois de Pro en tapant deux
+        // fois sur son téléphone, sans qu'un franc ne change de main. La demande
+        // est désormais enregistrée en attente, et c'est un administrateur qui
+        // l'honore une fois l'argent reçu ({@see AdminSubscriptionController}).
+        if ($method === 'cash') {
             return response()->json([
-                'message' => 'Abonnement activé (paiement cash)',
+                'message' => 'Demande enregistrée. Votre abonnement sera activé '
+                    . 'par NGONI PAY dès réception du paiement en espèces.',
+                'code' => 'SUBSCRIPTION_PENDING_VALIDATION',
+                'payment_id' => $payment->id,
                 'subscription' => $business->fresh()->subscription,
-            ]);
+            ], 202);
         }
         // 🔹 MOBILE → PayDunya
         $response = $payDunyaCli->createInvoiceForSubscription($payment, $business);
@@ -178,28 +189,6 @@ class SubscriptionController extends Controller
 
     }
 
-    private function activateSubscription(Business $business, string $plan): void
-    {
-        $endsAt = now()->addMonth();
-        if ($plan === 'pro') {
-            $endsAt = now()->addMonth();
-        } elseif ($plan === 'basic') {
-            $endsAt = now()->addMonth();
-        } elseif ($plan === 'free') {
-            $endsAt = now()->addDays(7);
-        }
-
-        Subscription::updateOrCreate(
-            ['business_id' => $business->id],
-            [
-                'plan' => $plan,
-                'is_active' => true,
-                'starts_at' => now(),
-                'ends_at' => $endsAt,
-            ]
-        );
-    }
-
     // Fonction pour retourner le prix en fonction du plan
     private function planPrice(string $plan): int
     {
@@ -210,9 +199,21 @@ class SubscriptionController extends Controller
         };
     }
 
+    /**
+     * Modification directe d'un abonnement : réservée aux administrateurs.
+     *
+     * Le propriétaire du business y avait accès, et la requête accepte `plan`,
+     * `ends_at` et `is_active` : un `PUT` suffisait à s'accorder un plan Pro à
+     * vie, sans payer et sans passer par la moindre vérification. Aucun écran de
+     * l'application n'appelle cette route — seuls les outils d'administration.
+     */
     public function update(UpdateSubscriptionRequest $request, Business $business, Subscription $subscription)
     {
-        $this->authorizeManager($business, $request);
+        abort_unless(
+            $request->user()->isSystemAdmin(),
+            403,
+            "Seul un administrateur peut modifier un abonnement. Souscrivez depuis l'application.",
+        );
 
         if ($subscription->business_id !== $business->id) {
             abort(404);

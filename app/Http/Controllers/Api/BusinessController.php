@@ -127,49 +127,77 @@ class BusinessController extends Controller
     {
         $this->authorizeManager($business, $request);
 
+        $currency = Currencies::normalize($business->currency);
+
+        // Base commune : les ventes de ce business, dans sa devise. Les
+        // abonnements en sont exclus — ce sont des dépenses payées à l'éditeur,
+        // pas des recettes du commerce, et ils gonflaient le chiffre d'affaires.
+        $ventes = fn () => Payment::query()->where('business_id', $business->id)
+            ->sales()
+            ->where('currency', $currency);
+
+        $encaisse = fn () => $ventes()->where('status', 'success');
+
         return response()->json([
             'data' => [
+                'currency' => $currency,
+
                 // 💰 TOTAUX
-                'total_success' => Payment::where('business_id', $business->id)
-                    ->where('status', 'success')
-                    ->sum('amount'),
-
-                'total_pending' => Payment::where('business_id', $business->id)
-                    ->where('status', 'pending')
-                    ->sum('amount'),
-
-                'total_failed' => Payment::where('business_id', $business->id)
-                    ->where('status', 'failed')
-                    ->sum('amount'),
+                'total_success' => (float) $encaisse()->sum('amount'),
+                'total_pending' => (float) $ventes()->where('status', 'pending')->sum('amount'),
+                'total_failed' => (float) $ventes()->where('status', 'failed')->sum('amount'),
 
                 // 🔢 COUNTS
-                'count_success' => Payment::where('business_id', $business->id)
-                    ->where('status', 'success')
-                    ->count(),
-
-                'count_pending' => Payment::where('business_id', $business->id)
-                    ->where('status', 'pending')
-                    ->count(),
-
-                'count_failed' => Payment::where('business_id', $business->id)
-                    ->where('status', 'failed')
-                    ->count(),
+                'count_success' => $encaisse()->count(),
+                'count_pending' => $ventes()->where('status', 'pending')->count(),
+                'count_failed' => $ventes()->where('status', 'failed')->count(),
 
                 // 📅 PÉRIODES
-                'today' => Payment::where('business_id', $business->id)
-                    ->whereDate('created_at', today())
-                    ->sum('amount'),
+                //
+                // Elles ne filtraient pas sur le statut : un paiement en attente,
+                // échoué ou annulé était compté dans la recette du jour.
+                'today' => (float) $encaisse()->whereDate('created_at', today())->sum('amount'),
+                'last_7_days' => (float) $encaisse()
+                    ->where('created_at', '>=', now()->subDays(7))->sum('amount'),
+                'last_30_days' => (float) $encaisse()
+                    ->where('created_at', '>=', now()->subDays(30))->sum('amount'),
 
-                'last_7_days' => Payment::where('business_id', $business->id)
-                    ->where('created_at', '>=', now()->subDays(7))
-                    ->sum('amount'),
-
-                'last_30_days' => Payment::where('business_id', $business->id)
-                    ->where('created_at', '>=', now()->subDays(30))
-                    ->sum('amount'),
+                // Ce qui n'entre dans aucun total ci-dessus, pour ne rien écarter
+                // en silence : les encaissements libellés dans une autre devise,
+                // hérités d'un changement de devise du business.
+                'other_currencies' => $this->otherCurrencies($business, $currency),
             ]
         ]);
     }
+
+    /**
+     * Encaissements du business libellés dans une autre devise que la sienne.
+     *
+     * Un business qui change de devise garde ses paiements passés tels qu'ils ont
+     * été encaissés : on ne réécrit pas une somme reçue, et on ne la convertit pas
+     * à un taux inventé. Ils sont donc rendus à part, jamais additionnés.
+     *
+     * @return list<array{currency: string, total: float, count: int}>
+     */
+    private function otherCurrencies(Business $business, string $currency): array
+    {
+        return Payment::query()
+            ->where('business_id', $business->id)
+            ->sales()
+            ->where('status', 'success')
+            ->where('currency', '!=', $currency)
+            ->selectRaw('currency, SUM(amount) as total, COUNT(*) as count')
+            ->groupBy('currency')
+            ->get()
+            ->map(fn ($row) => [
+                'currency' => (string) $row->currency,
+                'total' => (float) $row->total,
+                'count' => (int) $row->count,
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * Statistiques journalières
      */
@@ -188,8 +216,8 @@ class BusinessController extends Controller
         }
 
         // 2️⃣ Récupérer les vrais paiements
-        $payments = Payment::where('business_id', $business->id)
-            ->where('status', 'success')
+        $payments = Payment::query()
+            ->revenue($business)
             ->where('created_at', '>=', now()->subDays($days))
             ->selectRaw('DATE(created_at) as day, SUM(amount) as total')
             ->groupBy('day')
@@ -220,8 +248,8 @@ class BusinessController extends Controller
 
         $weeks = (int) $request->query('weeks', 4);
 
-        $rows = Payment::where('business_id', $business->id)
-            ->where('status', 'success')
+        $rows = Payment::query()
+            ->revenue($business)
             ->where('created_at', '>=', now()->subWeeks($weeks))
             ->selectRaw('YEARWEEK(created_at, 1) as week, SUM(amount) as total')
             ->groupBy('week')

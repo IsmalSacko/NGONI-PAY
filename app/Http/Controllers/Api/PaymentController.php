@@ -203,8 +203,22 @@ class PaymentController extends Controller
         // 🔐 Propriétaire ou manager (cohérent avec l'annulation).
         $this->authorizeManager($business, $request);
 
+        // Les abonnements sont écartés par défaut : ce sont des dépenses payées à
+        // l'éditeur, pas des encaissements du commerce. Ils apparaissaient dans
+        // la liste des paiements et dans les transactions récentes, où un plan Pro
+        // à 15 000 se lisait comme une vente.
+        //
+        // `?purpose=subscription` les demande explicitement — rien ne devient
+        // inatteignable.
+        $purpose = $request->query('purpose');
+
         $payments = Payment::with('client')
             ->where('business_id', $business->id)
+            ->when(
+                $purpose === Payment::PURPOSE_SUBSCRIPTION,
+                fn ($query) => $query->where('purpose', Payment::PURPOSE_SUBSCRIPTION),
+                fn ($query) => $query->sales(),
+            )
             ->latest()
             ->get();
 
