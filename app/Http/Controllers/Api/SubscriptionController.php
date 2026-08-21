@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\BillingCycle;
 use App\Http\Resources\SubscriptionRequestResource;
 use App\Models\Business;
 use App\Models\Subscription;
@@ -129,6 +130,10 @@ class SubscriptionController extends Controller
             plan: (string) $request->plan,
             requestedBy: $request->user(),
             method: $request->input('method'),
+            // La durée était perdue par ce chemin : toute demande valait un mois,
+            // même celle d'un commerçant qui réglait son année.
+            cycle: BillingCycle::tryFrom((string) $request->input('cycle'))
+                ?? BillingCycle::Monthly,
         );
 
         return response()->json([

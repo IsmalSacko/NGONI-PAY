@@ -189,6 +189,45 @@ class SubscriptionRequestService
         });
     }
 
+    /**
+     * Solde la demande en attente lorsqu'un plan est accordé par un autre chemin.
+     *
+     * L'exploitant peut attribuer un plan depuis la page « Abonnements », sans
+     * passer par la file des demandes. Ce chemin n'y touchait pas : la demande
+     * restait « en attente » indéfiniment, alors que le commerçant avait bien
+     * son abonnement — l'exploitant voyait un dossier à instruire qui ne
+     * l'était plus.
+     *
+     * Aucun encaissement n'est écrit ici, contrairement à {@see approve()} : une
+     * attribution manuelle peut être une faveur, et inventer un paiement serait
+     * pire que de n'en écrire aucun.
+     */
+    public function markGrantedManually(
+        Business $business,
+        User $decidedBy,
+        ?string $plan = null,
+    ): ?SubscriptionRequest {
+        $demande = SubscriptionRequest::query()
+            ->where('business_id', $business->id)
+            ->pending()
+            ->when($plan !== null, fn ($query) => $query->where('plan', $plan))
+            ->latest()
+            ->first();
+
+        if ($demande === null) {
+            return null;
+        }
+
+        $demande->update([
+            'status' => SubscriptionRequestStatus::Approved,
+            'decided_at' => now(),
+            'decided_by_user_id' => $decidedBy->id,
+            'decision_note' => 'Accordé manuellement depuis la console.',
+        ]);
+
+        return $demande->fresh();
+    }
+
     public function refuse(
         SubscriptionRequest $request,
         User $decidedBy,

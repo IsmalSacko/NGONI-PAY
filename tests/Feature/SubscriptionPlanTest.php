@@ -198,3 +198,41 @@ it('prend la durée de l’essai sur le plan gratuit', function () {
     expect(now()->diffInDays($fin))->toBeGreaterThan(12)
         ->and(now()->diffInDays($fin))->toBeLessThan(15);
 });
+
+it('transmet la durée par l’ancien chemin de souscription', function () {
+    // `POST /subscription` la perdait : toute demande valait un mois, même celle
+    // d'un commerçant qui réglait son année.
+    $reponse = $this->postJson("/api/businesses/{$this->business->id}/subscription", [
+        'plan' => 'pro',
+        'method' => 'cash',
+        'cycle' => 'yearly',
+        'starts_at' => now()->toDateString(),
+    ])->assertStatus(202);
+
+    expect($reponse->json('request.cycle'))->toBe('yearly')
+        ->and($reponse->json('request.months'))->toBe(12)
+        ->and($reponse->json('request.amount_due'))->toEqual(180000);
+});
+
+it('solde la demande en attente quand le plan est accordé à la main', function () {
+    // L'exploitant peut attribuer un plan depuis la page « Abonnements » : ce
+    // chemin ne touchait pas à la demande, qui restait « en attente »
+    // indéfiniment alors que le commerçant avait bien son abonnement.
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro', 'cycle' => 'quarterly'],
+    )->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/businesses/{$this->business->id}/subscription", [
+        'plan' => 'pro',
+        'lifetime' => true,
+    ])->assertSuccessful();
+
+    $this->assertDatabaseHas('subscription_requests', [
+        'id' => $demandeId,
+        'status' => 'approved',
+    ]);
+});

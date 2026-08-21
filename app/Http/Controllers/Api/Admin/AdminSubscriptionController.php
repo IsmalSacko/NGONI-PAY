@@ -162,6 +162,14 @@ class AdminSubscriptionController extends Controller
             ]
         );
 
+        // La demande en attente, s'il y en avait une, est soldée : sans cela elle
+        // resterait à instruire alors que le plan est déjà accordé.
+        $this->requests->markGrantedManually(
+            $business,
+            $request->user(),
+            $data['plan'],
+        );
+
         return (new AdminBusinessResource(
             $business->fresh(['owner', 'subscription'])
         ))->additional([

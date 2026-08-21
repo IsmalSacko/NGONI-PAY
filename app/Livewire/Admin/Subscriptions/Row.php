@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Subscriptions;
 
 use App\Models\Business;
 use App\Models\Subscription;
+use App\Services\SubscriptionRequestService;
 use Livewire\Component;
 
 class Row extends Component
@@ -53,8 +54,18 @@ class Row extends Component
             ]
         );
 
+        // Solde la demande en attente, s'il y en avait une : sans cela elle
+        // resterait à instruire alors que le plan est déjà accordé.
+        $soldee = app(SubscriptionRequestService::class)->markGrantedManually(
+            $this->business,
+            auth()->user(),
+            $data['plan'],
+        );
+
         $this->business->refresh();
-        $this->message = 'Abonnement mis à jour.';
+        $this->message = $soldee === null
+            ? 'Abonnement mis à jour.'
+            : 'Abonnement mis à jour, et la demande en attente a été soldée.';
         $this->messageType = 'status';
         $this->open = false;
     }

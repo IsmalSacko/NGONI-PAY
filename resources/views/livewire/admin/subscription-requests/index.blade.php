@@ -80,8 +80,18 @@
                         <div class="text-lg font-semibold text-slate-900">
                             {{ number_format((float) $demande->amount_due, 0, ',', ' ') }} {{ $demande->currency }}
                         </div>
-                        <div class="text-xs text-slate-500">
-                            {{ $demande->months }} mois · {{ $demande->method ? str_replace('_', ' ', $demande->method) : 'moyen non précisé' }}
+                        {{-- La durée demandée, nommée : « 3 » ne dit pas si le
+                             commerçant a pris un trimestre ou trois mois à
+                             l'unité, et c'est ce que l'approbation accorde. --}}
+                        <div class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                                <path d="M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"/>
+                            </svg>
+                            {{ $demande->cycle?->label() ?? 'Mensuel' }}
+                            · {{ $demande->months }} mois
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                            {{ $demande->method ? str_replace('_', ' ', $demande->method) : 'moyen non précisé' }}
                         </div>
                     </div>
                 </div>
@@ -106,7 +116,7 @@
                                 <button type="button" wire:click="approve({{ $demande->id }})"
                                         wire:loading.attr="disabled"
                                         class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-                                    Approuver — activer {{ strtoupper($demande->plan) }}
+                                    Approuver — {{ strtoupper($demande->plan) }} pour {{ $demande->months }} mois
                                 </button>
                                 <button type="button" wire:click="refuse({{ $demande->id }})"
                                         wire:loading.attr="disabled"
