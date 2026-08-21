@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\SubscriptionRequestResource;
 use App\Models\Business;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionRequestService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -24,13 +25,18 @@ class SubscriptionController extends Controller
         $subscription = $business->subscription;
         $now = Carbon::now();
 
+        // La durée de l'essai est celle que l'exploitant a fixée sur le plan
+        // gratuit. Elle était écrite en dur à trois endroits : la changer depuis
+        // la console n'avait aucun effet.
+        $essai = SubscriptionPlan::byCode('free')?->trialDays() ?? 7;
+
         if (! $subscription) {
             $subscription = Subscription::create([
                 'business_id' => $business->id,
                 'plan' => 'free',
                 'is_active' => true,
                 'starts_at' => $now,
-                'ends_at' => $now->copy()->addDays(7),
+                'ends_at' => $now->copy()->addDays($essai),
             ]);
             return new SubscriptionResource($subscription);
         }
@@ -54,8 +60,9 @@ class SubscriptionController extends Controller
         }
 
         if ($subscription->plan === 'free' && $subscription->ends_at) {
-            // L'essai Free ne doit jamais dépasser 7 jours à partir de starts_at.
-            $trialMax = Carbon::parse($subscription->starts_at)->copy()->addDays(7);
+            // L'essai ne doit jamais dépasser la durée du plan, comptée depuis
+            // `starts_at`.
+            $trialMax = Carbon::parse($subscription->starts_at)->copy()->addDays($essai);
             if (Carbon::parse($subscription->ends_at)->gt($trialMax)) {
                 $subscription->update([
                     'ends_at' => $trialMax,
@@ -79,7 +86,9 @@ class SubscriptionController extends Controller
                     'plan' => 'free',
                     'is_active' => true,
                     'starts_at' => now(),
-                    'ends_at' => now()->addDays(7),
+                    'ends_at' => now()->addDays(
+                        SubscriptionPlan::byCode('free')?->trialDays() ?? 7,
+                    ),
                 ]);
 
                 return new SubscriptionResource($subscription);

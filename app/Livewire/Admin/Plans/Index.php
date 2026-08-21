@@ -43,6 +43,20 @@ class Index extends Component
      */
     public array $plansActive = [];
 
+    /**
+     * Quota mensuel de paiements en ligne, par plan. Vide = sans limite.
+     *
+     * @var array<int, string>
+     */
+    public array $quotas = [];
+
+    /**
+     * Durée de l'essai en jours, pour le plan gratuit.
+     *
+     * @var array<int, string>
+     */
+    public array $trials = [];
+
     public function mount(): void
     {
         $this->hydrateFromDatabase();
@@ -52,6 +66,10 @@ class Index extends Component
     {
         foreach ($this->plans() as $plan) {
             $this->plansActive[$plan->id] = $plan->is_active;
+            $this->quotas[$plan->id] = $plan->monthly_online_payments === null
+                ? ''
+                : (string) $plan->monthly_online_payments;
+            $this->trials[$plan->id] = (string) ($plan->trial_days ?? '');
 
             foreach ($plan->prices as $price) {
                 // Sans décimales : les francs CFA ne se subdivisent pas, et un
@@ -99,6 +117,8 @@ class Index extends Component
     {
         $this->validate([
             'amounts.*' => ['required', 'numeric', 'min:0', 'max:99999999'],
+            'quotas.*' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'trials.*' => ['nullable', 'integer', 'min:0', 'max:365'],
         ], [
             'amounts.*.required' => 'Chaque tarif doit porter un montant.',
             'amounts.*.numeric' => 'Un tarif se saisit en chiffres.',
@@ -116,7 +136,15 @@ class Index extends Component
         }
 
         foreach ($this->plansActive as $id => $actif) {
-            SubscriptionPlan::whereKey($id)->update(['is_active' => (bool) $actif]);
+            $quota = trim((string) ($this->quotas[$id] ?? ''));
+            $essai = trim((string) ($this->trials[$id] ?? ''));
+
+            SubscriptionPlan::whereKey($id)->update([
+                'is_active' => (bool) $actif,
+                // Vide vaut « sans limite » : c'est ce que `null` signifie.
+                'monthly_online_payments' => $quota === '' ? null : (int) $quota,
+                'trial_days' => $essai === '' ? null : (int) $essai,
+            ]);
         }
 
         $this->hydrateFromDatabase();

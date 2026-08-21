@@ -369,3 +369,86 @@ it('laisse le commerçant retirer sa demande', function () {
         ['plan' => 'basic'],
     )->assertStatus(202);
 });
+
+it('n’ouvre la suppression qu’après annulation', function () {
+    $client = $this->client;
+
+    $paiement = Payment::create([
+        'business_id' => $this->business->id,
+        'client_id' => $client->id,
+        'user_id' => $this->owner->id,
+        'amount' => 3000,
+        'currency' => 'XOF',
+        'method' => 'cash',
+        'purpose' => 'sale',
+        'status' => 'success',
+        'transaction_ref' => 'a-supprimer',
+        'paid_at' => now(),
+    ]);
+
+    // Supprimer directement retirerait un encaissement des totaux sans qu'aucun
+    // motif ne soit tracé.
+    $this->deleteJson("/api/businesses/{$this->business->id}/payments/{$paiement->id}")
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'CANCEL_BEFORE_DELETE');
+
+    $this->assertDatabaseHas('payments', ['id' => $paiement->id]);
+
+    $this->patchJson(
+        "/api/businesses/{$this->business->id}/payments/{$paiement->id}/cancel",
+        ['reason' => 'Erreur de saisie'],
+    )->assertOk();
+
+    $this->deleteJson("/api/businesses/{$this->business->id}/payments/{$paiement->id}")
+        ->assertOk();
+
+    $this->assertDatabaseMissing('payments', ['id' => $paiement->id]);
+});
+
+it('ne supprime pas un paiement d’abonnement depuis la caisse', function () {
+    $paiement = Payment::create([
+        'business_id' => $this->business->id,
+        'client_id' => $this->client->id,
+        'user_id' => $this->owner->id,
+        'amount' => 15000,
+        'currency' => 'XOF',
+        'method' => 'cash',
+        'purpose' => 'subscription',
+        'status' => 'cancelled',
+        'transaction_ref' => 'abo-protege',
+        'cancelled_at' => now(),
+    ]);
+
+    // Il appartient à la comptabilité de l'éditeur, pas à celle du commerçant.
+    $this->deleteJson("/api/businesses/{$this->business->id}/payments/{$paiement->id}")
+        ->assertStatus(422);
+
+    $this->assertDatabaseHas('payments', ['id' => $paiement->id]);
+});
+
+it('emporte le reçu avec le paiement supprimé', function () {
+    $paiement = Payment::create([
+        'business_id' => $this->business->id,
+        'client_id' => $this->client->id,
+        'user_id' => $this->owner->id,
+        'amount' => 4000,
+        'currency' => 'XOF',
+        'method' => 'cash',
+        'purpose' => 'sale',
+        'status' => 'cancelled',
+        'transaction_ref' => 'avec-recu',
+        'cancelled_at' => now(),
+    ]);
+
+    $paiement->invoice()->create([
+        'invoice_number' => 'NGONI-TEST-1',
+        'total_amount' => 4000,
+        'sent_via' => 'none',
+    ]);
+
+    $this->deleteJson("/api/businesses/{$this->business->id}/payments/{$paiement->id}")
+        ->assertOk();
+
+    // Un reçu qui survivrait à son paiement pointerait dans le vide.
+    $this->assertDatabaseMissing('invoices', ['invoice_number' => 'NGONI-TEST-1']);
+});

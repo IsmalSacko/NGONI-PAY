@@ -107,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/businesses/{business}/payments', [PaymentController::class, 'store']);
     Route::get('/businesses/{business}/payments/{payment}', [PaymentController::class, 'show']);
     Route::patch('/businesses/{business}/payments/{payment}/cancel', [PaymentController::class, 'cancel']);
+    // La suppression n'est ouverte qu'après annulation : voir `destroy`.
+    Route::delete('/businesses/{business}/payments/{payment}', [PaymentController::class, 'destroy']);
 });
 
 // Payment Callback (Mobile Money) - No auth

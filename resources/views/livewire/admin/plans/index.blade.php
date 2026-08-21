@@ -36,6 +36,31 @@
                     </label>
                 </div>
 
+                {{-- Règles du plan : elles étaient écrites dans le code, et
+                     pouvaient contredire la description affichée. --}}
+                <div class="flex flex-wrap items-end gap-6 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">
+                            Paiements en ligne / mois
+                        </label>
+                        <input type="number" min="0" step="1" placeholder="illimité"
+                               wire:model="quotas.{{ $plan->id }}"
+                               class="mt-1 w-32 rounded-lg border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                        <p class="mt-1 text-xs text-slate-400">Vide = sans limite · 0 = aucun</p>
+                    </div>
+
+                    @if ($plan->isFree())
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600">
+                                Durée de l'essai (jours)
+                            </label>
+                            <input type="number" min="0" step="1"
+                                   wire:model="trials.{{ $plan->id }}"
+                                   class="mt-1 w-32 rounded-lg border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
+                        </div>
+                    @endif
+                </div>
+
                 @if ($plan->isFree())
                     <div class="px-4 py-4 text-sm text-slate-500">
                         Ce plan est gratuit : il n'a pas de tarif à régler.

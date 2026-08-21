@@ -153,3 +153,48 @@ it('garde le paiement en ligne des abonnements en pause', function () {
     // échouerait chez le commerçant. Le code reste, l'interrupteur est ouvert.
     expect(config('services.paydunya.subscriptions_enabled'))->toBeFalsy();
 });
+
+it('applique le quota de paiements en ligne que porte le plan', function () {
+    // Le quota était écrit dans le contrôleur — « Basic → 5 » — tandis que la
+    // description du plan vit en base : les deux pouvaient se contredire.
+    $plan = SubscriptionPlan::where('code', 'basic')->firstOrFail();
+
+    expect($plan->monthly_online_payments)->toBe(5)
+        ->and($plan->allowsOnlinePayment(4))->toBeTrue()
+        ->and($plan->allowsOnlinePayment(5))->toBeFalse();
+
+    // Ajusté depuis la console, il vaut aussitôt.
+    $plan->update(['monthly_online_payments' => 10]);
+
+    expect($plan->fresh()->allowsOnlinePayment(5))->toBeTrue();
+
+    // `null` vaut « sans limite » : c'est le cas de Pro.
+    $pro = SubscriptionPlan::where('code', 'pro')->firstOrFail();
+
+    expect($pro->monthly_online_payments)->toBeNull()
+        ->and($pro->allowsOnlinePayment(9999))->toBeTrue();
+});
+
+it('prend la durée de l’essai sur le plan gratuit', function () {
+    // Elle était écrite en dur à trois endroits : la changer depuis la console
+    // n'avait aucun effet.
+    $free = SubscriptionPlan::where('code', 'free')->firstOrFail();
+    $free->update(['trial_days' => 14]);
+
+    $business = Business::create([
+        'owner_id' => $this->owner->id,
+        'name' => 'Nouveau business',
+        'type' => 'shop',
+        'currency' => 'XOF',
+    ]);
+    $business->staff()->attach($this->owner->id, ['role' => 'manager']);
+
+    // 201 : l'abonnement d'essai est créé à la première consultation.
+    $reponse = $this->getJson("/api/businesses/{$business->id}/subscription")
+        ->assertSuccessful();
+
+    $fin = \Carbon\Carbon::parse($reponse->json('data.ends_at'));
+
+    expect(now()->diffInDays($fin))->toBeGreaterThan(12)
+        ->and(now()->diffInDays($fin))->toBeLessThan(15);
+});

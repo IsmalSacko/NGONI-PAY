@@ -23,6 +23,7 @@ class SubscriptionPlan extends Model
         'description',
         'features',
         'trial_days',
+        'monthly_online_payments',
         'is_active',
         'sort_order',
     ];
@@ -32,9 +33,44 @@ class SubscriptionPlan extends Model
         return [
             'features' => 'array',
             'trial_days' => 'integer',
+            'monthly_online_payments' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    /**
+     * Durée de l'essai, en jours.
+     *
+     * Sept par défaut : c'est la valeur qui était écrite dans le contrôleur, et
+     * qu'un plan sans `trial_days` conserve.
+     */
+    public function trialDays(): int
+    {
+        return $this->trial_days ?? 7;
+    }
+
+    /**
+     * Le plan autorise-t-il un paiement en ligne de plus ce mois-ci ?
+     *
+     * `monthly_online_payments` à `null` vaut « sans limite ».
+     */
+    public function allowsOnlinePayment(int $usedThisMonth): bool
+    {
+        $quota = $this->monthly_online_payments;
+
+        return $quota === null || $usedThisMonth < $quota;
+    }
+
+    /**
+     * Plan de ce code, ou `null`. Les tarifs suivent.
+     */
+    public static function byCode(?string $code): ?self
+    {
+        $normalise = strtolower(trim((string) $code));
+        if ($normalise === '') return null;
+
+        return static::query()->with('prices')->where('code', $normalise)->first();
     }
 
     public function prices(): HasMany

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Business;
+use App\Models\SubscriptionPlan;
 use App\Enums\Country;
 use App\Support\Money\Currencies;
 use App\Support\Phone\PhoneNumber;
@@ -102,11 +103,19 @@ class PaymentController extends Controller
 
         // FREE → pas de PayDunya (paiement enregistré comme offline)
 
-        // BASIC → max 5 paiements PayDunya / mois
-        if ($subscription->plan === 'basic' && $method !== 'cash') {
+        // Quota mensuel de paiements en ligne, tenu par le plan.
+        //
+        // Il était écrit ici — « Basic → 5 » — tandis que la description du plan
+        // vit en base depuis que l'exploitant la tient : un plan annonçant dix
+        // paiements en aurait laissé passer cinq. `null` vaut « sans limite ».
+        $plan = SubscriptionPlan::byCode($subscription->plan);
 
+        // La condition porte sur `$provider`, pas sur la méthode : un plan
+        // gratuit enregistre un paiement mobile money **hors ligne**, sans
+        // passer par le fournisseur, et n'a donc aucun quota à consommer.
+        if ($plan !== null && $provider === 'paydunya') {
             $usedThisMonth = Payment::where('business_id', $business->id)
-                ->where('purpose', 'sale')
+                ->where('purpose', Payment::PURPOSE_SALE)
                 ->where('provider', 'paydunya')
                 ->where('status', 'success')
                 ->whereBetween('paid_at', [
@@ -115,9 +124,13 @@ class PaymentController extends Controller
                 ])
                 ->count();
 
-            if ($usedThisMonth >= 5) {
+            if (! $plan->allowsOnlinePayment($usedThisMonth)) {
+                $quota = $plan->monthly_online_payments;
+
                 return response()->json([
-                    'message' => 'Limite mensuelle atteinte (5 paiements PayDunya)',
+                    'message' => $quota === 0
+                        ? "Le plan {$plan->name} n'inclut pas les paiements en ligne."
+                        : "Limite mensuelle atteinte ($quota paiements en ligne).",
                     'code' => 'PAYMENT_LIMIT_REACHED',
                 ], 403);
             }
@@ -341,6 +354,59 @@ class PaymentController extends Controller
     /**
      * Autorise le propriétaire OU un manager du business.
      */
+    /**
+     * Supprime définitivement un paiement enregistré par erreur.
+     *
+     * Deux conditions, et elles ne sont pas négociables :
+     * - le paiement doit avoir été **annulé** d'abord. Supprimer directement une
+     *   écriture ferait disparaître un encaissement des totaux sans que personne
+     *   n'en ait tracé le motif ; l'annulation, elle, laisse une raison et un
+     *   auteur.
+     * - un paiement d'abonnement ne se supprime pas ici : il appartient à la
+     *   comptabilité de l'éditeur, pas à celle du commerçant.
+     *
+     * La facture et les rappels du fournisseur suivent la ligne : leurs clés
+     * étrangères sont en cascade. La suppression est journalisée — elle retire de
+     * la base la seule trace qu'il restait.
+     */
+    public function destroy(Request $request, Business $business, Payment $payment)
+    {
+        $this->authorizeManager($business, $request);
+
+        if ($payment->business_id !== $business->id) {
+            abort(404);
+        }
+
+        if ($payment->purpose === Payment::PURPOSE_SUBSCRIPTION) {
+            return response()->json([
+                'message' => "Un paiement d'abonnement ne se supprime pas ici.",
+            ], 422);
+        }
+
+        if ($payment->status !== 'cancelled') {
+            return response()->json([
+                'message' => 'Annulez ce paiement avant de le supprimer.',
+                'code' => 'CANCEL_BEFORE_DELETE',
+            ], 422);
+        }
+
+        Log::warning('Paiement supprimé', [
+            'payment_id' => $payment->id,
+            'business_id' => $business->id,
+            'amount' => $payment->amount,
+            'currency' => $payment->currency,
+            'method' => $payment->method,
+            'transaction_ref' => $payment->transaction_ref,
+            'cancelled_at' => $payment->cancelled_at?->toIso8601String(),
+            'cancel_reason' => $payment->cancel_reason,
+            'deleted_by' => $request->user()->id,
+        ]);
+
+        $payment->delete();
+
+        return response()->json(['message' => 'Paiement supprimé.']);
+    }
+
     private function authorizeManager(Business $business, Request $request): void
     {
         $user = $request->user();
