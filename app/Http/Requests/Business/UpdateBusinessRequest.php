@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Business;
 
+use App\Support\Money\Currencies;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateBusinessRequest extends FormRequest
 {
@@ -12,6 +14,14 @@ class UpdateBusinessRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ['currency' => 'devise'];
     }
 
     /**
@@ -26,6 +36,7 @@ class UpdateBusinessRequest extends FormRequest
             'type' => 'sometimes|string|max:50',
             'address' => 'sometimes|nullable|string|max:255',
             'phone' => 'sometimes|string|max:20',
+            'currency' => ['sometimes', Rule::in(Currencies::codes())],
             'is_active' => 'sometimes|boolean',
         ];
     }

@@ -134,6 +134,9 @@ class SubscriptionController extends Controller
                 'client_id' => $client->id,
                 'user_id' => $request->user()->id,
                 'amount' => $mount,
+                // L'abonnement est facturé par l'éditeur, en francs CFA, quelle
+                // que soit la devise dans laquelle le business tient ses
+                // comptes : c'est un prix catalogue, pas un encaissement.
                 'currency' => 'XOF',
                 'method' => $method,
                 'provider' => $method === 'cash' ? null : 'paydunya',

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Client;
 use App\Models\Business;
+use App\Enums\Country;
+use App\Support\Phone\PhoneNumber;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ClientResource;
@@ -36,7 +38,7 @@ class ClientController extends Controller
         $client = Client::create([
             'business_id' => $business->id,
             'name'  => $request->name,
-            'phone' => $this->normalizePhone($request->phone),
+            'phone' => $this->normalizePhone($request->phone, $business),
             'email' => $request->email,
             'notes' => $request->notes,
         ]);
@@ -63,8 +65,10 @@ class ClientController extends Controller
             return response()->json(['data' => null]);
         }
 
+        // La recherche porte sur la forme enregistrée, pas sur la saisie : le
+        // caissier tape « 76008201 » quand la fiche porte « +22376008201 ».
         $client = Client::where('business_id', $business->id)
-            ->where('phone', $phone) // ✅ MATCH EXACT
+            ->where('phone', $this->normalizePhone((string) $phone, $business))
             ->first();
 
         return response()->json([
@@ -83,7 +87,13 @@ class ClientController extends Controller
         $this->authorizeManager($business, $request);
         $this->ensureSameBusiness($business, $client);
 
-        $client->update($request->validated());
+        $data = $request->validated();
+
+        if (isset($data['phone'])) {
+            $data['phone'] = $this->normalizePhone($data['phone'], $business);
+        }
+
+        $client->update($data);
 
         return new ClientResource($client);
     }
@@ -147,28 +157,18 @@ class ClientController extends Controller
         }
     }
 
-    private function normalizePhone(string $phone): string
+    /**
+     * Numéro du client, sous la forme qui sert de clé dans son business.
+     *
+     * L'indicatif est celui du pays du propriétaire : c'est là que le commerce
+     * encaisse, donc là que ses clients ont leur numéro.
+     */
+    private function normalizePhone(string $phone, Business $business): string
     {
-        // Supprimer espaces
-        $phone = str_replace(' ', '', $phone);
-
-        // Si déjà au format +223XXXXXXXX
-        if (str_starts_with($phone, '+223')) {
-            return $phone;
-        }
-
-        // Si envoyé sans indicatif (8 chiffres)
-        if (preg_match('/^\d{8}$/', $phone)) {
-            return '+223' . $phone;
-        }
-
-        // Si envoyé comme 223XXXXXXXX
-        if (preg_match('/^223\d{8}$/', $phone)) {
-            return '+' . $phone;
-        }
-
-        // Sinon, on retourne tel quel (ou on peut lever une erreur)
-        return $phone;
+        return PhoneNumber::normalize(
+            $phone,
+            $business->owner?->countryEnum() ?? Country::default(),
+        );
     }
 
 }

@@ -69,6 +69,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Pays par défaut
+    |--------------------------------------------------------------------------
+    |
+    | Code ISO à deux lettres du pays présélectionné à l'inscription, et retenu
+    | pour interpréter un numéro local saisi sans indicatif — y compris celui
+    | des comptes créés avant que le pays ne soit demandé.
+    |
+    */
+
+    'default_country' => env('DEFAULT_COUNTRY', 'ML'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

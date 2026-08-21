@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Country;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -17,6 +18,19 @@ class User extends Authenticatable
     public const ROLE_OWNER = 'owner';
     public const ROLE_STAFF = 'staff';
     public const ROLE_SYSTEM_ADMIN = 'system_admin';
+
+    /**
+     * Pays du compte, d'où l'indicatif de son numéro.
+     *
+     * Nommé ainsi pour ne pas se confondre avec la colonne `country`, qui reste
+     * la chaîne brute. Retombe sur le pays par défaut si le code est inconnu —
+     * une ligne écrite à la main, ou un code retiré du catalogue : le profil
+     * doit rester lisible.
+     */
+    public function countryEnum(): Country
+    {
+        return Country::tryFrom(strtoupper((string) $this->country)) ?? Country::default();
+    }
 
     /**
      * Super-administrateur : accès total, ignore toute restriction d'abonnement.
@@ -36,6 +50,7 @@ class User extends Authenticatable
         'email',
         'password',
         'phone',
+        'country',
         'role',
         'is_active',
         'avatar_url',

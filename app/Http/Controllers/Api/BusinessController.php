@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Business;
+use App\Support\Money\Currencies;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BusinessResource;
@@ -30,12 +31,21 @@ class BusinessController extends Controller
      */
     public function store(StoreBusinessRequest $request)
     {
+        $owner = $request->user();
+
         $business = Business::create([
-            'owner_id' => $request->user()->id,
+            'owner_id' => $owner->id,
             'name' => $request->name,
             'type' => $request->type,
             'address' => $request->address,
             'phone' => $request->phone,
+            // La devise du pays du propriétaire est le choix par défaut, celui
+            // que l'application présélectionne. Elle reste modifiable : un même
+            // propriétaire peut tenir un commerce dans une autre monnaie.
+            'currency' => Currencies::normalize(
+                $request->input('currency'),
+                $owner->countryEnum()->currency(),
+            ),
             'is_active' => true,
         ]);
 

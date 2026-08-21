@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Business;
+use App\Enums\Country;
+use App\Support\Money\Currencies;
+use App\Support\Phone\PhoneNumber;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
@@ -46,7 +49,7 @@ class PaymentController extends Controller
         // Client spontané
         else {
             $client = Client::firstOrCreate(
-                ['phone' => $this->normalizePhone($request->phone), 'business_id' => $business->id,],
+                ['phone' => $this->normalizePhone($request->phone, $business), 'business_id' => $business->id,],
                 ['name' => $request->name ?? 'Client spontané',]
             );
         }
@@ -126,7 +129,12 @@ class PaymentController extends Controller
                 'client_id' => $client->id,
                 'user_id' => $request->user()->id,
                 'amount' => $request->amount,
-                'currency' => $request->currency ?? 'XOF',
+                // La devise vient du business, jamais de la requête : c'est le
+                // registre du commerce qui la fixe. Une application restée sur
+                // une version antérieure envoie « XOF » en dur, ce qui
+                // libellerait en francs CFA les encaissements d'une boutique de
+                // Conakry.
+                'currency' => Currencies::normalize($business->currency),
                 'method' => $method,
                 'provider' => $provider,
                 'transaction_ref' => (string) Str::uuid(),
@@ -338,27 +346,18 @@ class PaymentController extends Controller
     }
 
 
-    private function normalizePhone(string $phone): string
+    /**
+     * Numéro du client, sous la forme qui sert de clé dans son business.
+     *
+     * L'indicatif est celui du pays du propriétaire : c'est là que le commerce
+     * encaisse, donc là que ses clients ont leur numéro. Un numéro déjà
+     * international est respecté tel quel — un client de passage se paie aussi.
+     */
+    private function normalizePhone(string $phone, Business $business): string
     {
-        // Supprimer espaces
-        $phone = str_replace(' ', '', $phone);
-
-        // Si déjà au format +223XXXXXXXX
-        if (str_starts_with($phone, '+223')) {
-            return $phone;
-        }
-
-        // Si envoyé sans indicatif (8 chiffres)
-        if (preg_match('/^\d{8}$/', $phone)) {
-            return '+223' . $phone;
-        }
-
-        // Si envoyé comme 223XXXXXXXX
-        if (preg_match('/^223\d{8}$/', $phone)) {
-            return '+' . $phone;
-        }
-
-        // Sinon, on retourne tel quel (ou on peut lever une erreur)
-        return $phone;
+        return PhoneNumber::normalize(
+            $phone,
+            $business->owner?->countryEnum() ?? Country::default(),
+        );
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Business;
 
+use App\Support\Money\Currencies;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreBusinessRequest extends FormRequest
 {
@@ -12,6 +14,14 @@ class StoreBusinessRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ['currency' => 'devise'];
     }
 
     /**
@@ -26,6 +36,10 @@ class StoreBusinessRequest extends FormRequest
             'type' => 'required|string|max:50',
             'address' => 'nullable|string|max:255',
             'phone' => 'required|string|max:20',
+            // Facultative : à défaut, celle du pays du propriétaire. Bornée au
+            // catalogue, sinon un code inventé s'afficherait derrière chaque
+            // montant, jusque sur les factures remises aux clients.
+            'currency' => ['sometimes', 'nullable', Rule::in(Currencies::codes())],
         ];
     }
 }

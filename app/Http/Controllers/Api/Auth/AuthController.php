@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\Enums\Country;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
@@ -12,18 +13,21 @@ use App\Services\PhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
 
 
-    public function register(RegisterRequest $req, PhoneService $phoneService)
+    /**
+     * Le numéro et le pays ont été mis en forme par la requête : ils arrivent
+     * ici sous la forme qui sera enregistrée, et qui servira à se reconnecter.
+     */
+    public function register(RegisterRequest $req)
     {
-        $phone = $phoneService->normalize($req->phone);
         $user = User::create([
             ...$req->validated(),
-            'phone' => $phone,
             'password' => Hash::make($req->password),
             'role' => 'owner',
 
@@ -36,10 +40,16 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function login(LoginRequest $req, PhoneService $phoneService)
+    /**
+     * Le compte est cherché sous toutes les écritures possibles du numéro saisi.
+     *
+     * Un même abonné a pu être enregistré « +22376008201 » aujourd'hui et
+     * « 76008201 » avant que le pays ne soit demandé : une seule requête ne
+     * retrouverait qu'une partie des comptes.
+     */
+    public function login(LoginRequest $req)
     {
-        $phone = $phoneService->normalize($req->phone);
-        $user = User::where('phone', $phone)->first();
+        $user = User::whereIn('phone', $req->phoneCandidates())->first();
 
         if (!$user || !Hash::check($req->password, $user->password)) {
             return response()->json(['message' => 'Identifiants invalides.'], 401);
@@ -60,13 +70,29 @@ class AuthController extends Controller
 
     public function updateProfile(Request $req, PhoneService $phoneService)
     {
+        $user = $req->user();
+
+        // Le pays peut changer — un commerçant qui déménage, ou une inscription
+        // faite avec la présélection sans y regarder. Il est retenu avant le
+        // numéro, puisque c'est lui qui donne l'indicatif à appliquer.
+        $country = $user->countryEnum();
+
+        if ($req->filled('country')) {
+            $req->validate([
+                'country' => [Rule::enum(Country::class)],
+            ]);
+
+            $country = Country::from(strtoupper((string) $req->input('country')));
+            $req->merge(['country' => $country->value]);
+        }
+
         if ($req->has('phone')) {
             $req->merge([
-                'phone' => $phoneService->normalize($req->phone),
+                'phone' => $phoneService->normalize($req->phone, $country),
             ]);
         }
-        $user = $req->user();
-        $data = $req->only(['name', 'email', 'phone', 'avatar_url']);
+
+        $data = $req->only(['name', 'email', 'phone', 'country', 'avatar_url']);
 
         if ($req->boolean('remove_avatar')) {
             if ($user->avatar_url) {
@@ -149,12 +175,17 @@ class AuthController extends Controller
     {
         $req->validate([
             'phone' => 'required|string',
+            'country' => ['sometimes', 'nullable', Rule::enum(Country::class)],
             'email' => 'nullable|email',
             'new_password' => 'required|string|min:6|confirmed',
         ]);
 
-        $phone = $phoneService->normalize($req->phone);
-        $user = User::where('phone', $phone)->first();
+        // Même tolérance qu'à la connexion : le numéro saisi peut ne pas être
+        // écrit comme il a été enregistré.
+        $country = Country::tryFrom(strtoupper((string) $req->input('country')))
+            ?? Country::default();
+
+        $user = User::whereIn('phone', $phoneService->candidates($req->phone, $country))->first();
 
         if (!$user) {
             return response()->json(['message' => 'Compte introuvable.'], 404);
@@ -199,7 +230,7 @@ class AuthController extends Controller
         }
 
         $users = User::query()
-            ->select(['id', 'name', 'phone', 'email', 'role', 'avatar_url', 'created_at'])
+            ->select(['id', 'name', 'phone', 'country', 'email', 'role', 'avatar_url', 'created_at'])
             ->orderByDesc('created_at')
             ->get();
 

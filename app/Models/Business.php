@@ -15,6 +15,7 @@ class Business extends Model
         'type',
         'address',
         'phone',
+        'currency',
         'is_active',
     ];
 

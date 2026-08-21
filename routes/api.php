@@ -7,12 +7,17 @@ use App\Http\Controllers\Api\PaymentController;
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\BusinessController;
+use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\BusinessUserController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
+
+// Catalogue public des pays : l'inscription et la connexion en ont besoin
+// avant toute session, pour l'indicatif du numéro et la devise proposée.
+Route::get('/countries', [CountryController::class, 'index']);
 
 // Auth routes
 Route::prefix('auth')->group(function () {

@@ -20,11 +20,13 @@ class AdminBusinessResource extends JsonResource
             'name' => $this->name,
             'type' => $this->type,
             'phone' => $this->phone,
+            'currency' => $this->currency ?: 'XOF',
             'is_active' => (bool) $this->is_active,
             'owner' => $this->owner ? [
                 'id' => $this->owner->id,
                 'name' => $this->owner->name,
                 'phone' => $this->owner->phone,
+                'country' => $this->owner->country ?: 'ML',
                 'email' => $this->owner->email,
             ] : null,
             'subscription' => $subscription ? [
