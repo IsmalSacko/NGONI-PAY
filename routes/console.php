@@ -16,6 +16,13 @@ Schedule::call(fn () => app(CampaignMailer::class)->runDueCampaigns())
     ->name('campaigns:run-due')
     ->withoutOverlapping();
 
+// Annonces de mise à jour programmées : vérifiées chaque minute, pour qu'une
+// annonce fixée à 8 h partisse à 8 h et non à l'heure ronde suivante.
+Schedule::command('announcements:dispatch-due')
+    ->everyMinute()
+    ->name('announcements:dispatch-due')
+    ->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

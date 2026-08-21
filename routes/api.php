@@ -132,5 +132,11 @@ Route::post(
 Route::get('/app-version', function () {
     return response()->json([
         'latest_version' => config('mobile.latest_version'),
+        // Sans le lien, l'application peut dire qu'une version existe mais pas
+        // où la prendre.
+        'store_url' => url('/telecharger'),
+        // En deçà de cette version, la mise à jour n'est plus facultative : une
+        // application trop ancienne parle à une API qui a changé.
+        'minimum_version' => config('mobile.minimum_version'),
     ]);
 });

@@ -45,6 +45,7 @@
                         ['pattern' => 'admin.plans.*', 'route' => 'admin.plans.index', 'label' => 'Plans et tarifs', 'icon' => 'M12 8c-2.2 0-4 .9-4 2s1.8 2 4 2 4 .9 4 2-1.8 2-4 2m0-10v12m-9-6a9 9 0 1 0 18 0 9 9 0 0 0-18 0Z'],
                         ['pattern' => 'admin.subscription-requests.*', 'route' => 'admin.subscription-requests.index', 'label' => 'Demandes', 'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z'],
                         ['pattern' => 'admin.payments.*', 'route' => 'admin.payments.index', 'label' => 'Paiements', 'icon' => 'M2 8h20M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M2 8l2-4h16l2 4M6 15h4'],
+                        ['pattern' => 'admin.announcements.*', 'route' => 'admin.announcements.index', 'label' => 'Mise à jour', 'icon' => 'M12 4v12m0 0-4-4m4 4 4-4M4 20h16'],
                         ['pattern' => 'admin.campaigns.*', 'route' => 'admin.campaigns.index', 'label' => 'Campagnes', 'icon' => 'M3 8l9 6 9-6M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z'],
                     ];
                 @endphp
