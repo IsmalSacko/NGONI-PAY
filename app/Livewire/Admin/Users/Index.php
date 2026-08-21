@@ -30,7 +30,11 @@ class Index extends Component
 
         $user->update(['is_active' => ! $user->is_active]);
 
+        $notifier = app(\App\Services\Notifier::class);
+
         if ($desactivation) {
+            $notifier->accountDeactivated($user);
+
             // Les jetons sont révoqués : sans cela le compte resterait ouvert sur
             // son téléphone jusqu'à la prochaine connexion, et la désactivation
             // ne serait pas immédiate.
@@ -43,6 +47,8 @@ class Index extends Component
 
             return;
         }
+
+        $notifier->accountReactivated($user);
 
         session()->flash('status', "Compte réactivé. {$user->name} peut se reconnecter.");
     }

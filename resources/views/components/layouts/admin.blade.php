@@ -58,7 +58,15 @@
                              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="{{ $item['icon'] }}" />
                         </svg>
-                        {{ $item['label'] }}
+                        <span class="flex-1">{{ $item['label'] }}</span>
+                        @if ($item['pattern'] === 'admin.subscription-requests.*')
+                            @php($enAttente = \App\Models\SubscriptionRequest::pending()->count())
+                            @if ($enAttente > 0)
+                                <span class="rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                                    {{ $enAttente > 99 ? '99+' : $enAttente }}
+                                </span>
+                            @endif
+                        @endif
                     </a>
                 @endforeach
             </nav>
@@ -94,6 +102,22 @@
                     </svg>
                 </button>
                 <h1 class="text-lg sm:text-xl font-semibold text-slate-900 truncate">{{ $title ?? 'Admin' }}</h1>
+
+                {{-- Demandes à instruire. Rien ne les signalait : il fallait
+                     ouvrir la page pour savoir qu'un commerçant attendait. --}}
+                @php($aInstruire = \App\Models\SubscriptionRequest::pending()->count())
+                <a href="{{ route('admin.subscription-requests.index') }}"
+                   class="relative ml-auto shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                   title="{{ $aInstruire === 0 ? 'Aucune demande en attente' : $aInstruire . ' demande(s) en attente' }}">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
+                    </svg>
+                    @if ($aInstruire > 0)
+                        <span class="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white ring-2 ring-white">
+                            {{ $aInstruire > 99 ? '99+' : $aInstruire }}
+                        </span>
+                    @endif
+                </a>
             </header>
             <div class="p-4 sm:p-8">
                 {{ $slot }}

@@ -33,6 +33,8 @@ use Illuminate\Validation\ValidationException;
  */
 class SubscriptionRequestService
 {
+    public function __construct(private readonly Notifier $notifier) {}
+
     /**
      * Devise de facturation de l'éditeur.
      *
@@ -331,6 +333,10 @@ class SubscriptionRequestService
                 'decision_note' => $note,
             ]);
 
+            // Le commerçant devait rouvrir l'application et deviner : la décision
+            // lui est désormais adressée.
+            $this->notifier->subscriptionApproved($request->fresh(['business']));
+
             return $request->fresh(['business.subscription']);
         });
     }
@@ -371,6 +377,8 @@ class SubscriptionRequestService
             'decision_note' => 'Accordé manuellement depuis la console.',
         ]);
 
+        $this->notifier->subscriptionGranted($business, (string) $demande->plan);
+
         return $demande->fresh();
     }
 
@@ -387,6 +395,10 @@ class SubscriptionRequestService
             'decided_by_user_id' => $decidedBy->id,
             'decision_note' => $reason,
         ]);
+
+        // Un refus se dit, avec son motif : sans quoi le commerçant attend une
+        // réponse qui ne viendra pas.
+        $this->notifier->subscriptionRefused($request->fresh(['business']));
 
         return $request->fresh();
     }

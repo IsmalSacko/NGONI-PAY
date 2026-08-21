@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaymentController;
 
 use App\Http\Controllers\Api\Auth\AuthController;
@@ -40,6 +41,14 @@ Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
+// Notifications du commerçant : ce que l'application ne peut pas savoir
+// d'elle-même, à savoir les décisions prises par l'exploitant.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+});
+
 // Business routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/businesses/deactivated', [BusinessController::class, 'deactivated']);

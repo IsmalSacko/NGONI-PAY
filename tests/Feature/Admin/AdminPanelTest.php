@@ -217,3 +217,32 @@ test('la console est fermée à un commerçant', function () {
         ->get(route('admin.subscription-requests.index'))
         ->assertForbidden();
 });
+
+test('la console signale les demandes à instruire', function () {
+    // Rien ne les signalait : il fallait ouvrir la page pour savoir qu'un
+    // commerçant attendait.
+    $admin = makeAdmin();
+    $business = makeBusinessWithOwner();
+
+    $this->actingAs($admin)
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('Aucune demande en attente');
+
+    \App\Models\SubscriptionRequest::create([
+        'business_id' => $business->id,
+        'requested_by_user_id' => $business->owner_id,
+        'plan' => 'pro',
+        'amount_due' => 15000,
+        'currency' => 'XOF',
+        'months' => 1,
+        'cycle' => 'monthly',
+        'status' => 'pending',
+    ]);
+
+    // Le compteur se lit depuis n'importe quelle page de la console.
+    $this->actingAs($admin)
+        ->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('1 demande(s) en attente');
+});
