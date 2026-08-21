@@ -26,7 +26,25 @@ class Index extends Component
             return;
         }
 
+        $desactivation = (bool) $user->is_active;
+
         $user->update(['is_active' => ! $user->is_active]);
+
+        if ($desactivation) {
+            // Les jetons sont révoqués : sans cela le compte resterait ouvert sur
+            // son téléphone jusqu'à la prochaine connexion, et la désactivation
+            // ne serait pas immédiate.
+            $user->tokens()->delete();
+
+            session()->flash(
+                'status',
+                "Compte désactivé. {$user->name} est déconnecté immédiatement.",
+            );
+
+            return;
+        }
+
+        session()->flash('status', "Compte réactivé. {$user->name} peut se reconnecter.");
     }
 
     public function delete(int $userId): void

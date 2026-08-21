@@ -25,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             'throttle:60,1',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            // Un compte désactivé n'encaisse plus, même avec un jeton déjà émis.
+            \App\Http\Middleware\EnsureAccountIsActive::class,
         ]);
 
         // API : jamais de redirection login (401 JSON géré dans withExceptions).

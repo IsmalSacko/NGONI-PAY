@@ -55,6 +55,20 @@ class AuthController extends Controller
             return response()->json(['message' => 'Identifiants invalides.'], 401);
         }
 
+        // Compte désactivé : la colonne existait et le panneau permettait de la
+        // basculer, mais rien ne la lisait — désactiver un compte n'avait aucun
+        // effet, son propriétaire continuait de se connecter et d'encaisser.
+        //
+        // Le refus est explicite et dit quoi faire : un « identifiants
+        // invalides » enverrait chercher un mot de passe perdu.
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Votre compte a été désactivé. Contactez le service '
+                    . 'client pour le réactiver.',
+                'code' => 'ACCOUNT_DEACTIVATED',
+            ], 403);
+        }
+
         $token = $user->createToken('api')->plainTextToken;
 
         return response()->json([
@@ -189,6 +203,16 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json(['message' => 'Compte introuvable.'], 404);
+        }
+
+        // Réinitialiser le mot de passe d'un compte désactivé n'y donnerait pas
+        // accès, et laisserait croire le contraire.
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Votre compte a été désactivé. Contactez le service '
+                    . 'client pour le réactiver.',
+                'code' => 'ACCOUNT_DEACTIVATED',
+            ], 403);
         }
 
         if ($req->filled('email')) {

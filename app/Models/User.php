@@ -59,6 +59,20 @@ class User extends Authenticatable
     ];
 
     /**
+     * Valeurs par défaut d'une instance neuve.
+     *
+     * La colonne `is_active` a une valeur par défaut en base, mais le modèle ne
+     * la connaissait pas : après `User::create()`, `$user->is_active` valait
+     * `null` — donc « faux » — jusqu'à ce qu'on relise la ligne. Tout code tenant
+     * un modèle frais voyait un compte désactivé.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_active' => true,
+    ];
+
+    /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>
