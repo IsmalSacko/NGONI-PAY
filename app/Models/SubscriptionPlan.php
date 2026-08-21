@@ -100,6 +100,34 @@ class SubscriptionPlan extends Model
             );
     }
 
+    /**
+     * Tarif ramené au mois, qui sert d'unité de valeur.
+     *
+     * C'est la référence qui permet de convertir ce qui reste d'un abonnement en
+     * jours d'un autre : sans unité commune, on ne peut que jeter les jours
+     * restants ou les reporter tels quels, et les deux sont faux dès que les
+     * plans n'ont pas le même prix.
+     *
+     * Le tarif mensuel s'il est proposé ; sinon le moins cher au mois parmi les
+     * durées ouvertes — un plan vendu au trimestre seulement a bien une valeur
+     * mensuelle. Zéro pour un plan gratuit : un essai n'a rien coûté.
+     */
+    public function monthlyRate(): float
+    {
+        $mensuel = $this->priceFor(BillingCycle::Monthly);
+
+        if ($mensuel !== null) {
+            return (float) $mensuel->amount;
+        }
+
+        $taux = $this->prices
+            ->where('is_active', true)
+            ->map(fn (SubscriptionPlanPrice $price) => (float) $price->amount / max(1, $price->months()))
+            ->min();
+
+        return $taux === null ? 0.0 : (float) $taux;
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

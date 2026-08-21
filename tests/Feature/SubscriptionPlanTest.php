@@ -11,6 +11,27 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 /**
+ * Dépose une demande, la fait approuver, et rend la date de fin accordée.
+ */
+function approuver($test, string $plan, string $cycle): \Carbon\Carbon
+{
+    $demandeId = $test->postJson(
+        "/api/businesses/{$test->business->id}/subscription/requests",
+        ['plan' => $plan, 'cycle' => $cycle],
+    )->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $test->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
+        ->assertOk();
+
+    Sanctum::actingAs($test->owner);
+
+    return $test->business->fresh()->subscription->ends_at;
+}
+
+/**
  * Les tarifs étaient écrits dans le code, à trois endroits : les ajuster
  * demandait un déploiement, et l'abonnement n'existait qu'au mois.
  */
@@ -265,31 +286,114 @@ it('prolonge le même plan en ajoutant les mois à ce qui reste', function () {
         ->and(now()->diffInDays($fin))->toBeLessThan(106);
 });
 
-it('repart de maintenant quand le commerçant change de plan', function () {
-    // Passer de Basic à Pro ne conserve pas les jours du plan précédent : ce
-    // n'est pas la même offre, et les additionner avantagerait à tort.
+/**
+ * Conversion du temps restant lors d'un changement de plan.
+ *
+ * Le jeter vole le commerçant, le reporter tel quel le fait payer trop : trente
+ * jours de Basic ne valent pas trente jours de Pro. Ce qui reste est donc compté
+ * en valeur, au tarif mensuel, et reconverti en jours du plan demandé.
+ */
+it('convertit les jours restants à la valeur du plan demandé, à la hausse', function () {
+    // 30 jours de Basic (5 000/mois) valent 10 jours de Pro (15 000/mois).
     $this->business->subscription->update([
         'plan' => 'basic',
-        'starts_at' => now()->subDays(20),
-        'ends_at' => now()->addDays(300),
+        'starts_at' => now()->subMonth(),
+        'ends_at' => now()->addDays(30),
+        'is_active' => true,
+        'is_manual' => false,
+    ]);
+
+    $fin = approuver($this, 'pro', 'monthly');
+
+    // 1 mois acheté + 10 jours convertis ≈ 41 jours.
+    expect(now()->diffInDays($fin))->toBeGreaterThan(38)
+        ->and(now()->diffInDays($fin))->toBeLessThan(44);
+});
+
+it('convertit les jours restants à la valeur du plan demandé, à la baisse', function () {
+    // 30 jours de Pro (15 000/mois) valent 90 jours de Basic (5 000/mois) : une
+    // descente en gamme ne fait pas perdre ce qui a été payé.
+    $this->business->subscription->update([
+        'plan' => 'pro',
+        'starts_at' => now()->subMonth(),
+        'ends_at' => now()->addDays(30),
+        'is_active' => true,
+        'is_manual' => false,
+    ]);
+
+    $fin = approuver($this, 'basic', 'monthly');
+
+    // 1 mois acheté + 90 jours convertis ≈ 121 jours.
+    expect(now()->diffInDays($fin))->toBeGreaterThan(115)
+        ->and(now()->diffInDays($fin))->toBeLessThan(126);
+});
+
+it('ne convertit rien depuis un essai gratuit', function () {
+    // Un essai n'a rien coûté : il n'y a pas de valeur à reporter.
+    $this->business->subscription->update([
+        'plan' => 'free',
+        'starts_at' => now()->subDays(2),
+        'ends_at' => now()->addDays(5),
         'is_active' => true,
     ]);
 
-    $demandeId = $this->postJson(
+    $fin = approuver($this, 'basic', 'monthly');
+
+    expect(now()->diffInDays($fin))->toBeLessThan(33);
+});
+
+it('ne convertit rien depuis une attribution manuelle', function () {
+    // Une faveur ne se convertit pas en jours payants : un cadeau de deux ans
+    // multiplierait sinon la valeur accordée.
+    $this->business->subscription->update([
+        'plan' => 'pro',
+        'starts_at' => now()->subMonth(),
+        'ends_at' => now()->addDays(700),
+        'is_active' => true,
+        'is_manual' => true,
+    ]);
+
+    $fin = approuver($this, 'basic', 'monthly');
+
+    expect(now()->diffInDays($fin))->toBeLessThan(33);
+});
+
+it('ne vend pas de temps à un abonnement sans échéance', function () {
+    // Il en a déjà sans limite : prendre son argent serait le prendre pour rien.
+    $this->business->subscription->update([
+        'plan' => 'pro',
+        'starts_at' => now()->subMonth(),
+        'ends_at' => null,
+        'is_active' => true,
+        'is_manual' => true,
+    ]);
+
+    $this->postJson(
         "/api/businesses/{$this->business->id}/subscription/requests",
         ['plan' => 'pro', 'cycle' => 'monthly'],
-    )->json('data.id');
+    )->assertStatus(422)->assertJsonValidationErrors('plan');
+});
 
-    $admin = User::factory()->create(['role' => 'system_admin']);
-    Sanctum::actingAs($admin);
+it('annonce la date que l’approbation accorderait', function () {
+    // Le commerçant comme l'exploitant doivent la voir avant de décider.
+    $this->business->subscription->update([
+        'plan' => 'basic',
+        'starts_at' => now()->subMonth(),
+        'ends_at' => now()->addDays(30),
+        'is_active' => true,
+        'is_manual' => false,
+    ]);
 
-    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
-        ->assertOk();
+    $reponse = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic', 'cycle' => 'quarterly'],
+    )->assertStatus(202);
 
-    $abonnement = $this->business->fresh()->subscription;
+    $annoncee = \Carbon\Carbon::parse($reponse->json('data.projected_ends_at'));
 
-    expect($abonnement->plan)->toBe('pro')
-        ->and(now()->diffInDays($abonnement->ends_at))->toBeLessThan(35);
+    // Même plan : 30 jours restants + 3 mois ≈ 121 jours.
+    expect(now()->diffInDays($annoncee))->toBeGreaterThan(115)
+        ->and(now()->diffInDays($annoncee))->toBeLessThan(126);
 });
 
 it('laisse déposer une autre demande après avoir retiré la précédente', function () {

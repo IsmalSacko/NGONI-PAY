@@ -13,6 +13,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionRequest;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -94,6 +95,19 @@ class SubscriptionRequestService
             ]);
         }
 
+        // Abonnement sans échéance : lui vendre du temps serait prendre son
+        // argent pour rien, puisqu'il en a déjà sans limite.
+        $courant = $business->subscription;
+
+        if ($courant !== null && $courant->is_active && $courant->ends_at === null) {
+            throw ValidationException::withMessages([
+                'plan' => [
+                    'Votre abonnement est illimité. Contactez le service client '
+                        . 'pour toute modification.',
+                ],
+            ]);
+        }
+
         $pending = SubscriptionRequest::query()
             ->where('business_id', $business->id)
             ->pending()
@@ -142,6 +156,100 @@ class SubscriptionRequestService
     }
 
     /**
+     * Date de fin qu'accorderait l'approbation de cette demande.
+     *
+     * Le point délicat : que devient le temps déjà payé quand le commerçant
+     * change de plan ? Le jeter le vole, le reporter tel quel le paie trop —
+     * trente jours de Basic ne valent pas trente jours de Pro.
+     *
+     * Ce qui reste n'est donc pas compté en jours mais en **valeur**, ramenée au
+     * tarif mensuel du plan concerné, puis reconvertie en jours du plan demandé :
+     *
+     *     créditJours = joursRestants × tarifMensuel(actuel) / tarifMensuel(demandé)
+     *
+     * Une seule règle, et chaque cas en découle :
+     * - même plan encore valide → extension exacte depuis son échéance, sans
+     *   passer par la valeur : le calendrier est plus juste qu'un mois de trente
+     *   jours ;
+     * - montée en gamme → les jours restants valent moins cher, donc moins de
+     *   jours ;
+     * - descente en gamme → ils valent davantage, donc plus de jours ;
+     * - essai gratuit → tarif nul, aucun crédit : il n'a rien coûté ;
+     * - attribution manuelle → aucun crédit : une faveur ne se convertit pas en
+     *   jours payants, et un cadeau de dix ans multiplierait sinon.
+     *
+     * Rend `null` pour un abonnement sans échéance, qu'on ne raccourcit jamais.
+     */
+    public function projectedEndDate(SubscriptionRequest $request): ?Carbon
+    {
+        $mois = max(1, (int) $request->months);
+        $courant = $request->business->subscription;
+
+        // Rien en cours : la durée part de maintenant.
+        if ($courant === null) {
+            return now()->addMonths($mois);
+        }
+
+        // Abonnement sans échéance : il ne se raccourcit pas.
+        if ($courant->is_active && $courant->ends_at === null) {
+            return null;
+        }
+
+        $echeance = $courant->ends_at ? Carbon::parse($courant->ends_at) : null;
+        $encoreValide = $echeance !== null && $echeance->isFuture();
+
+        // Même plan encore valide : extension exacte, en mois calendaires.
+        if ($encoreValide && $courant->plan === $request->plan) {
+            return $echeance->copy()->addMonths($mois);
+        }
+
+        $depart = now()->addMonths($mois);
+
+        if (! $encoreValide) {
+            return $depart;
+        }
+
+        return $depart->addDays($this->creditedDays($courant, $request));
+    }
+
+    /**
+     * Jours du plan demandé que vaut le reste de l'abonnement en cours.
+     */
+    private function creditedDays(Subscription $courant, SubscriptionRequest $request): int
+    {
+        // Une attribution manuelle n'a pas été payée : la convertir en jours d'un
+        // plan payant transformerait une faveur en argent.
+        if ($courant->is_manual) {
+            return 0;
+        }
+
+        $actuel = SubscriptionPlan::byCode($courant->plan);
+        $demande = SubscriptionPlan::byCode($request->plan);
+
+        if ($actuel === null || $demande === null) {
+            return 0;
+        }
+
+        $tauxDemande = $demande->monthlyRate();
+
+        // Plan demandé gratuit — cas écarté au dépôt — ou tarif nul : rien à
+        // diviser.
+        if ($tauxDemande <= 0) {
+            return 0;
+        }
+
+        $joursRestants = now()->diffInDays(Carbon::parse($courant->ends_at), false);
+
+        if ($joursRestants <= 0) {
+            return 0;
+        }
+
+        // Arrondi au jour inférieur : mieux vaut un jour de moins qu'un jour
+        // offert par un arrondi, répété sur chaque renouvellement.
+        return (int) floor($joursRestants * $actuel->monthlyRate() / $tauxDemande);
+    }
+
+    /**
      * L'exploitant approuve : le plan s'active, et l'encaissement est tracé.
      *
      * Le paiement écrit ici porte `purpose = subscription`, donc n'entre pas dans
@@ -156,15 +264,6 @@ class SubscriptionRequestService
 
         return DB::transaction(function () use ($request, $decidedBy, $note) {
             $business = $request->business;
-            $months = max(1, (int) $request->months);
-
-            // Un abonnement encore valide n'est pas écourté : les mois demandés
-            // s'ajoutent à ce qui reste.
-            $current = $business->subscription;
-            $depart = $current && $current->ends_at && $current->ends_at->isFuture()
-                && $current->plan === $request->plan
-                ? $current->ends_at
-                : now();
 
             Subscription::updateOrCreate(
                 ['business_id' => $business->id],
@@ -172,7 +271,9 @@ class SubscriptionRequestService
                     'plan' => $request->plan,
                     'is_active' => true,
                     'starts_at' => now(),
-                    'ends_at' => $depart->copy()->addMonths($months),
+                    // Voir `projectedEndDate` : ce qui reste est converti en
+                    // jours du plan demandé, à sa valeur.
+                    'ends_at' => $this->projectedEndDate($request),
                 ],
             );
 

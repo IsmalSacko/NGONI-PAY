@@ -126,8 +126,19 @@ class Index extends Component
             ->latest()
             ->paginate(15);
 
+        // Projections calculées à l'affichage, pas stockées : les jours passent
+        // entre le dépôt et la décision, et la date doit rester juste.
+        $service = app(SubscriptionRequestService::class);
+        $projections = $demandes->getCollection()
+            ->filter(fn (SubscriptionRequest $demande) => $demande->status === SubscriptionRequestStatus::Pending)
+            ->mapWithKeys(fn (SubscriptionRequest $demande) => [
+                $demande->id => $service->projectedEndDate($demande),
+            ])
+            ->all();
+
         return view('livewire.admin.subscription-requests.index', [
             'demandes' => $demandes,
+            'projections' => $projections,
             'compteurs' => [
                 'pending' => SubscriptionRequest::where('status', SubscriptionRequestStatus::Pending)->count(),
                 'approved' => SubscriptionRequest::where('status', SubscriptionRequestStatus::Approved)->count(),

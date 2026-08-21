@@ -93,6 +93,14 @@
                         <div class="mt-1 text-xs text-slate-500">
                             {{ $demande->method ? str_replace('_', ' ', $demande->method) : 'moyen non précisé' }}
                         </div>
+                        @if ($demande->status->value === 'pending')
+                            @php($fin = $projections[$demande->id] ?? null)
+                            {{-- Ce que l'approbation accorderait : le temps déjà
+                                 payé est converti, pas jeté. --}}
+                            <div class="mt-1 text-xs font-medium text-indigo-600">
+                                → {{ $fin ? 'jusqu\'au ' . $fin->translatedFormat('d/m/Y') : 'sans échéance' }}
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -116,7 +124,9 @@
                                 <button type="button" wire:click="approve({{ $demande->id }})"
                                         wire:loading.attr="disabled"
                                         class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-                                    Approuver — {{ strtoupper($demande->plan) }} pour {{ $demande->months }} mois
+                                    @php($fin = $projections[$demande->id] ?? null)
+                                    Approuver — {{ strtoupper($demande->plan) }}
+                                    {{ $fin ? "jusqu'au " . $fin->translatedFormat('d/m/Y') : 'sans échéance' }}
                                 </button>
                                 <button type="button" wire:click="refuse({{ $demande->id }})"
                                         wire:loading.attr="disabled"

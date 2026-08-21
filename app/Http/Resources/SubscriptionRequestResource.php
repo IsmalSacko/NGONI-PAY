@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use App\Enums\BusinessType;
+use App\Enums\SubscriptionRequestStatus;
+use App\Services\SubscriptionRequestService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -27,6 +29,14 @@ class SubscriptionRequestResource extends JsonResource
             // Chemin brut inutile côté client : seule l'URL sert à l'afficher.
             'proof_url' => $this->proofUrl(),
             'proof_note' => $this->proof_note,
+            // Ce qu'accorderait l'approbation, calculé à l'instant : le
+            // commerçant comme l'exploitant doivent voir la date avant de
+            // décider, pas la découvrir après. `null` = sans échéance.
+            'projected_ends_at' => $this->status === SubscriptionRequestStatus::Pending
+                ? app(SubscriptionRequestService::class)
+                    ->projectedEndDate($this->resource)
+                    ?->toIso8601String()
+                : null,
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
             'decided_at' => $this->decided_at,
