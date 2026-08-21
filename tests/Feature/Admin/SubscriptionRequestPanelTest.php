@@ -129,3 +129,14 @@ test('la durée demandée est visible dans la file', function () {
         ->test(RequestsIndex::class)
         ->assertSee('Trimestriel');
 });
+
+test('la file propose d’instruire une demande en attente', function () {
+    // Le bouton était rendu, mais invisible à l'écran : c'est ce que ce test
+    // vérifie en premier — sa présence dans le HTML.
+    Livewire::actingAs($this->admin)
+        ->test(RequestsIndex::class)
+        ->assertSee('Instruire cette demande')
+        ->call('startDeciding', $this->demande->id)
+        ->assertSee('Approuver')
+        ->assertSee('Refuser');
+});

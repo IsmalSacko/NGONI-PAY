@@ -236,3 +236,99 @@ it('solde la demande en attente quand le plan est accordé à la main', function
         'status' => 'approved',
     ]);
 });
+
+it('prolonge le même plan en ajoutant les mois à ce qui reste', function () {
+    // Un commerçant sur Basic doit pouvoir prendre un trimestre de plus sans
+    // perdre les jours qui lui restent — sinon renouveler tôt le pénalise.
+    $this->business->subscription->update([
+        'plan' => 'basic',
+        'starts_at' => now()->subDays(20),
+        'ends_at' => now()->addDays(10),
+        'is_active' => true,
+    ]);
+
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic', 'cycle' => 'quarterly'],
+    )->assertStatus(202)->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
+        ->assertOk();
+
+    // 10 jours restants + 3 mois ≈ 100 jours.
+    $fin = $this->business->fresh()->subscription->ends_at;
+
+    expect(now()->diffInDays($fin))->toBeGreaterThan(98)
+        ->and(now()->diffInDays($fin))->toBeLessThan(106);
+});
+
+it('repart de maintenant quand le commerçant change de plan', function () {
+    // Passer de Basic à Pro ne conserve pas les jours du plan précédent : ce
+    // n'est pas la même offre, et les additionner avantagerait à tort.
+    $this->business->subscription->update([
+        'plan' => 'basic',
+        'starts_at' => now()->subDays(20),
+        'ends_at' => now()->addDays(300),
+        'is_active' => true,
+    ]);
+
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro', 'cycle' => 'monthly'],
+    )->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
+        ->assertOk();
+
+    $abonnement = $this->business->fresh()->subscription;
+
+    expect($abonnement->plan)->toBe('pro')
+        ->and(now()->diffInDays($abonnement->ends_at))->toBeLessThan(35);
+});
+
+it('laisse déposer une autre demande après avoir retiré la précédente', function () {
+    // Une seule demande en attente à la fois : la retirer est ce qui permet
+    // d'en déposer une autre, pour une autre durée par exemple.
+    $premiere = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic', 'cycle' => 'monthly'],
+    )->json('data.id');
+
+    $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic', 'cycle' => 'yearly'],
+    )->assertStatus(422);
+
+    $this->deleteJson(
+        "/api/businesses/{$this->business->id}/subscription/requests/{$premiere}",
+    )->assertOk();
+
+    $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic', 'cycle' => 'yearly'],
+    )->assertStatus(202)->assertJsonPath('data.cycle', 'yearly');
+});
+
+it('liste ses demandes au commerçant', function () {
+    // L'application s'en sert pour dire « demande en attente » avant de laisser
+    // déposer, plutôt que de laisser le serveur refuser après coup.
+    $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro', 'cycle' => 'biannual', 'method' => 'cash'],
+    )->assertStatus(202);
+
+    $demandes = $this->getJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+    )->assertOk()->json('data');
+
+    expect($demandes)->toHaveCount(1)
+        ->and($demandes[0]['status'])->toBe('pending')
+        ->and($demandes[0]['cycle_label'])->toBe('Semestriel')
+        ->and($demandes[0]['months'])->toBe(6);
+});
