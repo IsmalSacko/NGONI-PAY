@@ -101,7 +101,7 @@ it('refuse une sélection vide', function () {
     expect(AppNotification::count())->toBe(0);
 });
 
-it('coche et décoche tout le monde d’un geste', function () {
+it('coche et décoche d’un geste, sans les comptes sans adresse', function () {
     // Cocher page par page ferait manquer des utilisateurs sans qu'on le
     // remarque : le geste porte sur toute la base filtrée.
     $composant = Livewire::actingAs($this->admin)
@@ -109,13 +109,38 @@ it('coche et décoche tout le monde d’un geste', function () {
         ->set('audience', 'selected')
         ->call('toggleAll');
 
-    // Les deux commerçants actifs : ni le compte désactivé, ni l'administrateur
-    // qui envoie l'annonce.
-    expect($composant->get('selected'))->toHaveCount(2);
+    // Seul le commerçant qui a une adresse : proposer de cocher celui qui n'en a
+    // pas promettrait un envoi qui n'aurait pas lieu. Ni le compte désactivé, ni
+    // l'administrateur qui envoie l'annonce.
+    expect($composant->get('selected'))->toEqual([$this->avecEmail->id]);
 
     $composant->call('toggleAll');
 
     expect($composant->get('selected'))->toHaveCount(0);
+});
+
+it('ne propose pas de cocher un commerçant sans adresse', function () {
+    Livewire::actingAs($this->admin)
+        ->test(AnnouncementsIndex::class)
+        ->set('audience', 'selected')
+        ->assertSee('awa@example.test')
+        // « Moussa Diarra » n'a pas d'adresse : il n'a rien à faire dans une
+        // liste de destinataires de courriel.
+        ->assertDontSee('Moussa Diarra');
+});
+
+it('atteint quand même par notification ceux qui n’ont pas d’adresse', function () {
+    // C'est le seul canal qui leur parvienne : les retirer de la liste des
+    // destinataires du courriel ne doit pas les priver de l'annonce.
+    Livewire::actingAs($this->admin)
+        ->test(AnnouncementsIndex::class)
+        ->set('message', 'Mise à jour générale.')
+        ->set('audience', 'all')
+        ->set('timing', 'now')
+        ->call('send');
+
+    expect(AppNotification::where('user_id', $this->sansEmail->id)->exists())
+        ->toBeTrue();
 });
 
 it('programme une annonce sans l’envoyer', function () {

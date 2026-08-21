@@ -7,12 +7,16 @@
          qu'une partie de la base, la notification touche tout le monde. --}}
     <div class="grid gap-3 sm:grid-cols-2">
         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <div class="text-2xl font-semibold text-slate-900">{{ $totalActifs }}</div>
-            <div class="text-xs text-slate-500">comptes actifs — tous notifiés dans l'application</div>
+            <div class="text-2xl font-semibold text-indigo-600">{{ $avecEmail }}</div>
+            <div class="text-xs text-slate-500">
+                avec une adresse email — <span class="font-medium">recevront le courriel</span>
+            </div>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <div class="text-2xl font-semibold text-indigo-600">{{ $avecEmail }}</div>
-            <div class="text-xs text-slate-500">avec une adresse email — recevront le courriel</div>
+            <div class="text-2xl font-semibold text-slate-900">{{ $totalActifs - $avecEmail }}</div>
+            <div class="text-xs text-slate-500">
+                sans adresse — joignables seulement par la notification dans l'application
+            </div>
         </div>
     </div>
 
@@ -87,12 +91,12 @@
                 <label class="flex items-center gap-2 text-sm text-slate-700">
                     <input type="radio" wire:model.live="audience" value="all"
                            class="border-slate-300 text-indigo-600 focus:ring-indigo-500/20">
-                    Tous les comptes actifs ({{ $totalActifs }})
+                    Tous ({{ $avecEmail }} par courriel, {{ $totalActifs }} notifiés dans l'application)
                 </label>
                 <label class="flex items-center gap-2 text-sm text-slate-700">
                     <input type="radio" wire:model.live="audience" value="selected"
                            class="border-slate-300 text-indigo-600 focus:ring-indigo-500/20">
-                    Une sélection
+                    Une sélection ({{ $avecEmail }} joignables par courriel)
                 </label>
             </div>
 
@@ -123,9 +127,7 @@
                                         </td>
                                         <td class="px-3 py-2 text-slate-800">{{ $destinataire->name }}</td>
                                         <td class="px-3 py-2 text-slate-500">{{ $destinataire->phone }}</td>
-                                        <td class="px-3 py-2 text-slate-500">
-                                            {{ $destinataire->email ?: '— sans email' }}
-                                        </td>
+                                        <td class="px-3 py-2 text-slate-500">{{ $destinataire->email }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

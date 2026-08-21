@@ -157,8 +157,10 @@ class Index extends Component
     {
         $needle = '%' . mb_strtolower($this->search) . '%';
 
+        // Seuls les comptes ayant une adresse : cocher un commerçant sans
+        // adresse promettrait un envoi qui n'aurait pas lieu.
         return app(AnnouncementDispatcher::class)
-            ->audienceQuery()
+            ->mailableQuery()
             ->when($this->search !== '', fn ($query) => $query->where(
                 fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', [$needle])
                     ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
@@ -174,8 +176,7 @@ class Index extends Component
         return view('livewire.admin.announcements.index', [
             'destinataires' => $destinataires,
             'totalActifs' => app(AnnouncementDispatcher::class)->audienceQuery()->count(),
-            'avecEmail' => app(AnnouncementDispatcher::class)->audienceQuery()
-                ->whereNotNull('email')->where('email', '!=', '')->count(),
+            'avecEmail' => app(AnnouncementDispatcher::class)->mailableQuery()->count(),
             'programmees' => Campaign::where('type', Campaign::TYPE_APP_UPDATE)
                 ->where('status', Campaign::STATUS_SCHEDULED)
                 ->orderBy('scheduled_at')

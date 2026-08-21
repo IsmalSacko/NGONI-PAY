@@ -57,6 +57,21 @@ class AnnouncementDispatcher
     }
 
     /**
+     * Comptes joignables par courriel.
+     *
+     * C'est parmi eux qu'on désigne des destinataires : proposer de cocher un
+     * commerçant sans adresse revient à promettre un envoi qui n'aura pas lieu.
+     * Ceux qui n'en ont pas restent atteints par la notification dans
+     * l'application, seul canal qui leur parvienne.
+     */
+    public function mailableQuery()
+    {
+        return $this->audienceQuery()
+            ->whereNotNull('email')
+            ->where('email', '!=', '');
+    }
+
+    /**
      * @return array{notified: int, mailed: int, failed: int}
      */
     public function dispatch(Campaign $campaign): array
