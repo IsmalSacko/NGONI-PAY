@@ -436,3 +436,35 @@ it('liste ses demandes au commerçant', function () {
         ->and($demandes[0]['cycle_label'])->toBe('Semestriel')
         ->and($demandes[0]['months'])->toBe(6);
 });
+
+it('annonce l’aperçu avant que la demande ne soit déposée', function () {
+    // Le commerçant doit voir qu'il ne perd rien **avant** de demander.
+    $this->business->subscription->update([
+        'plan' => 'basic',
+        'starts_at' => now()->subMonth(),
+        'ends_at' => now()->addDays(20),
+        'is_active' => true,
+        'is_manual' => false,
+    ]);
+
+    // Même plan : les 20 jours sont conservés tels quels.
+    $apercu = $this->getJson(
+        "/api/businesses/{$this->business->id}/subscription/preview?plan=basic&cycle=quarterly",
+    )->assertOk()->json('data');
+
+    expect($apercu['remaining_days'])->toBe(20)
+        ->and($apercu['extends'])->toBeTrue()
+        ->and($apercu['credited_days'])->toBe(20);
+
+    $fin = \Carbon\Carbon::parse($apercu['ends_at']);
+    expect(now()->diffInDays($fin))->toBeGreaterThan(105);
+
+    // Changement de plan : les 20 jours de Basic valent moins en Pro.
+    $versPro = $this->getJson(
+        "/api/businesses/{$this->business->id}/subscription/preview?plan=pro&cycle=monthly",
+    )->assertOk()->json('data');
+
+    expect($versPro['extends'])->toBeFalse()
+        ->and($versPro['credited_days'])->toBeLessThan(20)
+        ->and($versPro['credited_days'])->toBeGreaterThan(0);
+});

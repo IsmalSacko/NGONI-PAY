@@ -75,6 +75,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Demandes d'abonnement du commerçant. `requests` précède `{subscription}`
     // pour ne pas être capturé comme un identifiant.
+    // Aperçu de ce qu'accorderait un achat, avant de le demander.
+    Route::get('/businesses/{business}/subscription/preview', [SubscriptionRequestController::class, 'preview']);
     Route::get('/businesses/{business}/subscription/requests', [SubscriptionRequestController::class, 'index']);
     Route::post('/businesses/{business}/subscription/requests', [SubscriptionRequestController::class, 'store']);
     Route::delete('/businesses/{business}/subscription/requests/{subscriptionRequest}', [SubscriptionRequestController::class, 'destroy']);

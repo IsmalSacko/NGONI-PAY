@@ -182,8 +182,24 @@ class SubscriptionRequestService
      */
     public function projectedEndDate(SubscriptionRequest $request): ?Carbon
     {
-        $mois = max(1, (int) $request->months);
-        $courant = $request->business->subscription;
+        return $this->projectFor(
+            $request->business,
+            (string) $request->plan,
+            max(1, (int) $request->months),
+        );
+    }
+
+    /**
+     * Ce que donnerait l'achat de `$mois` mois du plan `$plan`.
+     *
+     * Séparé de la demande pour que l'application puisse l'annoncer **avant**
+     * qu'elle soit déposée : dupliquer la formule côté mobile la ferait dériver
+     * du serveur au premier ajustement de tarif.
+     */
+    public function projectFor(Business $business, string $plan, int $mois): ?Carbon
+    {
+        $mois = max(1, $mois);
+        $courant = $business->subscription;
 
         // Rien en cours : la durée part de maintenant.
         if ($courant === null) {
@@ -199,7 +215,7 @@ class SubscriptionRequestService
         $encoreValide = $echeance !== null && $echeance->isFuture();
 
         // Même plan encore valide : extension exacte, en mois calendaires.
-        if ($encoreValide && $courant->plan === $request->plan) {
+        if ($encoreValide && $courant->plan === $plan) {
             return $echeance->copy()->addMonths($mois);
         }
 
@@ -209,22 +225,51 @@ class SubscriptionRequestService
             return $depart;
         }
 
-        return $depart->addDays($this->creditedDays($courant, $request));
+        return $depart->addDays($this->creditedDays($courant, $plan));
+    }
+
+    /**
+     * Détail de la projection, pour l'annoncer au commerçant.
+     *
+     * @return array{ends_at: ?string, remaining_days: int, credited_days: int, extends: bool}
+     */
+    public function previewFor(Business $business, string $plan, int $mois): array
+    {
+        $courant = $business->subscription;
+        $echeance = $courant?->ends_at ? Carbon::parse($courant->ends_at) : null;
+        $restants = $echeance !== null && $echeance->isFuture()
+            ? (int) ceil(now()->diffInDays($echeance, false))
+            : 0;
+
+        $prolonge = $courant !== null
+            && $courant->plan === $plan
+            && $restants > 0;
+
+        return [
+            'ends_at' => $this->projectFor($business, $plan, $mois)?->toIso8601String(),
+            'remaining_days' => max(0, $restants),
+            // Sur le même plan les jours restants sont conservés tels quels : il
+            // n'y a pas de conversion, donc pas de crédit à annoncer.
+            'credited_days' => $prolonge
+                ? max(0, $restants)
+                : $this->creditedDays($courant ?? new Subscription(), $plan),
+            'extends' => $prolonge,
+        ];
     }
 
     /**
      * Jours du plan demandé que vaut le reste de l'abonnement en cours.
      */
-    private function creditedDays(Subscription $courant, SubscriptionRequest $request): int
+    private function creditedDays(Subscription $courant, string $plan): int
     {
         // Une attribution manuelle n'a pas été payée : la convertir en jours d'un
         // plan payant transformerait une faveur en argent.
-        if ($courant->is_manual) {
+        if ($courant->is_manual || $courant->ends_at === null) {
             return 0;
         }
 
         $actuel = SubscriptionPlan::byCode($courant->plan);
-        $demande = SubscriptionPlan::byCode($request->plan);
+        $demande = SubscriptionPlan::byCode($plan);
 
         if ($actuel === null || $demande === null) {
             return 0;

@@ -12,6 +12,7 @@ use App\Models\Business;
 use App\Models\SubscriptionRequest;
 use App\Services\SubscriptionRequestService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Demandes d'abonnement, côté commerçant.
@@ -34,6 +35,35 @@ class SubscriptionRequestController extends Controller
             ->get();
 
         return SubscriptionRequestResource::collection($demandes);
+    }
+
+    /**
+     * Ce que donnerait l'achat, avant de le demander.
+     *
+     * L'écran annonce la date de fin et les jours conservés : le commerçant doit
+     * voir qu'il ne perd rien **avant** de déposer sa demande. Le calcul reste au
+     * serveur — le dupliquer côté mobile le ferait dériver au premier ajustement
+     * de tarif.
+     */
+    public function preview(Request $request, Business $business)
+    {
+        $this->authorizeManager($business, $request);
+
+        $data = $request->validate([
+            'plan' => ['required', 'string', 'max:30'],
+            'cycle' => ['sometimes', Rule::enum(BillingCycle::class)],
+        ]);
+
+        $cycle = BillingCycle::tryFrom((string) ($data['cycle'] ?? ''))
+            ?? BillingCycle::Monthly;
+
+        return response()->json([
+            'data' => $this->requests->previewFor(
+                $business,
+                $data['plan'],
+                $cycle->months(),
+            ),
+        ]);
     }
 
     public function store(
