@@ -42,6 +42,7 @@
                         ['pattern' => 'admin.users.*', 'route' => 'admin.users.index', 'label' => 'Utilisateurs', 'icon' => 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14c-5 0-8 2.5-8 5v1h16v-1c0-2.5-3-5-8-5Z'],
                         ['pattern' => 'admin.businesses.*', 'route' => 'admin.businesses.index', 'label' => 'Entreprises', 'icon' => 'M4 21V7l8-4 8 4v14M9 21v-6h6v6M4 21h16'],
                         ['pattern' => 'admin.subscriptions.*', 'route' => 'admin.subscriptions.index', 'label' => 'Abonnements', 'icon' => 'M5 5h14v14H5V5Zm3 4h8M8 12h8M8 15h5'],
+                        ['pattern' => 'admin.subscription-requests.*', 'route' => 'admin.subscription-requests.index', 'label' => 'Demandes', 'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z'],
                         ['pattern' => 'admin.payments.*', 'route' => 'admin.payments.index', 'label' => 'Paiements', 'icon' => 'M2 8h20M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M2 8l2-4h16l2 4M6 15h4'],
                         ['pattern' => 'admin.campaigns.*', 'route' => 'admin.campaigns.index', 'label' => 'Campagnes', 'icon' => 'M3 8l9 6 9-6M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z'],
                     ];

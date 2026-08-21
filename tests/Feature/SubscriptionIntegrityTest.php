@@ -61,20 +61,28 @@ it('n’active pas un plan payant sur une déclaration de paiement en espèces',
     expect($this->business->fresh()->subscription->plan)->toBe('free');
 });
 
-it('trace la demande en espèces sans l’encaisser', function () {
+it('enregistre une demande à instruire, et aucun encaissement', function () {
     $this->postJson("/api/businesses/{$this->business->id}/subscription", [
         'plan' => 'basic',
         'method' => 'cash',
         'starts_at' => now()->toDateString(),
     ])->assertStatus(202);
 
-    // Le paiement existe — un administrateur doit pouvoir le retrouver — mais il
-    // reste en attente : personne n'a constaté l'argent.
-    $this->assertDatabaseHas('payments', [
+    // La demande existe — l'exploitant doit la retrouver — avec le montant figé
+    // au dépôt.
+    $this->assertDatabaseHas('subscription_requests', [
+        'business_id' => $this->business->id,
+        'plan' => 'basic',
+        'method' => 'cash',
+        'status' => 'pending',
+        'amount_due' => 5000,
+    ]);
+
+    // Aucun paiement en revanche : écrire une ligne d'encaissement pour de
+    // l'argent qui n'est pas arrivé la ferait figurer dans les journaux.
+    $this->assertDatabaseMissing('payments', [
         'business_id' => $this->business->id,
         'purpose' => 'subscription',
-        'status' => 'pending',
-        'amount' => 5000,
     ]);
 });
 
@@ -238,4 +246,126 @@ it('écarte les abonnements de la liste des paiements', function () {
     )->assertOk()->json('data');
 
     expect($abonnements)->toHaveCount(1);
+});
+
+it('n’accepte qu’une demande en attente à la fois', function () {
+    // Sans cette borne, un commerçant impatient en dépose dix et l'exploitant
+    // instruit dix fois le même dossier.
+    $depose = fn () => $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro'],
+    );
+
+    $depose()->assertStatus(202);
+    $depose()->assertStatus(422)->assertJsonValidationErrors('plan');
+});
+
+it('accepte une preuve de paiement, et s’en passe', function () {
+    $this->postJson("/api/businesses/{$this->business->id}/subscription/requests", [
+        'plan' => 'basic',
+        'method' => 'orange_money',
+        'note' => 'Payé ce matin à la boutique',
+        'contact_phone' => '76008201',
+        'proof_note' => 'Transfert de 5000 FCFA vers 74988201 - ID: 1234',
+    ])->assertStatus(202)
+        ->assertJsonPath('data.proof_note', 'Transfert de 5000 FCFA vers 74988201 - ID: 1234')
+        // Facultative : un commerçant qui règle de la main à la main n'a rien à
+        // joindre, et l'exiger bloquerait sa demande.
+        ->assertJsonPath('data.proof_url', null);
+});
+
+it('active le plan quand l’administrateur approuve, et pas avant', function () {
+    $reponse = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro', 'method' => 'cash'],
+    )->assertStatus(202);
+
+    $demandeId = $reponse->json('data.id');
+
+    expect($this->business->fresh()->subscription->plan)->toBe('free');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve", [
+        'note' => 'Reçu 15 000 en espèces',
+    ])->assertOk()->assertJsonPath('data.status', 'approved');
+
+    $subscription = $this->business->fresh()->subscription;
+
+    expect($subscription->plan)->toBe('pro')
+        ->and($subscription->is_active)->toBeTrue()
+        ->and($subscription->ends_at->isFuture())->toBeTrue();
+
+    // L'encaissement est tracé — mais hors chiffre d'affaires du commerçant.
+    $this->assertDatabaseHas('payments', [
+        'business_id' => $this->business->id,
+        'purpose' => 'subscription',
+        'status' => 'success',
+        'amount' => 15000,
+    ]);
+});
+
+it('refuse une demande avec un motif que le commerçant verra', function () {
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic'],
+    )->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/refuse", [
+        'reason' => 'Aucun paiement reçu',
+    ])->assertOk()
+        ->assertJsonPath('data.status', 'refused')
+        ->assertJsonPath('data.decision_note', 'Aucun paiement reçu');
+
+    expect($this->business->fresh()->subscription->plan)->toBe('free');
+});
+
+it('ne tranche pas deux fois la même demande', function () {
+    // Deux approbations accorderaient deux mois pour un seul paiement.
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic'],
+    )->json('data.id');
+
+    $admin = User::factory()->create(['role' => 'system_admin']);
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")->assertOk();
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('status');
+});
+
+it('interdit à un commerçant d’instruire une demande', function () {
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro'],
+    )->json('data.id');
+
+    // Toujours connecté comme propriétaire : la route est réservée aux admins.
+    $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
+        ->assertStatus(403);
+
+    expect($this->business->fresh()->subscription->plan)->toBe('free');
+});
+
+it('laisse le commerçant retirer sa demande', function () {
+    $demandeId = $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'pro'],
+    )->json('data.id');
+
+    $this->deleteJson(
+        "/api/businesses/{$this->business->id}/subscription/requests/{$demandeId}",
+    )->assertOk()->assertJsonPath('data.status', 'cancelled');
+
+    // Une demande retirée n'occupe plus la place : il peut en déposer une autre.
+    $this->postJson(
+        "/api/businesses/{$this->business->id}/subscription/requests",
+        ['plan' => 'basic'],
+    )->assertStatus(202);
 });

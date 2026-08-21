@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SubscriptionRequestController;
 use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
 
 // Catalogue public des pays : l'inscription et la connexion en ont besoin
@@ -65,11 +66,24 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/businesses/{business}/subscription', [SubscriptionController::class, 'show']);
     Route::post('/businesses/{business}/subscription', [SubscriptionController::class, 'store']);
+
+    // Demandes d'abonnement du commerçant. `requests` précède `{subscription}`
+    // pour ne pas être capturé comme un identifiant.
+    Route::get('/businesses/{business}/subscription/requests', [SubscriptionRequestController::class, 'index']);
+    Route::post('/businesses/{business}/subscription/requests', [SubscriptionRequestController::class, 'store']);
+    Route::delete('/businesses/{business}/subscription/requests/{subscriptionRequest}', [SubscriptionRequestController::class, 'destroy']);
+
     Route::put('/businesses/{business}/subscription/{subscription}', [SubscriptionController::class, 'update']);
 });
 
 // Admin routes (system_admin uniquement)
 Route::middleware(['auth:sanctum', 'role:system_admin'])->prefix('admin')->group(function () {
+    // Demandes d'abonnement à instruire : c'est l'approbation qui ouvre l'accès,
+    // jamais la déclaration du commerçant.
+    Route::get('/subscription-requests', [AdminSubscriptionController::class, 'requests']);
+    Route::post('/subscription-requests/{subscriptionRequest}/approve', [AdminSubscriptionController::class, 'approveRequest']);
+    Route::post('/subscription-requests/{subscriptionRequest}/refuse', [AdminSubscriptionController::class, 'refuseRequest']);
+
     Route::get('/businesses', [AdminSubscriptionController::class, 'index']);
     Route::post('/businesses/{business}/subscription', [AdminSubscriptionController::class, 'grant']);
     Route::delete('/businesses/{business}/subscription', [AdminSubscriptionController::class, 'revoke']);

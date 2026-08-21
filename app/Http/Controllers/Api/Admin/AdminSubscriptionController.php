@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GrantSubscriptionRequest;
 use App\Http\Resources\AdminBusinessResource;
+use App\Http\Resources\SubscriptionRequestResource;
 use App\Models\Business;
 use App\Models\Subscription;
+use App\Models\SubscriptionRequest;
+use App\Services\SubscriptionRequestService;
 use Illuminate\Http\Request;
 
 /**
@@ -15,6 +18,69 @@ use Illuminate\Http\Request;
  */
 class AdminSubscriptionController extends Controller
 {
+    public function __construct(private readonly SubscriptionRequestService $requests) {}
+
+    /**
+     * Demandes d'abonnement à instruire.
+     *
+     * Les demandes en attente d'abord, puis les tranchées : c'est la file de
+     * travail de l'exploitant, pas un journal.
+     */
+    public function requests(Request $request)
+    {
+        $statut = $request->query('status');
+
+        $demandes = SubscriptionRequest::query()
+            ->with(['business.owner', 'requestedBy', 'decidedBy'])
+            ->when(
+                is_string($statut) && $statut !== '',
+                fn ($query) => $query->where('status', $statut),
+            )
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->latest()
+            ->paginate(20);
+
+        return SubscriptionRequestResource::collection($demandes);
+    }
+
+    /**
+     * Approuve une demande : le plan s'active, l'encaissement est tracé.
+     */
+    public function approveRequest(Request $request, SubscriptionRequest $subscriptionRequest)
+    {
+        $data = $request->validate([
+            'note' => ['sometimes', 'nullable', 'string', 'max:500'],
+        ]);
+
+        $approuvee = $this->requests->approve(
+            $subscriptionRequest,
+            $request->user(),
+            $data['note'] ?? null,
+        );
+
+        return new SubscriptionRequestResource(
+            $approuvee->load(['business.subscription', 'requestedBy']),
+        );
+    }
+
+    /**
+     * Refuse une demande, avec un motif que le commerçant verra.
+     */
+    public function refuseRequest(Request $request, SubscriptionRequest $subscriptionRequest)
+    {
+        $data = $request->validate([
+            'reason' => ['sometimes', 'nullable', 'string', 'max:500'],
+        ]);
+
+        $refusee = $this->requests->refuse(
+            $subscriptionRequest,
+            $request->user(),
+            $data['reason'] ?? null,
+        );
+
+        return new SubscriptionRequestResource($refusee->load(['business', 'requestedBy']));
+    }
+
     /**
      * Liste paginée des business avec propriétaire + abonnement,
      * recherche optionnelle par nom de business / propriétaire / téléphone.

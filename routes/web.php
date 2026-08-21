@@ -10,6 +10,7 @@ use App\Livewire\Admin\Businesses\Index as AdminBusinessesIndex;
 use App\Livewire\Admin\Businesses\Show as AdminBusinessesShow;
 use App\Livewire\Admin\Payments\Index as AdminPaymentsIndex;
 use App\Livewire\Admin\Subscriptions\Index as AdminSubscriptionsIndex;
+use App\Livewire\Admin\SubscriptionRequests\Index as AdminSubscriptionRequestsIndex;
 use App\Livewire\Admin\Campaigns\Index as AdminCampaignsIndex;
 
 Route::prefix('api')->group(function () {
@@ -40,6 +41,7 @@ Route::middleware(['auth', 'admin.only'])->prefix('admin')->name('admin.')->grou
     Route::get('/businesses', AdminBusinessesIndex::class)->name('businesses.index');
     Route::get('/businesses/{business}', AdminBusinessesShow::class)->name('businesses.show');
     Route::get('/subscriptions', AdminSubscriptionsIndex::class)->name('subscriptions.index');
+    Route::get('/demandes', AdminSubscriptionRequestsIndex::class)->name('subscription-requests.index');
     Route::get('/payments', AdminPaymentsIndex::class)->name('payments.index');
     Route::get('/campagnes', AdminCampaignsIndex::class)->name('campaigns.index');
 });

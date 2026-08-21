@@ -2,14 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Resources\SubscriptionRequestResource;
 use App\Models\Business;
-use App\Models\Client;
-use App\Models\Payment;
 use App\Models\Subscription;
-use App\Services\Payments\PayDunyaClient;
+use App\Services\SubscriptionRequestService;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SubscriptionResource;
@@ -18,6 +15,8 @@ use App\Http\Requests\Subscription\UpdateSubscriptionRequest;
 
 class SubscriptionController extends Controller
 {
+    public function __construct(private readonly SubscriptionRequestService $requests) {}
+
     public function show(Business $business, Request $request)
     {
         $this->authorizeManager($business, $request);
@@ -67,7 +66,7 @@ class SubscriptionController extends Controller
         return new SubscriptionResource($subscription->fresh());
     }
 
-    public function store(StoreSubscriptionRequest $request, Business $business, PayDunyaClient $payDunyaCli)
+    public function store(StoreSubscriptionRequest $request, Business $business)
     {
         $this->authorizeManager($business, $request);
         // Pour le cas d'un abonnement gratuit: essai unique, non renouvelable.
@@ -104,109 +103,30 @@ class SubscriptionController extends Controller
 
             return new SubscriptionResource($existing->fresh());
         }
-        // Pour le basic/ pro
-        $mount = $this->planPrice($request->plan);
-        $method = $request->input('method');
-
-        if(! $method){
-            throw ValidationException::withMessages(
-                ['method' => 'Le mode de paiement est requis.']
-            );
-        }
-        $owner = $business->owner;
-        $clientName = $business->name ?: ($owner?->name ?? 'Abonnement');
-        $clientPhone = $business->phone ?: ($owner?->phone ?? 'SUBSCRIPTION-' . $business->id);
-
-        $client = Client::firstOrCreate(
-            [
-                'business_id' => $business->id,
-                'phone' => $clientPhone,
-            ],
-            [
-                'name' => $clientName,
-                // Email unique globalement : éviter d'écraser si déjà utilisé ailleurs
-                'email' => null,
-            ]
+        // 🔹 PLANS PAYANTS → demande à instruire, quel que soit le moyen
+        //
+        // Le règlement se fait hors application, et aucun canal ne prouve à lui
+        // seul que l'argent est arrivé : « espèces » activait le plan sur simple
+        // déclaration. Toute souscription payante devient donc une demande, que
+        // l'exploitant approuve quand il a constaté le paiement.
+        $demande = $this->requests->submit(
+            business: $business,
+            plan: (string) $request->plan,
+            requestedBy: $request->user(),
+            method: $request->input('method'),
         );
 
-        $payment = Payment::create([
-                'business_id' => $business->id,
-                'client_id' => $client->id,
-                'user_id' => $request->user()->id,
-                'amount' => $mount,
-                // L'abonnement est facturé par l'éditeur, en francs CFA, quelle
-                // que soit la devise dans laquelle le business tient ses
-                // comptes : c'est un prix catalogue, pas un encaissement.
-                'currency' => 'XOF',
-                'method' => $method,
-                'provider' => $method === 'cash' ? null : 'paydunya',
-                'purpose' => Payment::PURPOSE_SUBSCRIPTION,
-                // Un abonnement n'est encaissé que lorsque l'argent est arrivé :
-                // le fournisseur le confirme par rappel, ou un administrateur le
-                // constate. Jamais sur la seule déclaration du demandeur.
-                'status' => 'pending',
-                'transaction_ref' => (string) Str::uuid(), // Générer une référence unique
-            ]);
-
-        // 🔹 ESPÈCES → demande à valider, pas activation
-        //
-        // Le plan était activé sur-le-champ dès que « cash » était choisi :
-        // n'importe quel utilisateur s'accordait un mois de Pro en tapant deux
-        // fois sur son téléphone, sans qu'un franc ne change de main. La demande
-        // est désormais enregistrée en attente, et c'est un administrateur qui
-        // l'honore une fois l'argent reçu ({@see AdminSubscriptionController}).
-        if ($method === 'cash') {
-            return response()->json([
-                'message' => 'Demande enregistrée. Votre abonnement sera activé '
-                    . 'par NGONI PAY dès réception du paiement en espèces.',
-                'code' => 'SUBSCRIPTION_PENDING_VALIDATION',
-                'payment_id' => $payment->id,
-                'subscription' => $business->fresh()->subscription,
-            ], 202);
-        }
-        // 🔹 MOBILE → PayDunya
-        $response = $payDunyaCli->createInvoiceForSubscription($payment, $business);
-
-        if (! $response['successful']) {
-            throw ValidationException::withMessages([
-                'payment' => ['Impossible de lancer le paiement abonnement'],
-            ]);
-        }
-
-        $payment->update([
-            'provider_reference' => data_get($response['data'], 'token')
-                ?? data_get($response['data'], 'response_code'),
-            'provider_checkout_url' => data_get($response['data'], 'invoice_url')
-                ?? data_get($response['data'], 'redirect_url')
-                ?? data_get($response['data'], 'response_text'),
-        ]);
-
         return response()->json([
-            'payment_id' => $payment->id,
-            'checkout_url' => $payment->provider_checkout_url,
-        ]);
-
-
+            'message' => 'Demande enregistrée. Votre abonnement sera activé par '
+                . 'NGONI PAY dès validation du paiement.',
+            'code' => 'SUBSCRIPTION_PENDING_VALIDATION',
+            'request' => new SubscriptionRequestResource($demande),
+            // Le plan courant, inchangé : l'application ne doit pas annoncer un
+            // abonnement actif.
+            'subscription' => $business->fresh()->subscription,
+        ], 202);
     }
 
-    // Fonction pour retourner le prix en fonction du plan
-    private function planPrice(string $plan): int
-    {
-        return match ($plan) {
-            'basic' => 5000,
-            'pro'   => 15000,
-            default => 0,
-        };
-    }
-
-    /**
-     * Modification directe d'un abonnement : réservée aux administrateurs.
-     *
-     * Le propriétaire du business y avait accès, et la requête accepte `plan`,
-     * `ends_at` et `is_active` : un `PUT` suffisait à s'accorder un plan Pro à
-     * vie, sans payer et sans passer par la moindre vérification. Aucun écran de
-     * l'application n'appelle cette route — seuls les outils d'administration.
-     */
     public function update(UpdateSubscriptionRequest $request, Business $business, Subscription $subscription)
     {
         abort_unless(
