@@ -133,6 +133,6 @@ class Index extends Component
                 'approved' => SubscriptionRequest::where('status', SubscriptionRequestStatus::Approved)->count(),
                 'refused' => SubscriptionRequest::where('status', SubscriptionRequestStatus::Refused)->count(),
             ],
-        ]);
+        ])->layout('components.layouts.admin', ['title' => 'Demandes']);
     }
 }

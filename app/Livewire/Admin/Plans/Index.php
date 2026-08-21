@@ -137,6 +137,6 @@ class Index extends Component
         return view('livewire.admin.plans.index', [
             'plans' => $this->plans(),
             'cycles' => BillingCycle::cases(),
-        ]);
+        ])->layout('components.layouts.admin', ['title' => 'Plans et tarifs']);
     }
 }

@@ -179,3 +179,41 @@ test('un system_admin peut supprimer un utilisateur normal', function () {
 
     expect(User::find($owner->id))->toBeNull();
 });
+
+/**
+ * Les pages de la console se rendent-elles vraiment ?
+ *
+ * Un composant Livewire qui ne déclare pas son gabarit lève « No hint path
+ * defined for [layouts] » : la classe passe l'analyse, les tests unitaires ne la
+ * touchent pas, et la page renvoie 500 en production. Ces tests visitent les
+ * routes pour de bon.
+ */
+test('les pages de la console se rendent pour un system_admin', function () {
+    $admin = makeAdmin();
+    makeBusinessWithOwner();
+
+    $routes = [
+        'admin.dashboard',
+        'admin.users.index',
+        'admin.businesses.index',
+        'admin.subscriptions.index',
+        'admin.subscription-requests.index',
+        'admin.plans.index',
+        'admin.payments.index',
+        'admin.campaigns.index',
+    ];
+
+    foreach ($routes as $route) {
+        $this->actingAs($admin)
+            ->get(route($route))
+            ->assertOk();
+    }
+});
+
+test('la console est fermée à un commerçant', function () {
+    $business = makeBusinessWithOwner();
+
+    $this->actingAs($business->owner)
+        ->get(route('admin.subscription-requests.index'))
+        ->assertForbidden();
+});
