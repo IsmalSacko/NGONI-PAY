@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\BusinessType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,7 @@ class AdminBusinessResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'type' => $this->type,
+            'type_label' => BusinessType::labelFor($this->type),
             'phone' => $this->phone,
             'currency' => $this->currency ?: 'XOF',
             'is_active' => (bool) $this->is_active,

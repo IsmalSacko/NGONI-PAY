@@ -12,7 +12,7 @@
         <div class="bg-white rounded-xl border border-slate-200 p-5 lg:col-span-1">
             <h2 class="font-semibold text-slate-900 mb-3">Informations</h2>
             <dl class="text-sm space-y-2">
-                <div class="flex justify-between"><dt class="text-slate-500">Type</dt><dd class="text-slate-700">{{ $business->type }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-500">Secteur</dt><dd class="text-slate-700">{{ \App\Enums\BusinessType::labelFor($business->type) }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-500">Téléphone</dt><dd class="text-slate-700">{{ $business->phone ?? '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-500">Propriétaire</dt><dd class="text-slate-700">{{ $business->owner?->name ?? '—' }}</dd></div>
                 <div class="flex justify-between items-center"><dt class="text-slate-500">Statut</dt>

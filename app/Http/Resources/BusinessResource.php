@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\BusinessType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,9 @@ class BusinessResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'type' => $this->type,
+            // Libellé du secteur : l'application n'a pas à traduire les valeurs
+            // techniques, et un secteur ajouté n'attend pas sa mise à jour.
+            'type_label' => BusinessType::labelFor($this->type),
             'address' => $this->address,
             'phone' => $this->phone,
             'currency' => $this->currency ?: 'XOF',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\BusinessType;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class InvoiceResource extends JsonResource
@@ -27,10 +28,18 @@ class InvoiceResource extends JsonResource
                 'subscription_plan' => $this->payment->purpose === 'subscription'
                     ? $this->planFromAmount($this->payment->amount)
                     : null,
+                // Le business en entier, pas seulement son nom : une facture
+                // porte l'identité de celui qui l'émet — adresse et téléphone
+                // compris, sans quoi le client ne sait pas qui le recontacter.
                 'business' => $this->payment->business
                     ? [
                         'id' => $this->payment->business->id,
                         'name' => $this->payment->business->name,
+                        'type' => $this->payment->business->type,
+                        'type_label' => BusinessType::labelFor($this->payment->business->type),
+                        'address' => $this->payment->business->address,
+                        'phone' => $this->payment->business->phone,
+                        'currency' => $this->payment->business->currency ?: 'XOF',
                     ]
                     : null,
 

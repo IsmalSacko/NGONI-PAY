@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Business;
 
+use App\Enums\BusinessType;
 use App\Support\Money\Currencies;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class StoreBusinessRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return ['currency' => 'devise'];
+        return ['currency' => 'devise', 'type' => "secteur d'activité"];
     }
 
     /**
@@ -33,7 +34,10 @@ class StoreBusinessRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:150',
-            'type' => 'required|string|max:50',
+            // Borné au catalogue : la colonne acceptait n'importe quelle chaîne
+            // depuis qu'elle n'est plus un `enum`, et un secteur inventé
+            // s'afficherait tel quel sur les factures.
+            'type' => ['required', Rule::enum(BusinessType::class)],
             'address' => 'nullable|string|max:255',
             'phone' => 'required|string|max:20',
             // Facultative : à défaut, celle du pays du propriétaire. Bornée au

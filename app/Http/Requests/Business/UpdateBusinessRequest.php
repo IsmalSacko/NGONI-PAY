@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Business;
 
+use App\Enums\BusinessType;
 use App\Support\Money\Currencies;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class UpdateBusinessRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return ['currency' => 'devise'];
+        return ['currency' => 'devise', 'type' => "secteur d'activité"];
     }
 
     /**
@@ -33,7 +34,7 @@ class UpdateBusinessRequest extends FormRequest
     {
         return [
             'name' => 'sometimes|string|max:150',
-            'type' => 'sometimes|string|max:50',
+            'type' => ['sometimes', Rule::enum(BusinessType::class)],
             'address' => 'sometimes|nullable|string|max:255',
             'phone' => 'sometimes|string|max:20',
             'currency' => ['sometimes', Rule::in(Currencies::codes())],
