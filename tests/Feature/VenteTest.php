@@ -103,4 +103,34 @@ class VenteTest extends TestCase
 
         $this->assertSame(1, $produit->fresh()->stock);
     }
+
+    public function test_carte_bancaire_et_paypal_sont_acceptes_sans_montant_recu(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+        $produit = Produit::create(['nom' => 'Savon', 'prix_vente' => 250, 'taux_tva' => 18.00, 'stock' => 50]);
+        $token = $admin->createToken('test')->plainTextToken;
+
+        foreach (['carte' => 'Carte bancaire', 'paypal' => 'PayPal'] as $moyen => $libelle) {
+            $reponse = $this->withToken($token)->postJson('/api/ventes', [
+                'reference_locale' => (string) Str::uuid(),
+                'lignes' => [['produit_id' => $produit->id, 'quantite' => 2]],
+                'moyen_paiement' => $moyen,
+            ])->assertCreated();
+
+            $reponse->assertJsonPath('moyen_paiement', $moyen);
+            $reponse->assertJsonPath('montant_recu', null);
+            $this->assertSame($libelle, Vente::findOrFail($reponse->json('id'))->moyen_paiement->label());
+        }
+    }
+
+    public function test_un_moyen_de_paiement_inconnu_est_refuse(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+        $produit = Produit::create(['nom' => 'Savon', 'prix_vente' => 250, 'taux_tva' => 18.00, 'stock' => 50]);
+
+        $this->withToken($admin->createToken('test')->plainTextToken)->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+            'moyen_paiement' => 'bitcoin',
+        ])->assertUnprocessable()->assertJsonValidationErrors('moyen_paiement');
+    }
 }
