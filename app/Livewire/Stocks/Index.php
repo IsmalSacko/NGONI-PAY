@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Stocks;
 
-use App\Enums\TypeMouvementStock;
 use App\Livewire\Concerns\EstScopeParBoutique;
-use App\Models\MouvementStock;
 use App\Models\Produit;
+use App\Services\StockService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -50,26 +49,12 @@ class Index extends Component
             'motif' => ['nullable', 'string', 'max:255'],
         ]);
 
-        DB::transaction(function () use ($data): void {
-            $produit = Produit::lockForUpdate()->findOrFail($this->ajustementProduitId);
-            $ecart = (int) $data['nouveauStock'] - $produit->stock;
-
-            if ($ecart === 0) {
-                return;
-            }
-
-            $produit->stock = (int) $data['nouveauStock'];
-            $produit->save();
-
-            MouvementStock::create([
-                'produit_id' => $produit->id,
-                'user_id' => Auth::id(),
-                'type' => TypeMouvementStock::Ajustement,
-                'quantite' => $ecart,
-                'stock_apres' => $produit->stock,
-                'motif' => $data['motif'] ?: 'Ajustement d\'inventaire',
-            ]);
-        });
+        app(StockService::class)->ajuster(
+            Produit::findOrFail($this->ajustementProduitId),
+            (int) $data['nouveauStock'],
+            Auth::user(),
+            $data['motif'] ?: null,
+        );
 
         $this->fermerAjustement();
     }

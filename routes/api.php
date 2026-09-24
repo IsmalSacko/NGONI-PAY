@@ -28,6 +28,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('produits', [ProduitController::class, 'index'])->middleware('permission:produits.view');
     Route::post('produits', [ProduitController::class, 'store'])->middleware('permission:produits.create');
     Route::put('produits/{produit}', [ProduitController::class, 'update'])->middleware('permission:produits.update');
+    Route::post('produits/{produit}/ajuster-stock', [ProduitController::class, 'ajusterStock'])->middleware('permission:stocks.update');
     Route::delete('produits/{produit}', [ProduitController::class, 'destroy'])->middleware('permission:produits.delete');
 
     Route::get('clients', [ClientController::class, 'index'])->middleware('permission:clients.view');

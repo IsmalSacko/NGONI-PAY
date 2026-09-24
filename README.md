@@ -57,6 +57,14 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
   réseau ne se double pas. Les prix et taux de TVA ne sont jamais pris
   depuis le client, toujours relus depuis le catalogue serveur au moment de
   l'encaissement.
+- **Catalogue et stock** : `POST/PUT/DELETE /api/produits`. Le stock d'un
+  article existant n'est JAMAIS modifiable par `PUT` (le champ est ignoré) :
+  tout changement passe par `POST /api/produits/{id}/ajuster-stock`
+  (`StockService`, partagé avec l'écran Livewire), qui écrit le mouvement dans
+  le journal dans la même transaction — un stock changé sans trace serait
+  impossible à justifier à la fermeture de la caisse. Le code-barres est unique
+  par boutique (422 propre, pas une 500) et supprimer un article le libère ; la
+  catégorie est vérifiée dans la boutique de l'utilisateur.
 - **Séances de caisse** : un caissier ouvre sa caisse avec un fond initial
   (`App\Services\SessionCaisseService::ouvrir`), chaque vente encaissée
   pendant la séance s'y rattache automatiquement (`Vente.session_caisse_id`,

@@ -7,7 +7,9 @@ namespace App\Livewire\Produits;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\CategorieProduit;
 use App\Models\Produit;
+use App\Services\StockService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -77,7 +79,7 @@ class Index extends Component
             'nom' => ['required', 'string', 'max:255'],
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
-            'code_barre' => ['nullable', 'string', 'max:255'],
+            'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', Auth::user()->boutique_id)->ignore($this->produitId)],
             'prix_vente' => ['required', 'integer', 'min:0'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'integer', 'min:0'],
@@ -87,7 +89,18 @@ class Index extends Component
         $data['categorie_produit_id'] = $data['categorie_produit_id'] ?: null;
 
         if ($this->produitId) {
-            Produit::findOrFail($this->produitId)->update($data);
+            // Le stock passe par StockService (journalisé), jamais par un
+            // simple update : voir ProduitController::update côté API.
+            $nouveauStock = (int) $data['stock'];
+            unset($data['stock']);
+
+            $produit = Produit::findOrFail($this->produitId);
+            $produit->update($data);
+
+            if ($nouveauStock !== $produit->stock) {
+                Auth::user()->can('stocks.update') || abort(403);
+                app(StockService::class)->ajuster($produit, $nouveauStock, Auth::user(), 'Modification de la fiche article');
+            }
         } else {
             Produit::create($data);
         }
@@ -99,7 +112,9 @@ class Index extends Component
     {
         Auth::user()->can('produits.delete') || abort(403);
 
-        Produit::findOrFail($produitId)->delete();
+        $produit = Produit::findOrFail($produitId);
+        $produit->update(['code_barre' => null]);
+        $produit->delete();
     }
 
     public function render()
