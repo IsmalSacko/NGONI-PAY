@@ -6,13 +6,20 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PaiementController;
 use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\VenteController;
+use App\Http\Controllers\Api\WebhookPaiementController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('inscription', [AuthController::class, 'register']);
 Route::post('connexion', [AuthController::class, 'login']);
+
+// Notifications des fournisseurs de paiement en ligne : publiques, leur
+// authenticité est vérifiée dans le contrôleur.
+Route::post('webhooks/paydunya', [WebhookPaiementController::class, 'paydunya'])->middleware('throttle:120,1');
+Route::post('webhooks/paypal', [WebhookPaiementController::class, 'paypal'])->middleware('throttle:120,1');
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
@@ -39,6 +46,13 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes', [VenteController::class, 'store'])->middleware('permission:ventes.create');
+
+    // Paiement en ligne optionnel (PayPal, PayDunya) — POST /ventes reste le
+    // chemin déclaratif habituel.
+    Route::get('paiements/fournisseurs', [PaiementController::class, 'fournisseurs'])->middleware('permission:ventes.create');
+    Route::post('paiements', [PaiementController::class, 'store'])->middleware('permission:ventes.create');
+    Route::get('paiements/{paiement}', [PaiementController::class, 'show'])->middleware('permission:ventes.create');
+    Route::post('paiements/{paiement}/annuler', [PaiementController::class, 'annuler'])->middleware('permission:ventes.create');
 
     Route::get('sessions-caisse', [SessionCaisseController::class, 'index'])->middleware('permission:sessions_caisse.view');
     Route::get('sessions-caisse/courante', [SessionCaisseController::class, 'courante'])->middleware('permission:sessions_caisse.view');
