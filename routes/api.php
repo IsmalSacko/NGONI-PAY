@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProduitController;
+use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,4 +38,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes', [VenteController::class, 'store'])->middleware('permission:ventes.create');
+
+    Route::get('sessions-caisse', [SessionCaisseController::class, 'index'])->middleware('permission:sessions_caisse.view');
+    Route::get('sessions-caisse/courante', [SessionCaisseController::class, 'courante'])->middleware('permission:sessions_caisse.view');
+    Route::post('sessions-caisse', [SessionCaisseController::class, 'ouvrir'])->middleware('permission:sessions_caisse.create');
+    Route::put('sessions-caisse/{session}/fermer', [SessionCaisseController::class, 'fermer'])->middleware('permission:sessions_caisse.update');
 });

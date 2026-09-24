@@ -37,6 +37,7 @@ class Permissions
             'produits' => ['view', 'create', 'update', 'delete'],
             'stocks' => ['view', 'update'],
             'ventes' => ['view', 'create', 'delete'],
+            'sessions_caisse' => ['view', 'create', 'update'],
             'clients' => ['view', 'create', 'update', 'delete'],
             'utilisateurs' => ['view', 'create', 'update', 'delete'],
             'rapports' => ['view'],
@@ -74,6 +75,7 @@ class Permissions
         $caissier = [
             'produits.view', 'categories.view', 'stocks.view',
             'ventes.view', 'ventes.create',
+            'sessions_caisse.view', 'sessions_caisse.create', 'sessions_caisse.update',
             'clients.view', 'clients.create',
         ];
 

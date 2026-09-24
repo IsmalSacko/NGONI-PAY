@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'user_id', 'client_id', 'reference_locale', 'numero', 'sous_total', 'remise',
+    'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le',
 ])]
@@ -47,6 +47,14 @@ class Vente extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * @return BelongsTo<SessionCaisse, $this>
+     */
+    public function sessionCaisse(): BelongsTo
+    {
+        return $this->belongsTo(SessionCaisse::class);
     }
 
     /**

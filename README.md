@@ -57,6 +57,14 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
   réseau ne se double pas. Les prix et taux de TVA ne sont jamais pris
   depuis le client, toujours relus depuis le catalogue serveur au moment de
   l'encaissement.
+- **Séances de caisse** : un caissier ouvre sa caisse avec un fond initial
+  (`App\Services\SessionCaisseService::ouvrir`), chaque vente encaissée
+  pendant la séance s'y rattache automatiquement (`Vente.session_caisse_id`,
+  posé par `VenteService`, jamais fourni par le client). À la fermeture,
+  l'écart est calculé une seule fois et figé (`fond_final` déclaré − (fond
+  initial + espèces encaissées pendant la séance)) — un ticket annulé après
+  coup ne doit pas faire bouger l'écart d'une séance déjà close. Une
+  personne ne peut fermer que sa propre séance, sauf `gerant`/`admin`.
 - **API v1** (`routes/api.php`) pour le futur client tactile (tablette/
   desktop, voir le choix technique ci-dessous), **Livewire** (`routes/web.php`,
   `app/Livewire/`) pour le back-office web — les deux s'appuient sur les
@@ -87,8 +95,10 @@ Dans `../e-caisse-front` (Flutter — tablette Android + desktop, un seul
 code, SQLite local pour la file d'attente hors ligne) plutôt qu'une PWA —
 la robustesse du mode hors ligne et l'intégration matérielle (scanner,
 imprimante ESC/POS) priment sur le déploiement sans store. Écrans en place :
-connexion, caisse tactile, pilotage, stocks. Détails dans son propre
-README.
+connexion, caisse tactile (avec ouverture/fermeture de séance, scanner
+code-barres en mode clavier, bascule FR/BM), pilotage, stocks, historique
+des ventes, ticket (aperçu + impression Bluetooth ESC/POS). Détails dans
+son propre README.
 
 ## Écrans Livewire (`app/Livewire/`)
 
@@ -99,13 +109,12 @@ de comptes avec rôle). Chacun a un test dans `tests/Feature/BackofficeTest.php`
 
 ## Ce qui reste à construire
 
-- Écran historique des ventes et impression du ticket côté Flutter
-  (`../e-caisse-front`) ; scanner code-barres et imprimante ESC/POS non
-  câblés physiquement.
-- Génération du ticket 80 mm en PDF/ESC-POS (le modèle `Vente` porte déjà
-  tout le nécessaire : numéro, lignes, TVA, moyen de paiement).
-- Gestion des sessions de caisse (ouverture/fermeture, fond de caisse,
-  écart) — non modélisée pour l'instant.
+- Écran de suivi des séances de caisse côté back-office Livewire (l'API
+  existe — `/api/sessions-caisse` — mais aucun écran `gerant`/`admin` ne
+  liste encore les séances passées pour repérer les écarts).
+- Premier appairage réel d'une imprimante ESC/POS (le format des octets est
+  généré et testable côté Flutter, jamais vérifié contre du matériel — voir
+  le README de `../e-caisse-front`).
 - Import/export Excel des produits et des rapports (mentionnés dans la
   maquette, pas encore branchés).
 - Abonnement/facturation de la plateforme, si le modèle SaaS en a besoin.

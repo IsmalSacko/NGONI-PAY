@@ -28,7 +28,10 @@ use Illuminate\Validation\ValidationException;
  */
 class VenteService
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(
+        private readonly TenantContext $tenant,
+        private readonly SessionCaisseService $sessions,
+    ) {}
 
     /**
      * @param  array{
@@ -115,10 +118,12 @@ class VenteService
             unset($l);
 
             $numero = (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->max('numero') + 1;
+            $session = $this->sessions->courante($caissier);
 
             $vente = Vente::create([
                 'user_id' => $caissier->id,
                 'client_id' => $data['client_id'] ?? null,
+                'session_caisse_id' => $session?->id,
                 'reference_locale' => $data['reference_locale'] ?? null,
                 'numero' => $numero,
                 'sous_total' => $sousTotal,
