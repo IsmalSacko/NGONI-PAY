@@ -104,13 +104,13 @@ class VenteTest extends TestCase
         $this->assertSame(1, $produit->fresh()->stock);
     }
 
-    public function test_carte_bancaire_et_paypal_sont_acceptes_sans_montant_recu(): void
+    public function test_carte_paypal_et_virement_sont_acceptes_sans_montant_recu(): void
     {
         ['user' => $admin] = $this->boutiqueAvecAdmin();
         $produit = Produit::create(['nom' => 'Savon', 'prix_vente' => 250, 'taux_tva' => 18.00, 'stock' => 50]);
         $token = $admin->createToken('test')->plainTextToken;
 
-        foreach (['carte' => 'Carte bancaire', 'paypal' => 'PayPal'] as $moyen => $libelle) {
+        foreach (['carte' => 'Carte bancaire', 'paypal' => 'PayPal', 'virement' => 'Virement'] as $moyen => $libelle) {
             $reponse = $this->withToken($token)->postJson('/api/ventes', [
                 'reference_locale' => (string) Str::uuid(),
                 'lignes' => [['produit_id' => $produit->id, 'quantite' => 2]],

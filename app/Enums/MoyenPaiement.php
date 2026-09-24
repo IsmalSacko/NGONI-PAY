@@ -8,7 +8,7 @@ namespace App\Enums;
  * Moyens de paiement acceptés à la caisse tactile.
  *
  * Purement déclaratifs : aucun n'appelle d'API de paiement. Le caissier
- * encaisse (terminal de carte, application PayPal, téléphone du client...) puis
+ * encaisse (terminal de carte, application PayPal, virement reçu, téléphone du client...) puis
  * enregistre le moyen utilisé ; e-caisse ne débite rien et ne vérifie pas qu'un
  * paiement a réellement abouti. La valeur `carte` est conservée telle quelle
  * (libellé « Carte bancaire ») pour ne pas migrer les ventes déjà enregistrées.
@@ -21,6 +21,7 @@ enum MoyenPaiement: string
     case Wave = 'wave';
     case Carte = 'carte';
     case PayPal = 'paypal';
+    case Virement = 'virement';
     case CreditClient = 'credit_client';
 
     public function label(): string
@@ -32,6 +33,7 @@ enum MoyenPaiement: string
             self::Wave => 'Wave',
             self::Carte => 'Carte bancaire',
             self::PayPal => 'PayPal',
+            self::Virement => 'Virement',
             self::CreditClient => 'Crédit client',
         };
     }
