@@ -34,36 +34,6 @@ class VenteService
     ) {}
 
     /**
-     * Total qu'aurait une vente pour ce panier, aux prix du catalogue actuel
-     * — sans rien écrire ni verrouiller. Sert à figer le montant d'un
-     * paiement en ligne avant que le client ne paie ; `encaisser()` refait
-     * le calcul (sous verrou) quand la vente est réellement créée.
-     *
-     * @param  list<array{produit_id: string, quantite: int}>  $lignes
-     */
-    public function totalPanier(array $lignes, int $remise = 0): int
-    {
-        $produits = Produit::whereIn('id', array_column($lignes, 'produit_id'))->get()->keyBy('id');
-        $sousTotal = 0;
-
-        foreach ($lignes as $ligne) {
-            $produit = $produits->get($ligne['produit_id']);
-
-            if ($produit === null) {
-                throw ValidationException::withMessages(['lignes' => ["Produit introuvable : {$ligne['produit_id']}."]]);
-            }
-
-            if ($produit->stock < $ligne['quantite']) {
-                throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$produit->stock})."]]);
-            }
-
-            $sousTotal += $produit->prix_vente * $ligne['quantite'];
-        }
-
-        return $sousTotal - min($remise, $sousTotal);
-    }
-
-    /**
      * @param  array{
      *     reference_locale: ?string,
      *     client_id: ?string,

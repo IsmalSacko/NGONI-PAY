@@ -73,32 +73,6 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
   initial + espèces encaissées pendant la séance)) — un ticket annulé après
   coup ne doit pas faire bouger l'écart d'une séance déjà close. Une
   personne ne peut fermer que sa propre séance, sauf `gerant`/`admin`.
-- **Moyens de paiement** : tous **déclaratifs** par défaut — le caissier
-  encaisse hors de l'application (terminal de carte, application PayPal,
-  virement, téléphone du client...) et `POST /api/ventes` enregistre le moyen
-  utilisé, sans rien vérifier. C'est le chemin historique et il n'est pas
-  modifié par la couche ci-dessous.
-- **Paiements en ligne (optionnels)** : `carte` → PayDunya, `paypal` → PayPal
-  (`config/paiements.php`, clés dans le `.env` du serveur uniquement). Sans clés,
-  `GET /api/paiements/fournisseurs` renvoie une liste vide et la caisse reste
-  déclarative. Avec clés : la tablette ouvre un paiement
-  (`POST /api/paiements`, total recalculé par le serveur depuis le catalogue),
-  montre le lien/QR au client, puis relit `GET /api/paiements/{id}` jusqu'à
-  obtenir la vente. **C'est le serveur qui crée la vente**, une seule fois
-  (`VenteService::encaisser` avec l'identifiant du paiement comme
-  `reference_locale`), dès que le fournisseur confirme — par relecture de la
-  tablette, par la page de retour du client (`/paiements/retour/{id}`) ou par
-  webhook (`/api/webhooks/paydunya`, `/api/webhooks/paypal`), dans n'importe
-  quel ordre : une tablette éteinte après paiement ne fait pas perdre la vente.
-  Le contenu d'un webhook n'est jamais cru sur parole (hash SHA-512 PayDunya,
-  `verify-webhook-signature` PayPal), il ne fait que déclencher une relecture
-  chez le fournisseur. e-caisse ne manipule aucune donnée de carte.
-  Cas limites : si le stock a été épuisé ou un prix modifié pendant que le
-  client payait, le paiement reste `confirme` avec un `erreur` explicite et
-  aucune vente fausse n'est créée (retenté à chaque relecture) ; un paiement
-  « annulé » côté caisse mais réellement payé ensuite est quand même
-  enregistré. PayPal n'a pas de FCFA : facturé en EUR au taux fixe 655,957
-  (arrondi au centime supérieur). Réservé aux boutiques en XOF/XAF.
 - **API v1** (`routes/api.php`) pour le futur client tactile (tablette/
   desktop, voir le choix technique ci-dessous), **Livewire** (`routes/web.php`,
   `app/Livewire/`) pour le back-office web — les deux s'appuient sur les
@@ -116,30 +90,6 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
   la permission explicitement (`Auth::user()->can(...)`) : le middleware
   `permission:*` ne protège que le chargement initial de la page, pas les
   appels AJAX suivants.
-
-## Paiements en ligne : mise en route (bac à sable d'abord)
-
-1. Créer un compte marchand de test : PayDunya (clés Master / Private / Token
-   du mode test) et PayPal Developer (application « Sandbox » → Client ID +
-   Secret). Les clés **live** exigent la validation d'entreprise (RCCM/NIF) chez
-   chaque fournisseur ; elles se renseignent de la même façon, jamais dans le
-   dépôt ni dans le chat.
-2. Renseigner dans le `.env` du serveur : `PAYDUNYA_*`, `PAYPAL_*` et
-   `PAIEMENTS_URL_PUBLIQUE` (URL joignable depuis Internet, par ex. ngrok en
-   local — le téléphone du client et les webhooks doivent pouvoir l'atteindre).
-3. Facultatif mais recommandé (filet de sécurité si la tablette s'éteint) :
-   déclarer le webhook PayPal `https://<url>/api/webhooks/paypal` (événements
-   `CHECKOUT.ORDER.APPROVED` et `PAYMENT.CAPTURE.COMPLETED`), reporter son
-   identifiant dans `PAYPAL_WEBHOOK_ID` ; PayDunya reçoit son `callback_url` à
-   chaque facture, rien à déclarer.
-4. `php artisan config:clear`, puis se connecter sur la tablette : les boutons
-   « Payer en ligne » apparaissent sur les moyens « Carte bancaire » et
-   « PayPal ». Un bandeau « TEST » rappelle le mode bac à sable.
-
-Les échanges avec les fournisseurs sont testés avec des réponses simulées
-d'après leur documentation (`tests/Feature/PaiementEnLigneTest.php`) ; **aucun
-essai réel en bac à sable n'a encore été fait** — c'est la première chose à
-vérifier avec de vraies clés de test.
 
 ## Tests
 
@@ -173,11 +123,6 @@ de comptes avec rôle). Chacun a un test dans `tests/Feature/BackofficeTest.php`
 - Premier appairage réel d'une imprimante ESC/POS (le format des octets est
   généré et testable côté Flutter, jamais vérifié contre du matériel — voir
   le README de `../e-caisse-front`).
-- Premier essai réel des paiements en ligne avec des clés bac à sable (voir
-  plus haut), puis passage en live après validation d'entreprise chez les
-  fournisseurs. Pas encore : écran back-office listant les paiements confirmés
-  restés sans vente (`erreur`), remboursements, expiration automatique des
-  paiements laissés en attente.
 - Import/export Excel des produits et des rapports (mentionnés dans la
   maquette, pas encore branchés).
 - Abonnement/facturation de la plateforme, si le modèle SaaS en a besoin.

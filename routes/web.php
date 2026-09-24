@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\PaiementRetourController;
 use App\Livewire\Auth\Login;
 use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Clients\Index as ClientsIndex;
@@ -15,9 +14,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/tableau-de-bord');
-
-// Page où le fournisseur de paiement renvoie le client (publique, sans donnée sensible).
-Route::get('paiements/retour/{paiement}', PaiementRetourController::class)->middleware('throttle:60,1')->name('paiements.retour');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('connexion', Login::class)->name('connexion');
