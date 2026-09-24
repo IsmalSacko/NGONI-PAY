@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->trustProxies(at: '*');
+        $middleware->redirectGuestsTo('connexion');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

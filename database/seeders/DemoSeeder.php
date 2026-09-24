@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\Country;
 use App\Models\CategorieProduit;
 use App\Models\Client;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
+use App\Support\Phone\PhoneNumber;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\PermissionRegistrar;
@@ -45,7 +47,7 @@ class DemoSeeder extends Seeder
         $gerant = User::create([
             'boutique_id' => $boutique->id,
             'name' => 'Moussa Diarra',
-            'phone' => '+223 77 00 00 00',
+            'phone' => PhoneNumber::normalize('+223 77 00 00 00', Country::Mali),
             'password' => bcrypt('password'),
         ]);
         $gerant->assignRole('gerant');
@@ -53,7 +55,7 @@ class DemoSeeder extends Seeder
         $caissier = User::create([
             'boutique_id' => $boutique->id,
             'name' => 'Fatoumata Traoré',
-            'phone' => '+223 78 00 00 00',
+            'phone' => PhoneNumber::normalize('+223 78 00 00 00', Country::Mali),
             'password' => bcrypt('password'),
         ]);
         $caissier->assignRole('caissier');

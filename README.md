@@ -8,15 +8,17 @@ avec un mode hors ligne pensé pour une connectivité intermittente.
 
 ```bash
 composer install
+npm install
 cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite   # sqlite en local, zéro config
 php artisan migrate --seed       # rejoue le jeu de données de démonstration
+npm run build                    # ou `npm run dev` pendant le développement
 php artisan serve --port=8001
 ```
 
 Comptes de démonstration (voir `database/seeders/DemoSeeder.php`), boutique
-« Épicerie Koné » :
+« Épicerie Koné » — back-office web sur `/connexion` :
 
 | Rôle      | Téléphone         | Mot de passe |
 |-----------|-------------------|--------------|
@@ -55,9 +57,23 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
   réseau ne se double pas. Les prix et taux de TVA ne sont jamais pris
   depuis le client, toujours relus depuis le catalogue serveur au moment de
   l'encaissement.
-- **API v1** (`routes/api.php`), pensée pour un client tactile
-  (tablette/desktop, voir le choix technique ci-dessous) et un futur
-  back-office Livewire partageant les mêmes modèles et services.
+- **API v1** (`routes/api.php`) pour le futur client tactile (tablette/
+  desktop, voir le choix technique ci-dessous), **Livewire** (`routes/web.php`,
+  `app/Livewire/`) pour le back-office web — les deux s'appuient sur les
+  mêmes modèles et services pour ne jamais afficher deux chiffres différents.
+- **Livewire et l'AJAX de mise à jour** : `/livewire/update` (l'endpoint que
+  Livewire appelle pour chaque action après le rendu initial) ne passe QUE
+  par le groupe de middleware `web` — jamais par les middlewares de la route
+  qui a rendu la page (`tenant` compris, voir
+  `Livewire\Mechanisms\HandleRequests\HandleRequests::boot()`). Chaque
+  composant Livewire authentifié utilise donc le trait
+  `App\Livewire\Concerns\EstScopeParBoutique`, qui rejoue `SetTenantContext`
+  dans le hook `boot()` du composant (exécuté à CHAQUE requête, initiale et
+  suivantes) — sans lui, `boutique_id` ne serait jamais renseigné à la
+  création depuis une action Livewire. Chaque action mutante vérifie aussi
+  la permission explicitement (`Auth::user()->can(...)`) : le middleware
+  `permission:*` ne protège que le chargement initial de la page, pas les
+  appels AJAX suivants.
 
 ## Tests
 
@@ -74,14 +90,21 @@ code-barres et à l'imprimante thermique ESC/POS) plutôt qu'une PWA — la
 robustesse du mode hors ligne et l'intégration matérielle priment sur le
 déploiement sans store.
 
+## Écrans Livewire (`app/Livewire/`)
+
+Auth\Login, Dashboard, Produits\Index (catalogue), Categories\Index,
+Clients\Index (fidélité), Ventes\Index (historique + détail ticket),
+Stocks\Index (ajustement d'inventaire), Utilisateurs\Index (équipe, création
+de comptes avec rôle). Chacun a un test dans `tests/Feature/BackofficeTest.php`.
+
 ## Ce qui reste à construire
 
 - Client Flutter (caisse tactile, pilotage, stocks) — les maquettes de
   référence sont dans l'artefact de design partagé au démarrage du projet.
-- Back-office Livewire (catalogue, rapports, équipe), sur le modèle de
-  `sabati-api`.
 - Génération du ticket 80 mm en PDF/ESC-POS (le modèle `Vente` porte déjà
   tout le nécessaire : numéro, lignes, TVA, moyen de paiement).
 - Gestion des sessions de caisse (ouverture/fermeture, fond de caisse,
   écart) — non modélisée pour l'instant.
+- Import/export Excel des produits et des rapports (mentionnés dans la
+  maquette, pas encore branchés).
 - Abonnement/facturation de la plateforme, si le modèle SaaS en a besoin.
