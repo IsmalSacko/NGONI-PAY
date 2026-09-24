@@ -81,14 +81,14 @@ Documentation API générée (Scramble) : `/docs/api` une fois le serveur lancé
 php artisan test
 ```
 
-## Client (à construire)
+## Client tactile
 
-Pas encore de client dans ce dépôt. Recommandation retenue : Flutter pour
-la caisse tactile (tablette Android + desktop, un seul code, SQLite local
-via `drift` pour la file d'attente hors ligne, accès natif au scanner
-code-barres et à l'imprimante thermique ESC/POS) plutôt qu'une PWA — la
-robustesse du mode hors ligne et l'intégration matérielle priment sur le
-déploiement sans store.
+Dans `../e-caisse-front` (Flutter — tablette Android + desktop, un seul
+code, SQLite local pour la file d'attente hors ligne) plutôt qu'une PWA —
+la robustesse du mode hors ligne et l'intégration matérielle (scanner,
+imprimante ESC/POS) priment sur le déploiement sans store. Écrans en place :
+connexion, caisse tactile, pilotage, stocks. Détails dans son propre
+README.
 
 ## Écrans Livewire (`app/Livewire/`)
 
@@ -99,8 +99,9 @@ de comptes avec rôle). Chacun a un test dans `tests/Feature/BackofficeTest.php`
 
 ## Ce qui reste à construire
 
-- Client Flutter (caisse tactile, pilotage, stocks) — les maquettes de
-  référence sont dans l'artefact de design partagé au démarrage du projet.
+- Écran historique des ventes et impression du ticket côté Flutter
+  (`../e-caisse-front`) ; scanner code-barres et imprimante ESC/POS non
+  câblés physiquement.
 - Génération du ticket 80 mm en PDF/ESC-POS (le modèle `Vente` porte déjà
   tout le nécessaire : numéro, lignes, TVA, moyen de paiement).
 - Gestion des sessions de caisse (ouverture/fermeture, fond de caisse,
