@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToBoutique;
+use Database\Factories\BoutiqueFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * Racine du multi-tenant : un commerçant qui utilise e-caisse.
+ *
+ * Entité racine — n'utilise pas {@see BelongsToBoutique}
+ * pour la même raison que {@see User} : elle EST le tenant, elle ne lui
+ * appartient pas.
+ */
+#[Fillable(['nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo'])]
+class Boutique extends Model
+{
+    /** @use HasFactory<BoutiqueFactory> */
+    use HasFactory, HasUuids, SoftDeletes;
+
+    /**
+     * @return HasMany<User, $this>
+     */
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
+    /**
+     * @return HasMany<CategorieProduit, $this>
+     */
+    public function categoriesProduits(): HasMany
+    {
+        return $this->hasMany(CategorieProduit::class);
+    }
+
+    /**
+     * @return HasMany<Produit, $this>
+     */
+    public function produits(): HasMany
+    {
+        return $this->hasMany(Produit::class);
+    }
+
+    /**
+     * @return HasMany<Client, $this>
+     */
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+
+    /**
+     * @return HasMany<Vente, $this>
+     */
+    public function ventes(): HasMany
+    {
+        return $this->hasMany(Vente::class);
+    }
+
+    public function logoUrl(): ?string
+    {
+        return $this->logo ? Storage::disk('public')->url($this->logo) : null;
+    }
+}
