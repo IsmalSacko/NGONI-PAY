@@ -8,6 +8,7 @@ use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\CategorieProduit;
 use App\Models\Produit;
 use App\Services\StockService;
+use App\Support\Money\Montant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -63,7 +64,7 @@ class Index extends Component
         $this->format = (string) $produit->format;
         $this->code = (string) $produit->code;
         $this->code_barre = (string) $produit->code_barre;
-        $this->prix_vente = (string) $produit->prix_vente;
+        $this->prix_vente = Montant::saisie($produit->prix_vente);
         $this->taux_tva = (string) $produit->taux_tva;
         $this->stock = (string) $produit->stock;
         $this->seuil_alerte = (string) $produit->seuil_alerte;
@@ -85,13 +86,15 @@ class Index extends Component
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
             'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', $this->boutiqueActiveId())->ignore($this->produitId)],
-            'prix_vente' => ['required', 'integer', 'min:0'],
+            // Saisi dans la devise (« 2,50 » en euros), stocké en unités mineures.
+            'prix_vente' => ['required', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'integer', 'min:0'],
             'seuil_alerte' => ['required', 'integer', 'min:0'],
         ]);
 
         $data['categorie_produit_id'] = $data['categorie_produit_id'] ?: null;
+        $data['prix_vente'] = Montant::parse($data['prix_vente']);
 
         if ($this->produitId) {
             // Le stock passe par StockService (journalisé), jamais par un

@@ -32,7 +32,11 @@ class Tableau extends Component
             'utilisateurs' => User::count(),
             'demandes' => DemandeAbonnement::enAttente()->count(),
             'ventesJour' => Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today())->count(),
-            'montantJour' => (int) Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today())->sum('total'),
+            // Boutiques en franc CFA seulement : additionner des francs et des
+            // centimes d'euro n'aurait pas de sens.
+            'montantJour' => (int) Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today())
+                ->whereIn('boutique_id', Boutique::withoutGlobalScopes()->whereIn('devise', ['XOF', 'XAF'])->select('id'))
+                ->sum('total'),
         ]);
     }
 }

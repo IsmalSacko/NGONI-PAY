@@ -9,7 +9,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">Chiffre d'affaires du jour</span>
-            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ number_format($total, 0, ',', ' ') }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
+            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ \App\Support\Money\Montant::format($total) }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
         </div>
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">Tickets</span>
@@ -17,11 +17,11 @@
         </div>
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">Panier moyen</span>
-            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ number_format($panierMoyen, 0, ',', ' ') }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
+            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ \App\Support\Money\Montant::format($panierMoyen) }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
         </div>
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">TVA collectée</span>
-            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ number_format($tva, 0, ',', ' ') }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
+            <span class="font-display font-extrabold text-2xl md:text-3xl">{{ \App\Support\Money\Montant::format($tva) }} <span class="text-base font-bold text-[--color-muted]">{{ $boutique->devise }}</span></span>
         </div>
     </div>
 
@@ -33,7 +33,7 @@
                     <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
                         <div class="w-full rounded-t {{ $point['total'] === $maxHeure && $point['total'] > 0 ? 'bg-accent' : 'bg-accent-soft' }}"
                              style="height: {{ $maxHeure > 0 ? max(2, round($point['total'] / $maxHeure * 100)) : 0 }}%"
-                             title="{{ $point['heure'] }}h : {{ number_format($point['total'], 0, ',', ' ') }}"></div>
+                             title="{{ $point['heure'] }}h : {{ \App\Support\Money\Montant::format($point['total']) }}"></div>
                         <span class="text-[10px] text-[--color-muted]">{{ $point['heure'] }}h</span>
                     </div>
                 @endforeach
@@ -46,7 +46,7 @@
                 <div class="flex flex-col gap-1">
                     <div class="flex justify-between text-sm">
                         <span class="font-semibold">{{ $moyen['label'] }}</span>
-                        <span class="font-bold">{{ $moyen['pct'] }} % <span class="text-[--color-muted] font-normal">· {{ number_format($moyen['total'], 0, ',', ' ') }}</span></span>
+                        <span class="font-bold">{{ $moyen['pct'] }} % <span class="text-[--color-muted] font-normal">· {{ \App\Support\Money\Montant::format($moyen['total']) }}</span></span>
                     </div>
                     <div class="h-2 rounded-full bg-[#F1EDE4]"><div class="h-2 rounded-full bg-accent" style="width: {{ $moyen['pct'] }}%"></div></div>
                 </div>
@@ -66,7 +66,7 @@
                 <div class="grid grid-cols-[1fr_70px_110px] gap-3 text-sm py-2 border-b border-[#EEEAE1] items-center">
                     <span class="font-semibold">{{ $p->nom_produit }}</span>
                     <span class="text-right">{{ $p->quantite }}</span>
-                    <span class="text-right font-bold">{{ number_format($p->total, 0, ',', ' ') }}</span>
+                    <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($p->total) }}</span>
                 </div>
             @empty
                 <p class="text-sm text-[--color-muted] py-2">Aucune vente aujourd'hui.</p>

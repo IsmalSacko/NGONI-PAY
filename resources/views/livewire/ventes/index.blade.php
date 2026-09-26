@@ -14,7 +14,7 @@
                 <span>{{ $vente->caissier->name }}</span>
                 <span>{{ $vente->client->nom ?? '—' }}</span>
                 <span>{{ $vente->moyen_paiement->label() }}</span>
-                <span class="text-right font-bold">{{ number_format($vente->total, 0, ',', ' ') }}</span>
+                <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($vente->total) }}</span>
                 <button wire:click="voir('{{ $vente->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold justify-self-end">Détail</button>
             </div>
         @empty
@@ -42,20 +42,20 @@
                     @foreach ($detail->lignes as $ligne)
                         <div class="flex justify-between py-2 text-sm">
                             <span>{{ $ligne->nom_produit }} × {{ $ligne->quantite }}</span>
-                            <span class="font-semibold">{{ number_format($ligne->total_ligne, 0, ',', ' ') }}</span>
+                            <span class="font-semibold">{{ \App\Support\Money\Montant::format($ligne->total_ligne) }}</span>
                         </div>
                     @endforeach
                 </div>
 
                 <div class="flex flex-col gap-1 text-sm">
-                    <div class="flex justify-between"><span>Sous-total</span><span>{{ number_format($detail->sous_total, 0, ',', ' ') }}</span></div>
+                    <div class="flex justify-between"><span>Sous-total</span><span>{{ \App\Support\Money\Montant::format($detail->sous_total) }}</span></div>
                     @if ($detail->remise > 0)
-                        <div class="flex justify-between text-danger-fg"><span>Remise</span><span>−{{ number_format($detail->remise, 0, ',', ' ') }}</span></div>
+                        <div class="flex justify-between text-danger-fg"><span>Remise</span><span>−{{ \App\Support\Money\Montant::format($detail->remise) }}</span></div>
                     @endif
-                    <div class="flex justify-between font-bold text-base"><span>Total</span><span>{{ number_format($detail->total, 0, ',', ' ') }}</span></div>
+                    <div class="flex justify-between font-bold text-base"><span>Total</span><span>{{ \App\Support\Money\Montant::format($detail->total) }}</span></div>
                     <div class="flex justify-between text-[--color-muted]"><span>Payé par</span><span>{{ $detail->moyen_paiement->label() }}</span></div>
                     @if ($detail->montant_recu)
-                        <div class="flex justify-between text-[--color-muted]"><span>Monnaie rendue</span><span>{{ number_format($detail->monnaie_rendue, 0, ',', ' ') }}</span></div>
+                        <div class="flex justify-between text-[--color-muted]"><span>Monnaie rendue</span><span>{{ \App\Support\Money\Montant::format($detail->monnaie_rendue) }}</span></div>
                     @endif
                 </div>
 

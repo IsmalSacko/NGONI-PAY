@@ -7,7 +7,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">Valeur du stock</span>
-            <span class="font-display font-extrabold text-2xl">{{ number_format($valeurStock, 0, ',', ' ') }}</span>
+            <span class="font-display font-extrabold text-2xl">{{ \App\Support\Money\Montant::format($valeurStock) }}</span>
         </div>
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-warn-fg">Stock bas</span>

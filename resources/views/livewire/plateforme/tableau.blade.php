@@ -10,7 +10,7 @@
             ['Boutiques', $boutiques, ''],
             ['Utilisateurs', $utilisateurs, ''],
             ['Ventes du jour', $ventesJour, ''],
-            ['Encaissé aujourd’hui', number_format($montantJour, 0, ',', ' '), ''],
+            ['Encaissé aujourd’hui (F CFA)', number_format($montantJour, 0, ',', ' '), ''],
         ] as [$libelle, $valeur, $couleur])
             <div class="bg-white border border-border rounded-2xl p-5">
                 <p class="text-sm text-muted">{{ $libelle }}</p>

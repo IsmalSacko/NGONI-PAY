@@ -28,7 +28,7 @@
                     <span class="text-xs text-[--color-muted]">{{ $produit->format }}</span>
                 </div>
                 <span>{{ $produit->categorie?->nom ?? '—' }}</span>
-                <span class="text-right font-bold">{{ number_format($produit->prix_vente, 0, ',', ' ') }}</span>
+                <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}</span>
                 <span class="text-right">{{ rtrim(rtrim((string) $produit->taux_tva, '0'), '.') ?: '0' }} %</span>
                 <span class="text-right font-semibold {{ $produit->estEnRupture() ? 'text-danger-fg' : ($produit->stockFaible() ? 'text-warn-fg' : '') }}">{{ $produit->stock }}</span>
                 <div class="flex gap-2 justify-end">
