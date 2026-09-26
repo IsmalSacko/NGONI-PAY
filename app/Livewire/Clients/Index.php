@@ -45,6 +45,10 @@ class Index extends Component
 
     public function enregistrer(): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can($this->clientId ? 'clients.update' : 'clients.create') || abort(403);
 
         $data = $this->validate([
@@ -63,6 +67,10 @@ class Index extends Component
 
     public function supprimer(string $clientId): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can('clients.delete') || abort(403);
 
         Client::findOrFail($clientId)->delete();

@@ -39,6 +39,9 @@ class MultiBoutiqueTest extends TestCase
             'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Awa',
         ]);
         $this->jeton = $this->awa->createToken('test')->plainTextToken;
+
+        // Plusieurs boutiques : plan Pro (l'essai n'en couvre qu'une).
+        $this->awa->abonnement()->update(['plan' => 'pro', 'fin' => now()->addMonth()->toDateString()]);
         $this->oublierContexte();
     }
 

@@ -72,6 +72,10 @@ class Index extends Component
 
     public function enregistrer(): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can($this->produitId ? 'produits.update' : 'produits.create') || abort(403);
 
         $data = $this->validate([
@@ -111,6 +115,10 @@ class Index extends Component
 
     public function supprimer(string $produitId): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can('produits.delete') || abort(403);
 
         $produit = Produit::findOrFail($produitId);

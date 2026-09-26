@@ -37,6 +37,10 @@ class Index extends Component
 
     public function enregistrer(): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can($this->categorieId ? 'categories.update' : 'categories.create') || abort(403);
 
         $data = $this->validate([
@@ -55,6 +59,10 @@ class Index extends Component
 
     public function supprimer(string $categorieId): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can('categories.delete') || abort(403);
 
         CategorieProduit::findOrFail($categorieId)->delete();

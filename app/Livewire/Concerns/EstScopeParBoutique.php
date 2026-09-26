@@ -39,4 +39,23 @@ trait EstScopeParBoutique
     {
         return app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
     }
+
+    /**
+     * Sans abonnement en cours, le back-office reste consultable mais n'agit
+     * plus (comme l'API). Rend `false` et prévient l'utilisateur.
+     */
+    protected function abonnementActif(): bool
+    {
+        $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
+
+        if (app(\App\Services\AbonnementService::class)->boutiqueActive($boutique)) {
+            return true;
+        }
+
+        session()->flash('abonnement_expire', 'Votre essai ou abonnement est terminé : les données restent consultables, '
+            .'mais aucune modification n’est possible. Abonnez-vous depuis l’application.');
+        $this->dispatch('abonnement-expire');
+
+        return false;
+    }
 }

@@ -64,9 +64,34 @@
                     <span class="text-sm font-semibold text-[--color-muted]">{{ $mesBoutiques->first()?->nom }}</span>
                 @endif
             </div>
+            @php
+                $abonnementCourant = app(\App\Services\AbonnementService::class)
+                    ->pourBoutique(\App\Models\Boutique::find($boutiqueActiveId));
+            @endphp
+            @if (! $abonnementCourant?->estEnCours())
+                <div class="mb-5 rounded-2xl border border-[--color-danger-fg]/30 bg-[--color-danger-bg] px-5 py-4 text-sm">
+                    <p class="font-bold text-[--color-danger-fg]">
+                        {{ $abonnementCourant?->estEssai() ? 'Essai gratuit terminé' : 'Abonnement expiré' }}
+                        @if ($abonnementCourant?->fin) le {{ $abonnementCourant->fin->format('d/m/Y') }} @endif
+                    </p>
+                    <p class="mt-1">Vos données restent consultables, mais aucune modification n’est possible. Abonnez-vous depuis l’application e-caisse.</p>
+                </div>
+            @endif
+            @if (session('abonnement_expire'))
+                <p class="mb-4 rounded-xl bg-[--color-danger-bg] text-[--color-danger-fg] px-4 py-3 text-sm font-semibold">{{ session('abonnement_expire') }}</p>
+            @endif
             {{ $slot }}
         </main>
     </div>
     @livewireScripts
+    <script>
+        // Action refusée faute d'abonnement : on le dit tout de suite, au clic.
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('abonnement-expire', () => alert(
+                "Votre essai ou abonnement est terminé : vos données restent consultables, "
+                + "mais aucune modification n'est possible. Abonnez-vous depuis l'application e-caisse."
+            ));
+        });
+    </script>
 </body>
 </html>

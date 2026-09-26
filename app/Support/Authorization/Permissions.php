@@ -42,6 +42,8 @@ class Permissions
             'utilisateurs' => ['view', 'create', 'update', 'delete'],
             'rapports' => ['view'],
             'dashboard' => ['view'],
+            // Demander un abonnement engage le propriétaire : réservé à l'admin.
+            'abonnement' => ['manage'],
         ];
     }
 
@@ -70,6 +72,7 @@ class Permissions
             // boutique est identifiée (nom, devise, pays).
             'boutique.update',
             'utilisateurs.create', 'utilisateurs.update', 'utilisateurs.delete',
+            'abonnement.manage',
         ]));
 
         $caissier = [

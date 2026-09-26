@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -81,5 +82,15 @@ class User extends Authenticatable
     public function boutiquesPossedees(): HasMany
     {
         return $this->hasMany(Boutique::class, 'proprietaire_id');
+    }
+
+    /**
+     * Abonnement porté par ce compte, s'il est propriétaire.
+     *
+     * @return HasOne<Abonnement, $this>
+     */
+    public function abonnement(): HasOne
+    {
+        return $this->hasOne(Abonnement::class);
     }
 }

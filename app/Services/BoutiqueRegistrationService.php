@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\Authorization\Permissions;
 use App\Support\Phone\PhoneNumber;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -60,6 +61,10 @@ class BoutiqueRegistrationService
 
             $boutique->update(['proprietaire_id' => $user->id]);
 
+            // Essai offert au compte, une seule fois : une boutique ajoutée plus
+            // tard ne le relance pas.
+            app(AbonnementService::class)->demarrerEssai($user);
+
             return ['boutique' => $boutique->fresh(), 'user' => $user->fresh()];
         });
     }
@@ -72,6 +77,19 @@ class BoutiqueRegistrationService
      */
     public function ajouterBoutique(User $proprietaire, array $data): Boutique
     {
+        $abonnements = app(AbonnementService::class);
+
+        if (! $abonnements->peutCreerBoutique($proprietaire)) {
+            $abonnement = $proprietaire->abonnement()->first();
+
+            throw new HttpResponseException(response()->json([
+                'message' => $abonnement !== null && ! $abonnement->estEnCours()
+                    ? 'Votre abonnement est terminé : abonnez-vous pour ouvrir une nouvelle boutique.'
+                    : 'Votre plan ne permet pas d’autre boutique. Passez au plan supérieur.',
+                'code' => $abonnement !== null && ! $abonnement->estEnCours() ? 'ABONNEMENT_EXPIRE' : 'LIMITE_BOUTIQUES',
+            ], 403));
+        }
+
         $equipePrecedente = app(PermissionRegistrar::class)->getPermissionsTeamId();
         $tenantPrecedent = $this->tenant->boutiqueId();
 
@@ -96,6 +114,10 @@ class BoutiqueRegistrationService
 
                 $this->provisionnerRoles($boutique);
                 $proprietaire->unsetRelation('roles')->assignRole('admin');
+
+                // Premier compte propriétaire (un salarié qui ouvre sa boutique) :
+                // son essai démarre ici.
+                app(AbonnementService::class)->demarrerEssai($proprietaire);
 
                 return $boutique;
             });

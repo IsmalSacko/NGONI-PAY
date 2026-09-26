@@ -42,6 +42,10 @@ class Index extends Component
 
     public function enregistrerAjustement(): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can('stocks.update') || abort(403);
 
         $data = $this->validate([

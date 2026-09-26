@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant' => SetTenantContext::class,
+            'abonnement' => \App\Http\Middleware\ExigeAbonnementActif::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);

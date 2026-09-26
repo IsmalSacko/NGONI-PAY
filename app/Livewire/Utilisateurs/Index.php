@@ -8,6 +8,7 @@ use App\Enums\Country;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Boutique;
 use App\Models\User;
+use App\Services\AbonnementService;
 use App\Support\Phone\PhoneNumber;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,10 @@ class Index extends Component
 
     public function enregistrer(): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+
         Auth::user()->can('utilisateurs.create') || abort(403);
 
         $this->validate([
@@ -67,7 +72,18 @@ class Index extends Component
             'role' => ['required', Rule::in(['admin', 'gerant', 'caissier'])],
         ]);
 
-        $pays = Country::tryFrom($this->boutique()->pays) ?? Country::default();
+        $boutique = $this->boutique();
+
+        if (! app(AbonnementService::class)->peutAjouterMembre($boutique, count($this->membreIds()))) {
+            $abonnement = app(AbonnementService::class)->pourBoutique($boutique);
+            $this->addError('telephone', $abonnement?->estEnCours()
+                ? 'Votre plan ne permet pas d’autre membre dans cette boutique. Passez au plan supérieur.'
+                : 'Votre abonnement est terminé : abonnez-vous pour ajouter un membre.');
+
+            return;
+        }
+
+        $pays = Country::tryFrom($boutique->pays) ?? Country::default();
         $phone = PhoneNumber::normalize($this->telephone, $pays);
         $existant = User::whereIn('phone', PhoneNumber::candidates($this->telephone, $pays))->first();
 
