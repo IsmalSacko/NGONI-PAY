@@ -42,5 +42,5 @@ class AccesBackOffice
     }
 
     public const MESSAGE = 'Le back-office est réservé aux administrateurs et aux gérants. '
-        .'Les caissiers encaissent depuis l’application e-caisse.';
+        .'Les caissiers encaissent depuis l’application Ngoni Caisse.';
 }

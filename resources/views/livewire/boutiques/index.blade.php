@@ -14,7 +14,7 @@
     @endif
     @if ($alerte)
         <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">
-            {{ $alerte }} Le plan Pro permet jusqu’à 5 boutiques : abonnez-vous depuis l’application e-caisse.
+            {{ $alerte }} Le plan Pro permet jusqu’à 5 boutiques : abonnez-vous depuis l’application Ngoni Caisse.
         </p>
     @elseif (! $peutCreer)
         <p class="rounded-xl bg-[--color-warn-bg] text-[--color-warn-fg] px-4 py-3 text-sm">

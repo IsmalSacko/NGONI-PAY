@@ -4,7 +4,7 @@
 <body style="margin:0; padding:24px 0; background:#f4f5f7; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#1f2937;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#fff; border-radius:12px; overflow:hidden;">
-    <tr><td style="background:#0f172a; padding:20px 28px; color:#fff; font-size:18px; font-weight:700;">e-caisse <span style="color:#94a3b8; font-size:14px; font-weight:400;">· Demande d'abonnement</span></td></tr>
+    <tr><td style="background:#0f172a; padding:20px 28px; color:#fff; font-size:18px; font-weight:700;">Ngoni Caisse <span style="color:#94a3b8; font-size:14px; font-weight:400;">· Demande d'abonnement</span></td></tr>
     <tr><td style="padding:24px 28px 8px 28px; font-size:15px; line-height:1.6;">
       <p style="margin:0 0 16px 0;"><strong>{{ $demande->boutique?->nom ?? '—' }}</strong> demande le plan <strong>{{ ucfirst($demande->plan) }}</strong> ({{ strtolower($demande->cycle->libelle()) }}) pour <strong>{{ $montant }}</strong>.</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">

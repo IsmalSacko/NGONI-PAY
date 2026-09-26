@@ -74,7 +74,7 @@ class Utilisateurs extends Component
         $user->forceFill(['password' => $motDePasse])->save();
         $user->tokens()->delete();
 
-        $message = "Bonjour {$user->name}, votre mot de passe e-caisse provisoire est : {$motDePasse}\n"
+        $message = "Bonjour {$user->name}, votre mot de passe Ngoni Caisse provisoire est : {$motDePasse}\n"
             .'Connectez-vous puis changez-le.';
         $lien = WhatsApp::link($user->phone);
 

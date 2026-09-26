@@ -18,7 +18,7 @@ class CodeReinitialisationMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Votre code de réinitialisation e-caisse');
+        return new Envelope(subject: 'Votre code de réinitialisation Ngoni Caisse');
     }
 
     public function content(): Content

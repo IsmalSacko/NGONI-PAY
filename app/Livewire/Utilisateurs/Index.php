@@ -87,7 +87,7 @@ class Index extends Component
 
         if ($this->motDePasseProvisoire !== null) {
             $lien = WhatsApp::link($user->phone);
-            $message = "Bonjour {$user->name}, votre compte e-caisse est prêt. Numéro : {$user->phone}. "
+            $message = "Bonjour {$user->name}, votre compte Ngoni Caisse est prêt. Numéro : {$user->phone}. "
                 ."Mot de passe provisoire : {$this->motDePasseProvisoire}";
             $this->lienWhatsApp = $lien === null ? null : $lien.'?text='.rawurlencode($message);
         }

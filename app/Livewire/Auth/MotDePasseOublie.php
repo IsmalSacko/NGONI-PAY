@@ -80,7 +80,7 @@ class MotDePasseOublie extends Component
     public function render()
     {
         $support = (string) config('ecaisse.support_whatsapp');
-        $message = 'Bonjour, j’ai oublié mon mot de passe e-caisse. Mon numéro : '.$this->telephone;
+        $message = 'Bonjour, j’ai oublié mon mot de passe Ngoni Caisse. Mon numéro : '.$this->telephone;
 
         return view('livewire.auth.mot-de-passe-oublie', [
             'listePays' => Country::cases(),

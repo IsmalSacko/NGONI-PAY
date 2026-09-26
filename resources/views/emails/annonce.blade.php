@@ -5,7 +5,7 @@
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background:#fff; border-radius:12px; overflow:hidden;">
-        <tr><td style="background:#0B6E4F; padding:20px 28px; color:#fff; font-size:18px; font-weight:700;">e-caisse</td></tr>
+        <tr><td style="background:#0B6E4F; padding:20px 28px; color:#fff; font-size:18px; font-weight:700;">Ngoni Caisse</td></tr>
         <tr><td style="padding:28px; font-size:15px; line-height:1.6;">
           <p style="margin:0 0 12px 0;">Bonjour {{ $nom ?: '' }},</p>
           <p style="margin:0 0 12px 0; font-size:18px; font-weight:700;">{{ $annonce->titre }}</p>

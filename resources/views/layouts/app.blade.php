@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? 'e-caisse' }}</title>
+    <title>{{ $title ?? 'Ngoni Caisse' }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -26,7 +26,7 @@
     {{-- Téléphone : barre du haut et menu déroulant. --}}
     <header class="md:hidden sticky top-0 z-40 bg-ink text-white">
         <div class="h-14 px-4 flex items-center gap-3">
-            <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center font-display font-extrabold">e</span>
+            <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center font-display font-extrabold">N</span>
             <span class="flex-grow truncate font-semibold text-sm">{{ $boutiqueActive?->nom }}</span>
             <button type="button" @click="menu = !menu" :aria-expanded="menu" class="h-10 px-3 rounded-lg bg-[#263039] text-sm font-bold">
                 <span x-text="menu ? 'Fermer' : 'Menu'">Menu</span>
@@ -51,7 +51,7 @@
     <div class="flex min-h-screen">
         {{-- Ordinateur et tablette : colonne de navigation. --}}
         <nav aria-label="Navigation principale" class="hidden md:flex w-20 shrink-0 bg-ink flex-col items-center py-4 gap-2">
-            <span class="w-11 h-11 rounded-2xl bg-accent text-white flex items-center justify-center font-display font-extrabold text-xl mb-3">e</span>
+            <span class="w-11 h-11 rounded-2xl bg-accent text-white flex items-center justify-center font-display font-extrabold text-xl mb-3">N</span>
 
             @foreach ($liens as $lien)
                 @can($lien['permission'])
@@ -100,7 +100,7 @@
                         {{ $abonnementCourant?->estEssai() ? 'Essai gratuit terminé' : 'Abonnement expiré' }}
                         @if ($abonnementCourant?->fin) le {{ $abonnementCourant->fin->format('d/m/Y') }} @endif
                     </p>
-                    <p class="mt-1">Vos données restent consultables, mais aucune modification n’est possible. Abonnez-vous depuis l’application e-caisse.</p>
+                    <p class="mt-1">Vos données restent consultables, mais aucune modification n’est possible. Abonnez-vous depuis l’application Ngoni Caisse.</p>
                 </div>
             @endif
             @if (session('abonnement_expire'))
@@ -115,7 +115,7 @@
         document.addEventListener('livewire:init', () => {
             Livewire.on('abonnement-expire', () => alert(
                 "Votre essai ou abonnement est terminé : vos données restent consultables, "
-                + "mais aucune modification n'est possible. Abonnez-vous depuis l'application e-caisse."
+                + "mais aucune modification n'est possible. Abonnez-vous depuis l'application Ngoni Caisse."
             ));
         });
     </script>

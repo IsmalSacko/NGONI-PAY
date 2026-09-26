@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::view('privacy', 'privacy')->name('confidentialite');
 
 Route::get('telecharger', fn () => view('telecharger', [
-    'titre' => 'e-caisse — La caisse de votre commerce',
+    'titre' => 'Ngoni Caisse — La caisse de votre commerce',
     'description' => 'Ventes, stocks, reçus et équipe depuis votre téléphone, même hors ligne.',
     'version' => config('mobile.latest_version'),
     'storeUrl' => config('mobile.store_url'),

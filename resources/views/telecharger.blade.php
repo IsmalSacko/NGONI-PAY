@@ -8,13 +8,13 @@
     {{-- Balises Open Graph : un lien partagé sur WhatsApp affiche le nom, la
          description et l'icône de l'application, pas une simple adresse. --}}
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="e-caisse">
+    <meta property="og:site_name" content="Ngoni Caisse">
     <meta property="og:locale" content="fr_FR">
     <meta property="og:title" content="{{ $titre }}">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:url" content="{{ url('/telecharger') }}">
     <meta property="og:image" content="{{ asset('images/e-caisse.png') }}">
-    <meta property="og:image:alt" content="e-caisse">
+    <meta property="og:image:alt" content="Ngoni Caisse">
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <style>
         body { margin: 0; min-height: 100vh; display: grid; place-items: center;
@@ -31,8 +31,8 @@
 </head>
 <body>
 <main>
-    <img src="{{ asset('images/e-caisse.png') }}" alt="e-caisse">
-    <h1>e-caisse @if ($version)<span class="version">{{ $version }}</span>@endif</h1>
+    <img src="{{ asset('images/e-caisse.png') }}" alt="Ngoni Caisse">
+    <h1>Ngoni Caisse @if ($version)<span class="version">{{ $version }}</span>@endif</h1>
     <p>{{ $description }}</p>
     <a class="bouton" href="{{ $storeUrl }}" rel="noopener">Télécharger sur Google Play</a>
 </main>

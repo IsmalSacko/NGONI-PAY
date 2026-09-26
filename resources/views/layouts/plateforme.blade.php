@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? 'Console plateforme' }} · e-caisse</title>
+    <title>{{ $title ?? 'Console plateforme' }} · Ngoni Caisse</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -11,7 +11,7 @@
     <header class="bg-ink text-white">
         <div class="max-w-7xl mx-auto px-4 md:px-6 py-3 md:h-16 md:py-0 flex flex-wrap items-center gap-3 md:gap-6">
             <span class="flex items-center gap-2 font-display font-extrabold">
-                <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center">e</span>
+                <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center">N</span>
                 Console plateforme
             </span>
             @php

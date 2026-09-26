@@ -64,7 +64,7 @@ class Annonces extends Component
             $this->version = (string) config('mobile.latest_version');
             $this->lien = (string) config('mobile.store_url');
             $this->titre = 'Nouvelle version de l’application';
-            $this->message = 'Mettez à jour e-caisse depuis le Play Store pour profiter des nouveautés.';
+            $this->message = 'Mettez à jour Ngoni Caisse depuis le Play Store pour profiter des nouveautés.';
             $this->par_email = true;
         }
 
