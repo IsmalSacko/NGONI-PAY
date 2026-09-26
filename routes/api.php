@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AbonnementController;
+use App\Http\Controllers\Api\AchatController;
 use App\Http\Controllers\Api\AppareilController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
@@ -84,6 +85,12 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('equipe', [EquipeController::class, 'store'])->middleware(['permission:utilisateurs.create', 'abonnement']);
     Route::put('equipe/{membre}', [EquipeController::class, 'update'])->middleware(['permission:utilisateurs.update', 'abonnement']);
     Route::delete('equipe/{membre}', [EquipeController::class, 'destroy'])->middleware('permission:utilisateurs.delete');
+
+    Route::get('fournisseurs', [AchatController::class, 'fournisseurs'])->middleware('permission:achats.view');
+    Route::post('fournisseurs', [AchatController::class, 'creerFournisseur'])->middleware(['permission:achats.create', 'abonnement']);
+    Route::post('fournisseurs/{fournisseur}/paiements', [AchatController::class, 'payer'])->middleware(['permission:achats.create', 'abonnement']);
+    Route::get('achats', [AchatController::class, 'index'])->middleware('permission:achats.view');
+    Route::post('achats', [AchatController::class, 'store'])->middleware(['permission:achats.create', 'abonnement']);
 
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');

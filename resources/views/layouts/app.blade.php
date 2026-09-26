@@ -13,6 +13,7 @@
             ['route' => 'tableau-de-bord', 'label' => 'Pilotage', 'permission' => 'dashboard.view'],
             ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
             ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
+            ['route' => 'achats.index', 'label' => 'Achats', 'permission' => 'achats.view'],
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
             ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
             ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],

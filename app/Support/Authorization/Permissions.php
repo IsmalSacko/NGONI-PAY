@@ -42,6 +42,8 @@ class Permissions
             'ventes' => ['view', 'view_all', 'create', 'delete'],
             'sessions_caisse' => ['view', 'create', 'update'],
             'clients' => ['view', 'create', 'update', 'delete'],
+            // Réceptions de marchandise, fournisseurs et ce qu'on leur doit.
+            'achats' => ['view', 'create'],
             'utilisateurs' => ['view', 'create', 'update', 'delete'],
             'rapports' => ['view'],
             'dashboard' => ['view'],
