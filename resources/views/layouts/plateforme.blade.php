@@ -9,7 +9,7 @@
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
     <header class="bg-ink text-white">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center gap-6">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 py-3 md:h-16 md:py-0 flex flex-wrap items-center gap-3 md:gap-6">
             <span class="flex items-center gap-2 font-display font-extrabold">
                 <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center">e</span>
                 Console plateforme
@@ -24,7 +24,7 @@
                     ['route' => 'plateforme.utilisateurs', 'label' => 'Utilisateurs'],
                 ];
             @endphp
-            <nav class="flex gap-1 text-sm font-semibold">
+            <nav class="order-last md:order-none w-full md:w-auto flex gap-1 text-sm font-semibold overflow-x-auto whitespace-nowrap">
                 @foreach ($liens as $lien)
                     <a href="{{ route($lien['route']) }}"
                        class="px-3 py-2 rounded-lg {{ request()->routeIs($lien['route']) ? 'bg-[#263039]' : 'text-[#B9BEC6] hover:text-white' }}">
@@ -42,7 +42,7 @@
             </form>
         </div>
     </header>
-    <main class="max-w-7xl mx-auto px-6 py-8">
+    <main class="max-w-7xl mx-auto px-4 md:px-6 py-5 md:py-8">
         {{ $slot }}
     </main>
     @livewireScripts

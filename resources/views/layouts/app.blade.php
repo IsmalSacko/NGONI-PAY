@@ -7,21 +7,51 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-paper text-ink font-sans antialiased">
-    <div class="flex min-h-screen">
-        <nav aria-label="Navigation principale" class="w-20 shrink-0 bg-ink flex flex-col items-center py-4 gap-2">
-            <span class="w-11 h-11 rounded-2xl bg-accent text-white flex items-center justify-center font-display font-extrabold text-xl mb-3">e</span>
+<body class="bg-paper text-ink font-sans antialiased" x-data="{ menu: false }">
+    @php
+        $liens = [
+            ['route' => 'tableau-de-bord', 'label' => 'Pilotage', 'permission' => 'dashboard.view'],
+            ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
+            ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
+            ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
+            ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],
+            ['route' => 'utilisateurs.index', 'label' => 'Équipe', 'permission' => 'utilisateurs.view'],
+            ['route' => 'boutiques.index', 'label' => 'Boutiques', 'permission' => 'backoffice.access'],
+        ];
+        $boutiqueActiveId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+        $mesBoutiques = \App\Models\Boutique::whereIn('id', auth()->user()->boutiquesBackOffice())->orderBy('nom')->get(['id', 'nom']);
+        $boutiqueActive = $mesBoutiques->firstWhere('id', $boutiqueActiveId);
+    @endphp
 
-            @php
-                $liens = [
-                    ['route' => 'tableau-de-bord', 'label' => 'Pilotage', 'permission' => 'dashboard.view'],
-                    ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
-                    ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
-                    ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
-                    ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],
-                    ['route' => 'utilisateurs.index', 'label' => 'Équipe', 'permission' => 'utilisateurs.view'],
-                ];
-            @endphp
+    {{-- Téléphone : barre du haut et menu déroulant. --}}
+    <header class="md:hidden sticky top-0 z-40 bg-ink text-white">
+        <div class="h-14 px-4 flex items-center gap-3">
+            <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center font-display font-extrabold">e</span>
+            <span class="flex-grow truncate font-semibold text-sm">{{ $boutiqueActive?->nom }}</span>
+            <button type="button" @click="menu = !menu" :aria-expanded="menu" class="h-10 px-3 rounded-lg bg-[#263039] text-sm font-bold">
+                <span x-text="menu ? 'Fermer' : 'Menu'">Menu</span>
+            </button>
+        </div>
+        <nav x-show="menu" x-cloak x-transition.opacity @click.outside="menu = false" class="px-4 pb-4 flex flex-col gap-1" aria-label="Navigation principale">
+            @foreach ($liens as $lien)
+                @can($lien['permission'])
+                    <a href="{{ route($lien['route']) }}"
+                       class="h-11 px-3 rounded-lg flex items-center font-semibold no-underline {{ request()->routeIs($lien['route']) ? 'bg-[#263039] text-white' : 'text-[#B9BEC6]' }}">
+                        {{ $lien['label'] }}
+                    </a>
+                @endcan
+            @endforeach
+            <form method="POST" action="{{ route('deconnexion') }}">
+                @csrf
+                <button type="submit" class="h-11 px-3 w-full text-left rounded-lg font-semibold text-[#B9BEC6]">Quitter</button>
+            </form>
+        </nav>
+    </header>
+
+    <div class="flex min-h-screen">
+        {{-- Ordinateur et tablette : colonne de navigation. --}}
+        <nav aria-label="Navigation principale" class="hidden md:flex w-20 shrink-0 bg-ink flex-col items-center py-4 gap-2">
+            <span class="w-11 h-11 rounded-2xl bg-accent text-white flex items-center justify-center font-display font-extrabold text-xl mb-3">e</span>
 
             @foreach ($liens as $lien)
                 @can($lien['permission'])
@@ -42,26 +72,22 @@
             </form>
         </nav>
 
-        <main class="flex-grow min-w-0 p-8">
-            @php
-                $boutiqueActiveId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
-                $mesBoutiques = \App\Models\Boutique::whereIn('id', auth()->user()->boutiqueIds())->orderBy('nom')->get(['id', 'nom']);
-            @endphp
+        <main class="flex-grow min-w-0 p-4 md:p-8">
             {{-- Boutique de travail : un compte peut en gérer plusieurs. --}}
             <div class="flex justify-end mb-4">
                 @if ($mesBoutiques->count() > 1)
-                    <form method="POST" action="{{ route('boutique-active') }}" class="flex items-center gap-2 text-sm">
+                    <form method="POST" action="{{ route('boutique-active') }}" class="flex items-center gap-2 text-sm w-full md:w-auto">
                         @csrf
                         <label for="boutique-active" class="text-[--color-muted] font-semibold">Boutique</label>
                         <select id="boutique-active" name="boutique" onchange="this.form.submit()"
-                                class="h-10 px-3 rounded-xl border border-[--color-border-strong] bg-white font-semibold">
+                                class="h-10 px-3 rounded-xl border border-[--color-border-strong] bg-white font-semibold flex-grow md:flex-grow-0 min-w-0">
                             @foreach ($mesBoutiques as $b)
                                 <option value="{{ $b->id }}" @selected($b->id === $boutiqueActiveId)>{{ $b->nom }}</option>
                             @endforeach
                         </select>
                     </form>
                 @else
-                    <span class="text-sm font-semibold text-[--color-muted]">{{ $mesBoutiques->first()?->nom }}</span>
+                    <span class="hidden md:inline text-sm font-semibold text-[--color-muted]">{{ $mesBoutiques->first()?->nom }}</span>
                 @endif
             </div>
             @php

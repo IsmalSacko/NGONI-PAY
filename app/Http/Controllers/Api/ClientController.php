@@ -13,12 +13,15 @@ class ClientController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Client::query();
+        // Achats validés : combien, et pour combien.
+        $query = Client::query()
+            ->withCount(['ventes as achats' => fn ($q) => $q->valides()])
+            ->withSum(['ventes as total_achats' => fn ($q) => $q->valides()], 'total');
 
         if ($request->filled('recherche')) {
             $terme = '%'.$request->string('recherche').'%';
             $query->where(function ($q) use ($terme): void {
-                $q->where('nom', 'like', $terme)->orWhere('telephone', 'like', $terme);
+                $q->where('nom', 'like', $terme)->orWhere('telephone', 'like', $terme)->orWhere('email', 'like', $terme);
             });
         }
 
@@ -30,6 +33,8 @@ class ClientController extends Controller
         $data = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         return response()->json(Client::create($data), 201);
@@ -40,6 +45,8 @@ class ClientController extends Controller
         $data = $request->validate([
             'nom' => ['sometimes', 'required', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $client->update($data);

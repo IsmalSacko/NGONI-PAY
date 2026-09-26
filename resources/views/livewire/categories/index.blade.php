@@ -1,14 +1,14 @@
 <div class="flex flex-col gap-5">
-    <div class="flex items-end justify-between gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
-            <h1 class="font-display font-extrabold text-3xl">Catégories</h1>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Catégories</h1>
             <span class="text-[--color-muted] text-sm">Organisent la grille de la caisse tactile.</span>
         </div>
         <a href="{{ route('produits.index') }}" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">← Produits</a>
     </div>
 
-    <div class="grid grid-cols-[2fr_1fr] gap-4">
-        <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
+    <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+        <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
             @forelse ($categories as $categorie)
                 <div class="flex items-center gap-3 px-5 py-3 border-b border-[#EEEAE1]">
                     <span class="w-4 h-4 rounded-full shrink-0" style="background: {{ $categorie->couleur ?: '#0B6E4F' }}"></span>

@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-5">
-    <div class="flex items-end justify-between gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h1 class="font-display font-extrabold text-3xl">Demandes d’abonnement</h1>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Demandes d’abonnement</h1>
             <p class="text-sm text-muted">Approuvez une fois le paiement constaté. Le plan ne s’active qu’à ce moment.</p>
         </div>
         <select wire:model.live="filtre" class="h-11 px-3 rounded-xl border border-border-strong bg-white">

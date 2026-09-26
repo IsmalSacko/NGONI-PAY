@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-5">
-    <div class="flex items-end justify-between gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
-            <h1 class="font-display font-extrabold text-3xl">Produits</h1>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Produits</h1>
             <span class="text-[--color-muted] text-sm">Catalogue, prix et TVA de la boutique.</span>
         </div>
         <div class="flex gap-3">
@@ -17,12 +17,12 @@
     <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher un article…"
            class="w-96 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="grid grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
+        <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span>Catégorie</span><span class="text-right">Vente</span><span class="text-right">TVA</span><span class="text-right">Stock</span><span></span>
         </div>
         @foreach ($produits as $produit)
-            <div class="grid grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <div class="flex flex-col">
                     <span class="font-bold">{{ $produit->nom }}</span>
                     <span class="text-xs text-[--color-muted]">{{ $produit->format }}</span>
@@ -46,8 +46,8 @@
     {{ $produits->links() }}
 
     @if ($modaleOuverte)
-        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" wire:click.self="$set('modaleOuverte', false)">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-lg flex flex-col gap-4">
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('modaleOuverte', false)">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-lg max-h-[90vh] overflow-y-auto flex flex-col gap-4">
                 <h2 class="font-display font-extrabold text-xl">{{ $produitId ? 'Modifier l’article' : 'Nouvel article' }}</h2>
 
                 <form wire:submit="enregistrer" class="flex flex-col gap-3">
@@ -57,7 +57,7 @@
                         @error('nom') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Format</label>
                             <input wire:model="format" type="text" placeholder="Sac 5 kg" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
@@ -73,7 +73,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Prix de vente</label>
                             <input wire:model="prix_vente" type="number" min="0" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
@@ -89,7 +89,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-sm font-semibold mb-1">Code-barres</label>
                             <input wire:model="code_barre" type="text" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">

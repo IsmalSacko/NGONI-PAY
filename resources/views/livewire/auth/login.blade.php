@@ -2,6 +2,10 @@
     <h1 class="font-display font-extrabold text-2xl mb-1">Connexion</h1>
     <p class="text-[--color-muted] text-sm mb-6">Accédez au pilotage de votre boutique.</p>
 
+    @if (session('alerte'))
+        <p class="mb-4 rounded-xl bg-[--color-warn-bg] text-[--color-warn-fg] px-4 py-3 text-sm">{{ session('alerte') }}</p>
+    @endif
+
     <form wire:submit="connexion" class="flex flex-col gap-4">
         <div>
             <label for="pays" class="block text-sm font-semibold mb-1">Pays</label>

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\SessionCaisseController;
@@ -66,6 +67,11 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('clients', [ClientController::class, 'store'])->middleware(['permission:clients.create', 'abonnement']);
     Route::put('clients/{client}', [ClientController::class, 'update'])->middleware(['permission:clients.update', 'abonnement']);
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->middleware(['permission:clients.delete', 'abonnement']);
+
+    Route::get('equipe', [EquipeController::class, 'index'])->middleware('permission:utilisateurs.view');
+    Route::post('equipe', [EquipeController::class, 'store'])->middleware(['permission:utilisateurs.create', 'abonnement']);
+    Route::put('equipe/{membre}', [EquipeController::class, 'update'])->middleware(['permission:utilisateurs.update', 'abonnement']);
+    Route::delete('equipe/{membre}', [EquipeController::class, 'destroy'])->middleware('permission:utilisateurs.delete');
 
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');

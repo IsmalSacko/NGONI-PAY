@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-5">
     <div class="flex items-end justify-between gap-4 flex-wrap">
         <div>
-            <h1 class="font-display font-extrabold text-3xl">Comptes</h1>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Comptes</h1>
             <p class="text-sm text-muted">Propriétaires, leurs boutiques et leur abonnement.</p>
         </div>
         <div class="flex gap-3">

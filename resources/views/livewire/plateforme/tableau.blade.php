@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-6">
-    <h1 class="font-display font-extrabold text-3xl">Tableau de bord</h1>
+    <h1 class="font-display font-extrabold text-2xl md:text-3xl">Tableau de bord</h1>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         @foreach ([
@@ -14,7 +14,7 @@
         ] as [$libelle, $valeur, $couleur])
             <div class="bg-white border border-border rounded-2xl p-5">
                 <p class="text-sm text-muted">{{ $libelle }}</p>
-                <p class="mt-1 font-display font-extrabold text-3xl {{ $couleur }}">{{ $valeur }}</p>
+                <p class="mt-1 font-display font-extrabold text-2xl md:text-3xl {{ $couleur }}">{{ $valeur }}</p>
             </div>
         @endforeach
     </div>

@@ -1,10 +1,10 @@
 <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-1">
-        <h1 class="font-display font-extrabold text-3xl">Stocks &amp; inventaire</h1>
+        <h1 class="font-display font-extrabold text-2xl md:text-3xl">Stocks &amp; inventaire</h1>
         <span class="text-[--color-muted] text-sm">Ajustez le stock à la suite d'un inventaire ou d'un réassort.</span>
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-[--color-muted]">Valeur du stock</span>
             <span class="font-display font-extrabold text-2xl">{{ number_format($valeurStock, 0, ',', ' ') }}</span>
@@ -32,12 +32,12 @@
         </div>
     </div>
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
+        <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span class="text-right">Stock</span><span class="text-right">Seuil</span><span>Statut</span><span></span>
         </div>
         @forelse ($produits as $produit)
-            <div class="grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <span class="font-bold">{{ $produit->nom }}</span>
                 <span class="text-right font-semibold">{{ $produit->stock }}</span>
                 <span class="text-right text-[--color-muted]">{{ $produit->seuil_alerte }}</span>
@@ -60,8 +60,8 @@
     </section>
 
     @if ($ajustementProduitId)
-        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" wire:click.self="fermerAjustement">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4">
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="fermerAjustement">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-sm max-h-[90vh] overflow-y-auto flex flex-col gap-4">
                 <h2 class="font-display font-extrabold text-xl">Ajuster le stock</h2>
                 <form wire:submit="enregistrerAjustement" class="flex flex-col gap-3">
                     <div>

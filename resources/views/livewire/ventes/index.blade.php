@@ -1,15 +1,15 @@
 <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-1">
-        <h1 class="font-display font-extrabold text-3xl">Ventes</h1>
+        <h1 class="font-display font-extrabold text-2xl md:text-3xl">Ventes</h1>
         <span class="text-[--color-muted] text-sm">Historique des tickets encaissés.</span>
     </div>
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="grid grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
+        <div class="grid min-w-[680px] grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>N°</span><span>Caissier</span><span>Client</span><span>Moyen</span><span class="text-right">Total</span><span></span>
         </div>
         @forelse ($ventes as $vente)
-            <div class="grid grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid min-w-[680px] grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <span class="font-mono">{{ $vente->numeroFormate() }}@if ($vente->estAnnulee()) <span class="ml-1 rounded bg-danger-bg px-1.5 text-xs font-bold text-danger-fg">annulée</span>@endif</span>
                 <span>{{ $vente->caissier->name }}</span>
                 <span>{{ $vente->client->nom ?? '—' }}</span>
@@ -25,8 +25,8 @@
     {{ $ventes->links() }}
 
     @if ($detail)
-        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" wire:click.self="fermer">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-md flex flex-col gap-3">
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="fermer">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto flex flex-col gap-3">
                 <div class="flex justify-between items-baseline">
                     <h2 class="font-display font-extrabold text-xl">Ticket n° {{ $detail->numeroFormate() }}</h2>
                     <span class="text-xs text-[--color-muted]">{{ $detail->created_at->format('d/m/Y H:i') }}</span>

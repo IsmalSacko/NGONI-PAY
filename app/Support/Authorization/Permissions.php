@@ -16,8 +16,9 @@ use App\Console\Commands\SyncRolePermissions;
  * - `gerant` — fait tourner la boutique au quotidien : catalogue, stocks,
  *   rapports. Ne touche pas aux comptes ni aux réglages sensibles.
  * - `caissier` — la caisse tactile, et rien d'autre : encaisser, consulter
- *   le stock affiché sur les tuiles, ajouter un client à la volée. Ne voit
- *   ni le pilotage ni l'inventaire détaillé.
+ *   le stock affiché sur les tuiles, ajouter un client à la volée, revoir ses
+ *   propres ventes. Ne voit ni le pilotage, ni l'équipe, ni les ventes des
+ *   autres, et n'entre pas dans le back-office web.
  *
  * Une seule source pour la matrice, rejouée par une commande plutôt que
  * réglée à la main dans chaque environnement : une permission ajoutée demain
@@ -36,7 +37,9 @@ class Permissions
             'categories' => ['view', 'create', 'update', 'delete'],
             'produits' => ['view', 'create', 'update', 'delete'],
             'stocks' => ['view', 'update'],
-            'ventes' => ['view', 'create', 'delete'],
+            // view_all : l'historique de toute la boutique. Sans elle, chacun
+            // ne voit que ses propres ventes.
+            'ventes' => ['view', 'view_all', 'create', 'delete'],
             'sessions_caisse' => ['view', 'create', 'update'],
             'clients' => ['view', 'create', 'update', 'delete'],
             'utilisateurs' => ['view', 'create', 'update', 'delete'],
@@ -44,6 +47,9 @@ class Permissions
             'dashboard' => ['view'],
             // Demander un abonnement engage le propriétaire : réservé à l'admin.
             'abonnement' => ['manage'],
+            // Le back-office web : gérer la boutique depuis un ordinateur.
+            // Les caissiers encaissent depuis l'application, sans y accéder.
+            'backoffice' => ['access'],
         ];
     }
 

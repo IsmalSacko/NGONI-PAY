@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Auth;
 
 use App\Enums\Country;
+use App\Http\Middleware\AccesBackOffice;
 use App\Support\Auth\Identification;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -36,6 +37,13 @@ class Login extends Component
 
         if ($user === null) {
             $this->addError('telephone', 'Identifiants incorrects.');
+
+            return;
+        }
+
+        // Caissier partout : il encaisse depuis l'application.
+        if (! $user->est_admin_plateforme && $user->boutiqueIds() !== [] && $user->boutiquesBackOffice() === []) {
+            $this->addError('telephone', AccesBackOffice::MESSAGE);
 
             return;
         }

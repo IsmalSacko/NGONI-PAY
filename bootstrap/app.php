@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => SetTenantContext::class,
             'abonnement' => \App\Http\Middleware\ExigeAbonnementActif::class,
             'plateforme' => \App\Http\Middleware\EstAdminPlateforme::class,
+            'backoffice' => \App\Http\Middleware\AccesBackOffice::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);

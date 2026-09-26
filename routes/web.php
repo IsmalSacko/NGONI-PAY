@@ -56,7 +56,8 @@ Route::post('boutique-active', function () {
     return redirect()->route('tableau-de-bord');
 })->middleware('auth')->name('boutique-active');
 
-Route::middleware(['auth', 'tenant'])->group(function (): void {
+Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
+    Route::get('boutiques', \App\Livewire\Boutiques\Index::class)->name('boutiques.index');
     Route::get('tableau-de-bord', Dashboard::class)->name('tableau-de-bord')->middleware('permission:dashboard.view');
 
     Route::get('produits', ProduitsIndex::class)->name('produits.index')->middleware('permission:produits.view');

@@ -1,6 +1,6 @@
 <div class="flex flex-col gap-5">
     <div>
-        <h1 class="font-display font-extrabold text-3xl">Plans et tarifs</h1>
+        <h1 class="font-display font-extrabold text-2xl md:text-3xl">Plans et tarifs</h1>
         <p class="text-sm text-muted">Limites vides = illimité. Un tarif vide ou décoché n’est pas proposé. Les demandes déjà déposées gardent leur montant.</p>
     </div>
 
@@ -17,7 +17,7 @@
                     @endunless
                 </div>
                 <textarea wire:model="plans.{{ $id }}.description" rows="2" class="w-full px-3 py-2 rounded-lg border border-border-strong text-sm"></textarea>
-                <div class="grid grid-cols-3 gap-3 mt-3 text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 text-sm">
                     @if ($plan['essai'])
                         <label>Durée de l’essai (jours)
                             <input wire:model="plans.{{ $id }}.jours_essai" type="number" min="1" class="mt-1 w-full h-10 px-3 rounded-lg border border-border-strong">

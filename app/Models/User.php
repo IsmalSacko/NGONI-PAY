@@ -70,6 +70,25 @@ class User extends Authenticatable
             ->all();
     }
 
+    /**
+     * Boutiques où ce compte a accès au back-office (admin ou gérant).
+     *
+     * @return list<string>
+     */
+    public function boutiquesBackOffice(): array
+    {
+        return DB::table(config('permission.table_names.model_has_roles').' as mhr')
+            ->join(config('permission.table_names.roles').' as r', 'r.id', '=', 'mhr.role_id')
+            ->where('mhr.model_type', $this->getMorphClass())
+            ->where('mhr.'.config('permission.column_names.model_morph_key'), $this->getKey())
+            ->whereIn('r.name', ['admin', 'gerant'])
+            ->pluck('mhr.'.config('permission.column_names.team_foreign_key'))
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function appartientA(?string $boutiqueId): bool
     {
         return $boutiqueId !== null && in_array($boutiqueId, $this->boutiqueIds(), true);
