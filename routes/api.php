@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('inscription', [AuthController::class, 'register']);
 Route::post('connexion', [AuthController::class, 'login']);
+// Limités : un code à 6 chiffres ne doit pas pouvoir être deviné en rafale.
+Route::post('mot-de-passe-oublie', [AuthController::class, 'motDePasseOublie'])->middleware('throttle:reinit-demande');
+Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiserMotDePasse'])->middleware('throttle:reinit-code');
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
