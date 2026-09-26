@@ -6,11 +6,13 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('pays', [PaysController::class, 'index']);
 Route::post('inscription', [AuthController::class, 'register']);
 Route::post('connexion', [AuthController::class, 'login']);
 // Limités : un code à 6 chiffres ne doit pas pouvoir être deviné en rafale.

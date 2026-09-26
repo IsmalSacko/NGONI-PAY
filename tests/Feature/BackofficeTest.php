@@ -63,6 +63,26 @@ class BackofficeTest extends TestCase
         $this->assertAuthenticatedAs($this->admin);
     }
 
+    public function test_login_avec_un_numero_local_ivoirien_et_le_pays_choisi(): void
+    {
+        $gerante = User::create([
+            'boutique_id' => $this->admin->boutique_id,
+            'name' => 'Gérante Abidjan',
+            'phone' => '+2250708123456',
+            'password' => bcrypt('password123'),
+        ]);
+
+        // Sans le pays, « 0708123456 » serait lu comme un numéro malien.
+        Livewire::test(Login::class)
+            ->set('pays', 'CI')
+            ->set('telephone', '07 08 12 34 56')
+            ->set('password', 'password123')
+            ->call('connexion')
+            ->assertRedirect(route('tableau-de-bord'));
+
+        $this->assertAuthenticatedAs($gerante);
+    }
+
     public function test_dashboard_affiche_les_kpis_de_la_boutique(): void
     {
         $this->actingAs($this->admin);

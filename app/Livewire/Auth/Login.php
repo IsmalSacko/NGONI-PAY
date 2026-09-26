@@ -17,7 +17,15 @@ class Login extends Component
 {
     public string $telephone = '';
 
+    /** Pays du numéro : décide de l'indicatif ajouté à un numéro local. */
+    public string $pays = '';
+
     public string $password = '';
+
+    public function mount(): void
+    {
+        $this->pays = Country::default()->value;
+    }
 
     public function connexion(): void
     {
@@ -26,7 +34,7 @@ class Login extends Component
             'password' => ['required', 'string'],
         ]);
 
-        $candidats = PhoneNumber::candidates($this->telephone, Country::default());
+        $candidats = PhoneNumber::candidates($this->telephone, Country::tryFrom($this->pays) ?? Country::default());
 
         $user = User::withoutGlobalScopes()->whereIn('phone', $candidats)->first();
 
@@ -44,6 +52,6 @@ class Login extends Component
 
     public function render()
     {
-        return view('livewire.auth.login');
+        return view('livewire.auth.login', ['listePays' => Country::cases()]);
     }
 }
