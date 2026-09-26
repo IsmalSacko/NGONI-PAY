@@ -44,7 +44,8 @@ class Index extends Component
     public bool $reglagesOuverts = false;
 
     /** @var array{nom: string, pays: string, devise: string, telephone: string, email: string, adresse: string} */
-    public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => '', 'convertir' => true, 'taux' => ''];
+    public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => '', 'convertir' => true, 'taux' => '',
+        'identifiant_fiscal' => '', 'rccm' => '', 'message_ticket' => ''];
 
     /** Devise avant modification : le taux se lit « 1 nouvelle = x ancienne ». */
     public string $deviseInitiale = '';
@@ -71,6 +72,7 @@ class Index extends Component
             'nom' => $b->nom, 'pays' => (string) $b->pays, 'devise' => (string) $b->devise,
             'telephone' => (string) $b->telephone, 'email' => (string) $b->email, 'adresse' => (string) $b->adresse,
             'convertir' => true, 'taux' => '',
+            'identifiant_fiscal' => (string) $b->identifiant_fiscal, 'rccm' => (string) $b->rccm, 'message_ticket' => (string) $b->message_ticket,
         ];
         $this->deviseInitiale = (string) $b->devise;
         $this->reglagesOuverts = true;

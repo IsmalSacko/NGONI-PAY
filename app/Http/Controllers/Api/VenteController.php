@@ -62,8 +62,21 @@ class VenteController extends Controller
             'vendue_hors_ligne' => ['nullable', 'boolean'],
         ]);
 
+        // À crédit : on doit savoir qui doit.
+        if (($data['moyen_paiement'] ?? null) === MoyenPaiement::CreditClient->value && empty($data['client_id'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['client_id' => ['Choisissez le client qui paiera plus tard.']]);
+        }
+
         $vente = $this->ventes->encaisser($data, $request->user());
 
-        return response()->json($vente, 201);
+        return response()->json($vente->load(['client', 'caissier']), 201);
+    }
+
+    /** Annulation tracée (gérant, admin) : motif obligatoire, stock remis. */
+    public function annuler(Request $request, Vente $vente): JsonResponse
+    {
+        $data = $request->validate(['motif' => ['required', 'string', 'max:255']], [], ['motif' => 'motif']);
+
+        return response()->json($this->ventes->annuler($vente, $request->user(), $data['motif']));
     }
 }

@@ -193,4 +193,49 @@ class VenteService
             return $vente->load('lignes');
         });
     }
+
+    /**
+     * Annule une vente : elle reste dans l'historique, marquée annulée, avec
+     * qui, quand et pourquoi. Le stock des articles revient (mouvement
+     * d'entrée tracé). Elle ne compte plus dans le chiffre d'affaires, l'écart
+     * de caisse ni ce que doit un client à crédit.
+     */
+    public function annuler(Vente $vente, User $auteur, string $motif): Vente
+    {
+        return DB::transaction(function () use ($vente, $auteur, $motif): Vente {
+            $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
+
+            if ($vente->estAnnulee()) {
+                throw ValidationException::withMessages(['vente' => ['Cette vente est déjà annulée.']]);
+            }
+
+            $vente->update([
+                'statut' => Vente::STATUT_ANNULEE,
+                'annulee_le' => now(),
+                'annulee_par' => $auteur->id,
+                'motif_annulation' => $motif,
+            ]);
+
+            foreach ($vente->lignes()->whereNotNull('produit_id')->get() as $ligne) {
+                $produit = Produit::whereKey($ligne->produit_id)->lockForUpdate()->first();
+                if ($produit === null) {
+                    continue;
+                }
+                $produit->stock += $ligne->quantite;
+                $produit->save();
+
+                MouvementStock::create([
+                    'produit_id' => $produit->id,
+                    'user_id' => $auteur->id,
+                    'vente_id' => $vente->id,
+                    'type' => TypeMouvementStock::Entree,
+                    'quantite' => $ligne->quantite,
+                    'stock_apres' => $produit->stock,
+                    'motif' => 'Annulation vente '.$vente->numeroFormate(),
+                ]);
+            }
+
+            return $vente->load(['lignes', 'client', 'caissier']);
+        });
+    }
 }

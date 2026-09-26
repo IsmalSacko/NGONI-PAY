@@ -35,6 +35,10 @@ class ReglagesBoutique
             'telephone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'adresse' => ['nullable', 'string', 'max:255'],
+            // Mentions du ticket.
+            'identifiant_fiscal' => ['nullable', 'string', 'max:60'],
+            'rccm' => ['nullable', 'string', 'max:60'],
+            'message_ticket' => ['nullable', 'string', 'max:160'],
             // Changement de devise : convertir (par défaut, au taux fixe s'il
             // existe, sinon au taux donné) ou garder les mêmes nombres.
             'convertir' => ['nullable', 'boolean'],
@@ -67,6 +71,10 @@ class ReglagesBoutique
             'telephone' => filled($data['telephone'] ?? null) ? PhoneNumber::normalize((string) $data['telephone'], $pays) : null,
             'email' => $data['email'] ?? null,
             'adresse' => $data['adresse'] ?? null,
+            // Absents de la requête (application plus ancienne) : inchangés.
+            'identifiant_fiscal' => array_key_exists('identifiant_fiscal', $donnees) ? ($data['identifiant_fiscal'] ?? null) : $boutique->identifiant_fiscal,
+            'rccm' => array_key_exists('rccm', $donnees) ? ($data['rccm'] ?? null) : $boutique->rccm,
+            'message_ticket' => array_key_exists('message_ticket', $donnees) ? ($data['message_ticket'] ?? null) : $boutique->message_ticket,
         ]);
 
         return $boutique->fresh();

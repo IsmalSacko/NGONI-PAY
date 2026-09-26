@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
-    'vendue_hors_ligne', 'synchronisee_le',
+    'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
 ])]
 class Vente extends Model
 {
@@ -37,6 +37,7 @@ class Vente extends Model
             'moyen_paiement' => MoyenPaiement::class,
             'vendue_hors_ligne' => 'boolean',
             'synchronisee_le' => 'datetime',
+            'annulee_le' => 'datetime',
         ];
     }
 

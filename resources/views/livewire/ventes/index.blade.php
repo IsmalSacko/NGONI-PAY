@@ -60,6 +60,20 @@
                     @endif
                 </div>
 
+                @if ($detail->estAnnulee())
+                    <div class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm">
+                        <strong>Vente annulée</strong> le {{ $detail->annulee_le?->format('d/m/Y à H:i') }}@if ($detail->annule_par_nom) par {{ $detail->annule_par_nom }}@endif.
+                        @if ($detail->motif_annulation)<br>Motif : {{ $detail->motif_annulation }}@endif
+                    </div>
+                @elseif (auth()->user()->can('ventes.delete'))
+                    <form wire:submit="annuler" class="rounded-xl border border-[--color-border] p-3 flex flex-col gap-2">
+                        <label class="text-sm font-semibold">Annuler cette vente <span class="font-normal text-[--color-muted]">(le stock est remis, la vente reste tracée)</span></label>
+                        <input wire:model="motif" type="text" maxlength="255" placeholder="Motif : erreur de saisie, retour client…" class="h-10 px-3 rounded-lg border border-[--color-border-strong]">
+                        @error('motif') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                        <button type="submit" wire:confirm="Annuler définitivement cette vente ?" class="h-10 rounded-lg border border-danger-fg text-danger-fg font-bold">Annuler la vente</button>
+                    </form>
+                @endif
+
                 <button wire:click="fermer" class="h-11 rounded-lg border border-[--color-border-strong] font-bold mt-2">Fermer</button>
             </div>
         </div>

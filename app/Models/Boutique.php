@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Storage;
  * pour la même raison que {@see User} : elle EST le tenant, elle ne lui
  * appartient pas.
  */
-#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo'])]
+#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket'])]
 class Boutique extends Model
 {
     /** @use HasFactory<BoutiqueFactory> */

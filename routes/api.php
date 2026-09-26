@@ -74,6 +74,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('clients', [ClientController::class, 'index'])->middleware('permission:clients.view');
     Route::post('clients', [ClientController::class, 'store'])->middleware(['permission:clients.create', 'abonnement']);
     Route::put('clients/{client}', [ClientController::class, 'update'])->middleware(['permission:clients.update', 'abonnement']);
+    Route::get('clients/{client}/credit', [ClientController::class, 'credit'])->middleware('permission:clients.view');
+    Route::post('clients/{client}/reglements', [ClientController::class, 'reglement'])->middleware(['permission:ventes.create', 'abonnement']);
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->middleware(['permission:clients.delete', 'abonnement']);
 
     Route::get('equipe', [EquipeController::class, 'index'])->middleware('permission:utilisateurs.view');
@@ -83,6 +85,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
+    Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
     Route::post('ventes', [VenteController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement'])->name('ventes.store');
 
     Route::get('sessions-caisse', [SessionCaisseController::class, 'index'])->middleware('permission:sessions_caisse.view');

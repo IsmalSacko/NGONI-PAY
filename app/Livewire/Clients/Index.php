@@ -65,6 +65,47 @@ class Index extends Component
         $this->modaleOuverte = false;
     }
 
+    /** Règlement d'une dette (ventes à crédit). */
+    public ?string $reglementClientId = null;
+
+    public string $reglementMontant = '';
+
+    public string $reglementMoyen = 'especes';
+
+    public function ouvrirReglement(string $clientId): void
+    {
+        $this->resetValidation();
+        $this->reglementClientId = $clientId;
+        $this->reglementMontant = \App\Support\Money\Montant::saisie(Client::findOrFail($clientId)->soldeDu());
+        $this->reglementMoyen = 'especes';
+    }
+
+    public function enregistrerReglement(): void
+    {
+        if (! $this->abonnementActif()) {
+            return;
+        }
+        Auth::user()->can('ventes.create') || abort(403);
+        $this->resetValidation();
+
+        $client = Client::findOrFail($this->reglementClientId);
+        $solde = $client->soldeDu();
+        $montant = \App\Support\Money\Montant::parse($this->reglementMontant);
+
+        if ($montant === null || $montant <= 0 || $montant > $solde) {
+            $this->addError('reglementMontant', 'Montant entre 1 et '.\App\Support\Money\Montant::format($solde).'.');
+
+            return;
+        }
+
+        $client->reglements()->create([
+            'montant' => $montant,
+            'moyen_paiement' => in_array($this->reglementMoyen, ['especes', 'orange_money', 'moov_money', 'wave', 'carte', 'virement'], true) ? $this->reglementMoyen : 'especes',
+            'user_id' => Auth::id(),
+        ]);
+        $this->reglementClientId = null;
+    }
+
     public function supprimer(string $clientId): void
     {
         if (! $this->abonnementActif()) {
@@ -78,7 +119,7 @@ class Index extends Component
 
     public function render()
     {
-        $clients = Client::when($this->recherche, fn ($q) => $q->where('nom', 'like', "%{$this->recherche}%")
+        $clients = Client::avecSoldeDu()->when($this->recherche, fn ($q) => $q->where('nom', 'like', "%{$this->recherche}%")
             ->orWhere('telephone', 'like', "%{$this->recherche}%"))
             ->orderBy('nom')
             ->paginate(15);

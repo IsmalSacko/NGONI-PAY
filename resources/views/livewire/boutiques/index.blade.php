@@ -123,6 +123,20 @@
                         <label class="block text-sm font-semibold mb-1">Adresse (imprimée sur le ticket)</label>
                         <input wire:model="reglages.adresse" type="text" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
                     </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">NIF <span class="font-normal text-[--color-muted]">(sur le ticket)</span></label>
+                            <input wire:model="reglages.identifiant_fiscal" type="text" maxlength="60" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">RCCM <span class="font-normal text-[--color-muted]">(sur le ticket)</span></label>
+                            <input wire:model="reglages.rccm" type="text" maxlength="60" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Message en bas du ticket</label>
+                        <input wire:model="reglages.message_ticket" type="text" maxlength="160" placeholder="Merci de votre visite ! Les articles vendus ne sont ni repris ni échangés." class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                    </div>
                     <div>
                         <label class="block text-sm font-semibold mb-1">E-mail</label>
                         <input wire:model="reglages.email" type="email" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">

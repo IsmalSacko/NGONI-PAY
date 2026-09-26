@@ -14,14 +14,22 @@
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
         <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
-            <span>Nom</span><span>Téléphone</span><span class="text-right">Points fidélité</span><span></span>
+            <span>Nom</span><span>Téléphone</span><span class="text-right">Doit</span><span></span>
         </div>
         @forelse ($clients as $client)
             <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <span class="font-bold">{{ $client->nom }}</span>
                 <span class="text-right md:text-left">{{ $client->telephone ?: '—' }}</span>
-                <span class="md:text-right font-bold">{{ number_format($client->points_fidelite, 0, ',', ' ') }}<span class="md:hidden font-normal text-[--color-muted]"> points</span></span>
+                @php($doit = max(0, (int) $client->credit_total - (int) $client->reglements_total))
+                <span class="md:text-right font-bold {{ $doit > 0 ? 'text-danger-fg' : 'text-[--color-muted]' }}">
+                    <span class="md:hidden font-normal">Doit </span>{{ $doit > 0 ? \App\Support\Money\Montant::format($doit) : '—' }}
+                </span>
                 <div class="flex gap-2 justify-end">
+                    @if ($doit > 0)
+                        @can('ventes.create')
+                            <button wire:click="ouvrirReglement('{{ $client->id }}')" class="h-9 px-3 rounded-lg bg-accent text-white text-xs font-bold">Règlement</button>
+                        @endcan
+                    @endif
                     @can('clients.update')
                         <button wire:click="modifier('{{ $client->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Modifier</button>
                     @endcan
@@ -57,6 +65,29 @@
                     </div>
                 </form>
             </div>
+        </div>
+    @endif
+
+    @if ($reglementClientId)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('reglementClientId', null)">
+            <form wire:submit="enregistrerReglement" class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-sm flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl">Règlement de crédit</h2>
+                <label class="text-sm font-semibold">Montant reçu
+                    <input wire:model="reglementMontant" type="text" inputmode="decimal" class="mt-1 w-full h-11 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                </label>
+                @error('reglementMontant') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                <label class="text-sm font-semibold">Payé par
+                    <select wire:model="reglementMoyen" class="mt-1 w-full h-11 px-3 rounded-lg border border-[--color-border-strong] bg-white font-normal">
+                        @foreach (['especes' => 'Espèces', 'orange_money' => 'Orange Money', 'moov_money' => 'Moov Money', 'wave' => 'Wave', 'carte' => 'Carte', 'virement' => 'Virement'] as $code => $libelle)
+                            <option value="{{ $code }}">{{ $libelle }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="flex gap-3 mt-2">
+                    <button type="button" wire:click="$set('reglementClientId', null)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
+                    <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
+                </div>
+            </form>
         </div>
     @endif
 </div>
