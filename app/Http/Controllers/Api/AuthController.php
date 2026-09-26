@@ -62,9 +62,16 @@ class AuthController extends Controller
         $pays = Country::tryFrom(strtoupper($data['pays'] ?? '')) ?? Country::default();
         $candidats = PhoneNumber::candidates($data['telephone'], $pays);
 
-        $user = User::withoutGlobalScopes()->whereIn('phone', $candidats)->first();
+        // Un même numéro peut désigner deux comptes repris de Ngoni Pay :
+        // « 0605758494 » et « +33605758494 ». Le mot de passe départage ; à
+        // défaut, la forme la plus probable (ordre des candidats) passe d'abord.
+        $user = User::withoutGlobalScopes()
+            ->whereIn('phone', $candidats)
+            ->get()
+            ->sortBy(fn (User $u) => array_search($u->phone, $candidats, true))
+            ->first(fn (User $u) => $u->is_active && Hash::check($data['password'], $u->password));
 
-        if ($user === null || ! $user->is_active || ! Hash::check($data['password'], $user->password)) {
+        if ($user === null) {
             throw ValidationException::withMessages([
                 'telephone' => ['Identifiants incorrects.'],
             ]);

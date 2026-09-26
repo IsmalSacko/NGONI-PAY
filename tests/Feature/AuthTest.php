@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Produit;
+use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,6 +65,26 @@ class AuthTest extends TestCase
         $this->postJson('/api/connexion', [
             'telephone' => '+223 76 00 00 00',
             'password' => 'wrong',
+        ])->assertUnprocessable();
+    }
+
+    public function test_login_picks_the_account_whose_password_matches_when_a_number_is_shared(): void
+    {
+        // Repris de Ngoni Pay : le même numéro, une fois en local, une fois en
+        // international, sur deux comptes distincts.
+        $local = User::factory()->create(['phone' => '0605758494', 'password' => 'provisoire1']);
+        User::factory()->create(['phone' => '+33605758494', 'password' => 'autre-compte']);
+
+        $this->postJson('/api/connexion', [
+            'telephone' => '06 05 75 84 94',
+            'pays' => 'FR',
+            'password' => 'provisoire1',
+        ])->assertOk()->assertJsonPath('user.id', $local->id);
+
+        $this->postJson('/api/connexion', [
+            'telephone' => '0605758494',
+            'pays' => 'FR',
+            'password' => 'ni-l-un-ni-l-autre',
         ])->assertUnprocessable();
     }
 
