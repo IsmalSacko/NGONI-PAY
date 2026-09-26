@@ -73,12 +73,24 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    @php($devise = \App\Support\Money\Montant::deviseActive())
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-sm font-semibold mb-1">Prix de vente</label>
-                            <input wire:model="prix_vente" type="number" min="0" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                            <label class="block text-sm font-semibold mb-1">Prix d’achat <span class="font-normal text-[--color-muted]">({{ $devise }}, facultatif)</span></label>
+                            <input wire:model.live.debounce.400ms="prix_achat" type="text" inputmode="decimal" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                            @error('prix_achat') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Prix de vente <span class="font-normal text-[--color-muted]">({{ $devise }})</span></label>
+                            <input wire:model.live.debounce.400ms="prix_vente" type="text" inputmode="decimal" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
                             @error('prix_vente') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                         </div>
+                    </div>
+                    @if ($marge)
+                        <p class="text-sm font-semibold {{ $marge['perte'] ? 'text-danger-fg' : 'text-accent-dark' }}">{{ $marge['texte'] }}</p>
+                    @endif
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-semibold mb-1">TVA %</label>
                             <input wire:model="taux_tva" type="number" min="0" max="100" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">

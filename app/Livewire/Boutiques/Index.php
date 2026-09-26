@@ -41,7 +41,10 @@ class Index extends Component
     public bool $reglagesOuverts = false;
 
     /** @var array{nom: string, pays: string, devise: string, telephone: string, email: string, adresse: string} */
-    public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => ''];
+    public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => '', 'convertir' => true, 'taux' => ''];
+
+    /** Devise avant modification : le taux se lit « 1 nouvelle = x ancienne ». */
+    public string $deviseInitiale = '';
 
     public function mount(): void
     {
@@ -64,7 +67,9 @@ class Index extends Component
         $this->reglages = [
             'nom' => $b->nom, 'pays' => (string) $b->pays, 'devise' => (string) $b->devise,
             'telephone' => (string) $b->telephone, 'email' => (string) $b->email, 'adresse' => (string) $b->adresse,
+            'convertir' => true, 'taux' => '',
         ];
+        $this->deviseInitiale = (string) $b->devise;
         $this->reglagesOuverts = true;
     }
 
@@ -74,7 +79,9 @@ class Index extends Component
         $b = Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
 
         try {
-            $b = $service->mettreAJour($b, array_map(fn ($v) => $v === '' ? null : $v, $this->reglages));
+            $donnees = array_map(fn ($v) => $v === '' ? null : $v, $this->reglages);
+            $donnees['taux'] = $donnees['taux'] === null ? null : str_replace(',', '.', (string) $donnees['taux']);
+            $b = $service->mettreAJour($b, $donnees);
         } catch (ValidationException $e) {
             foreach ($e->errors() as $champ => $messages) {
                 $this->addError('reglages.'.$champ, $messages[0]);

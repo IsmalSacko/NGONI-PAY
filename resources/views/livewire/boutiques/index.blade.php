@@ -100,8 +100,20 @@
                                 <option value="{{ $code }}">{{ $code }}</option>
                             @endforeach
                         </select>
-                        <p class="text-xs text-[--color-muted] mt-1">Affichée sur la caisse et les tickets. Les montants déjà enregistrés ne sont pas convertis.</p>
                         @error('reglages.devise') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="rounded-xl bg-[#F7F5F0] p-3 text-sm flex flex-col gap-2">
+                        <span class="font-semibold">Si la devise change (actuellement {{ $deviseInitiale }})</span>
+                        <label class="flex items-start gap-2">
+                            <input type="checkbox" wire:model="reglages.convertir" class="mt-1">
+                            <span>Convertir les prix et les ventes. Franc CFA ↔ euro : au taux fixe 1 € = 655,957 F, automatiquement.</span>
+                        </label>
+                        <label class="block">
+                            <span class="text-[--color-muted]">Autre devise : combien de {{ $deviseInitiale }} vaut 1 unité de la nouvelle devise ?</span>
+                            <input wire:model="reglages.taux" type="text" inputmode="decimal" placeholder="ex. 655,957" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong]">
+                        </label>
+                        @error('reglages.taux') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                        <span class="text-xs text-[--color-muted]">Décoché : les montants gardent les mêmes chiffres (300 F → 300,00 €).</span>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-1">Téléphone (imprimé sur le ticket)</label>

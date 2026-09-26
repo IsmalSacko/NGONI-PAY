@@ -38,6 +38,8 @@ class Index extends Component
 
     public string $prix_vente = '';
 
+    public string $prix_achat = '';
+
     public string $taux_tva = '18';
 
     public string $stock = '0';
@@ -47,7 +49,7 @@ class Index extends Component
     public function nouveauProduit(): void
     {
         $this->resetValidation();
-        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'stock']);
+        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock']);
         $this->taux_tva = '18';
         $this->seuil_alerte = '10';
         $this->modaleOuverte = true;
@@ -65,6 +67,7 @@ class Index extends Component
         $this->code = (string) $produit->code;
         $this->code_barre = (string) $produit->code_barre;
         $this->prix_vente = Montant::saisie($produit->prix_vente);
+        $this->prix_achat = $produit->prix_achat === null ? '' : Montant::saisie($produit->prix_achat);
         $this->taux_tva = (string) $produit->taux_tva;
         $this->stock = (string) $produit->stock;
         $this->seuil_alerte = (string) $produit->seuil_alerte;
@@ -88,6 +91,7 @@ class Index extends Component
             'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', $this->boutiqueActiveId())->ignore($this->produitId)],
             // Saisi dans la devise (« 2,50 » en euros), stocké en unités mineures.
             'prix_vente' => ['required', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
+            'prix_achat' => ['nullable', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'integer', 'min:0'],
             'seuil_alerte' => ['required', 'integer', 'min:0'],
@@ -95,6 +99,7 @@ class Index extends Component
 
         $data['categorie_produit_id'] = $data['categorie_produit_id'] ?: null;
         $data['prix_vente'] = Montant::parse($data['prix_vente']);
+        $data['prix_achat'] = Montant::parse($data['prix_achat'] ?? null);
 
         if ($this->produitId) {
             // Le stock passe par StockService (journalisé), jamais par un
@@ -139,6 +144,24 @@ class Index extends Component
         return view('livewire.produits.index', [
             'produits' => $produits,
             'categories' => CategorieProduit::orderBy('nom')->get(),
+            'marge' => $this->marge(),
         ]);
+    }
+
+    /** « Marge : 5 000 par article (20 %) », ou vente à perte. */
+    private function marge(): ?array
+    {
+        $vente = Montant::parse($this->prix_vente);
+        $achat = Montant::parse($this->prix_achat);
+        if ($vente === null || $achat === null || $vente <= 0) {
+            return null;
+        }
+
+        $marge = $vente - $achat;
+        $devise = Montant::deviseActive();
+
+        return $marge < 0
+            ? ['perte' => true, 'texte' => 'Vente à perte : '.Montant::format(-$marge).' '.$devise.' par article']
+            : ['perte' => false, 'texte' => 'Marge : '.Montant::format($marge).' '.$devise.' par article ('.round($marge * 100 / $vente).' %)'];
     }
 }

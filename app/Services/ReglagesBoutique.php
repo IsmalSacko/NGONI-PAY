@@ -12,14 +12,16 @@ use App\Support\Money\Reechelonnement;
 use App\Support\Phone\PhoneNumber;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Réglages d'une boutique : nom, pays, devise, coordonnées. Pour l'app comme
  * pour le back-office, réservé à qui a `boutique.update` (l'admin).
  *
  * La devise suit le pays sauf choix contraire (boutique au Mali tenue par un
- * commerçant joignable en France : pays ML, devise XOF). Les montants ne sont
- * pas convertis au taux de change : ils gardent leur valeur affichée.
+ * commerçant joignable en France : pays ML, devise XOF). Au changement de
+ * devise, les montants sont convertis : au taux fixe pour franc CFA ↔ euro
+ * (655,957), au taux indiqué sinon — ou gardés tels quels sur demande.
  */
 class ReglagesBoutique
 {
@@ -33,14 +35,29 @@ class ReglagesBoutique
             'telephone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'adresse' => ['nullable', 'string', 'max:255'],
-        ], [], ['devise' => 'devise', 'pays' => 'pays'])->validate();
+            // Changement de devise : convertir (par défaut, au taux fixe s'il
+            // existe, sinon au taux donné) ou garder les mêmes nombres.
+            'convertir' => ['nullable', 'boolean'],
+            'taux' => ['nullable', 'numeric', 'gt:0'],
+        ], [], ['devise' => 'devise', 'pays' => 'pays', 'taux' => 'taux de conversion'])->validate();
 
         $pays = Country::from($data['pays']);
         $devise = $data['devise'] ?? $pays->currency();
 
-        // Même valeur affichée dans la nouvelle devise : 25 000 F deviennent
-        // 25 000,00 € (montants stockés en unités mineures).
-        Reechelonnement::entreDevises($boutique->id, (string) $boutique->devise, $devise);
+        $ancienne = (string) $boutique->devise;
+        if ($ancienne !== $devise) {
+            $taux = null;
+            if ($data['convertir'] ?? true) {
+                $taux = isset($data['taux']) ? (float) $data['taux'] : Reechelonnement::tauxFixe($ancienne, $devise);
+                if ($taux === null) {
+                    throw ValidationException::withMessages(['taux' => [
+                        "Indiquez combien de {$ancienne} vaut 1 {$devise}, ou choisissez de garder les mêmes montants.",
+                    ]]);
+                }
+            }
+            // Sans conversion : même valeur affichée (25 000 F → 25 000,00 €).
+            Reechelonnement::entreDevises($boutique->id, $ancienne, $devise, $taux);
+        }
         Montant::oublier();
 
         $boutique->update([

@@ -29,7 +29,14 @@ class ProduitController extends Controller
             });
         }
 
-        return response()->json($query->orderBy('nom')->get());
+        $produits = $query->orderBy('nom')->get();
+
+        // Le prix d'achat (la marge) ne regarde pas le caissier.
+        if (! $request->user()->can('produits.update')) {
+            $produits->each->makeHidden('prix_achat');
+        }
+
+        return response()->json($produits);
     }
 
     public function store(Request $request): JsonResponse
