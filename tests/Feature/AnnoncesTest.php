@@ -48,7 +48,9 @@ class AnnoncesTest extends TestCase
         Livewire::test(Annonces::class)
             ->call('nouvelle', 'mise_a_jour')
             ->assertSet('lien', config('mobile.store_url'))
+            ->assertSet('par_email', false)
             ->set('version', '3.0.0')
+            ->set('par_email', true)
             ->call('enregistrer')
             ->assertHasNoErrors()
             ->assertSet('info', fn ($i) => str_contains($i, '2 notification(s), 0 push, 1 e-mail(s)'));

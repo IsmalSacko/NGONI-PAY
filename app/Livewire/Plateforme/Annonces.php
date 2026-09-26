@@ -15,8 +15,9 @@ use Livewire\Component;
 
 /**
  * Annonces aux commerçants : mise à jour de l'application, message libre ou
- * campagne. Envoi immédiat ou programmé, une fois ou chaque semaine/mois ;
- * notification dans l'application et, au choix, e-mail.
+ * campagne. Envoi immédiat ou programmé, une fois ou chaque semaine/mois.
+ * Par défaut : notification push (Firebase) et cloche de l'application,
+ * gratuites. L'e-mail (payant au-delà du quota Mailjet) seulement si coché.
  */
 #[Layout('layouts.plateforme', ['title' => 'Annonces'])]
 class Annonces extends Component
@@ -65,7 +66,6 @@ class Annonces extends Component
             $this->lien = (string) config('mobile.store_url');
             $this->titre = 'Nouvelle version de l’application';
             $this->message = 'Mettez à jour Ngoni Caisse depuis le Play Store pour profiter des nouveautés.';
-            $this->par_email = true;
         }
 
         $this->formulaire = true;

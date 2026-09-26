@@ -2,7 +2,7 @@
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Annonces</h1>
-            <p class="text-sm text-muted">Notification dans l’application de chaque commerçant, et e-mail si vous le cochez.</p>
+            <p class="text-sm text-muted">Envoyées en notification push sur les téléphones et dans la cloche de l’application. L’e-mail seulement si vous le cochez.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <button wire:click="nouvelle('mise_a_jour')" class="h-11 px-4 rounded-xl bg-accent text-white font-bold">Mise à jour</button>
@@ -52,7 +52,7 @@
                     <span class="font-normal text-muted">{{ $apercu }} compte(s) concerné(s).</span>
                 </label>
                 <label class="flex items-center gap-2 text-sm sm:mt-7">
-                    <input type="checkbox" wire:model="par_email"> Envoyer aussi par e-mail <span class="text-muted">(comptes avec une adresse)</span>
+                    <input type="checkbox" wire:model="par_email"> Envoyer aussi par e-mail <span class="text-muted">(facultatif, compte dans le quota Mailjet)</span>
                 </label>
             </div>
 
