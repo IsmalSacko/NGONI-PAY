@@ -251,6 +251,27 @@ class AbonnementTest extends TestCase
         $this->get('/tableau-de-bord')->assertOk()->assertSee('Essai gratuit terminé');
     }
 
+    public function test_les_seances_de_caisse_sont_reservees_au_pro(): void
+    {
+        // Essai : tout est inclus.
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', ['seances_caisse']);
+        $session = $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
+
+        // Passé en Basic : plus de nouvelle séance, mais la vente passe sans,
+        // et la séance ouverte pendant l'essai se clôture.
+        $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', []);
+        $this->api()->putJson("/api/sessions-caisse/{$session->json('id')}/fermer", ['fond_final' => 5000])->assertOk();
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])
+            ->assertForbidden()->assertJsonPath('code', 'FONCTION_PRO');
+        $this->api()->postJson('/api/ventes', $this->vente((string) Str::uuid()))
+            ->assertCreated()->assertJsonPath('session_caisse_id', null);
+
+        // Pro : de nouveau permis.
+        $this->awa->abonnement()->update(['plan' => 'pro']);
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
+    }
+
     public function test_le_plan_limite_la_taille_de_l_equipe(): void
     {
         $this->actingAs($this->awa);

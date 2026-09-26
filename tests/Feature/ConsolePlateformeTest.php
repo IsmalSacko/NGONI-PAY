@@ -131,6 +131,24 @@ class ConsolePlateformeTest extends TestCase
         $this->getJson('/api/plans')->assertJsonPath('data.1.tarifs.0.montant', 5000);
     }
 
+    public function test_la_console_coche_les_fonctions_d_un_plan(): void
+    {
+        $basic = Plan::parCode('basic');
+        $pro = Plan::parCode('pro');
+        $this->actingAs($this->exploitant);
+
+        Livewire::test(Plans::class)
+            ->assertSet("plans.{$pro->id}.fonctionnalites.seances_caisse", true)
+            ->set("plans.{$basic->id}.fonctionnalites.seances_caisse", true)
+            ->set("plans.{$pro->id}.fonctionnalites.seances_caisse", false)
+            ->call('enregistrer')
+            ->assertHasNoErrors();
+
+        $this->assertTrue(Plan::parCode('basic')->inclut(Plan::SEANCES_CAISSE));
+        $this->assertFalse(Plan::parCode('pro')->inclut(Plan::SEANCES_CAISSE));
+        $this->assertTrue(Plan::parCode('essai')->inclut(Plan::SEANCES_CAISSE));
+    }
+
     public function test_mot_de_passe_provisoire_pour_un_commercant_sans_email(): void
     {
         $this->awa->createToken('tablette');

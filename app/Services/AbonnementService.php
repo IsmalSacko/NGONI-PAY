@@ -93,6 +93,17 @@ class AbonnementService
         return $max === null || $proprietaire->boutiquesPossedees()->count() < $max;
     }
 
+    /** Fonction réservée à certains plans (voir Plan::FONCTIONNALITES), abonnement en cours. */
+    public function permet(?Boutique $boutique, string $fonctionnalite): bool
+    {
+        $abonnement = $this->pourBoutique($boutique);
+        if ($abonnement === null || ! $abonnement->estEnCours()) {
+            return false;
+        }
+
+        return $this->planDe($abonnement)?->inclut($fonctionnalite) ?? false;
+    }
+
     public function peutAjouterMembre(Boutique $boutique, int $membresActuels): bool
     {
         $abonnement = $this->pourBoutique($boutique);

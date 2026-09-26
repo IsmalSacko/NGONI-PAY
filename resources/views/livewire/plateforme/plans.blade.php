@@ -32,6 +32,16 @@
                     </label>
                 </div>
 
+                <div class="flex flex-wrap gap-4 mt-3 text-sm">
+                    @foreach ($fonctionnalites as $code => $libelle)
+                        @if ($plan['essai'])
+                            <span class="text-muted">✓ {{ $libelle }} (l’essai couvre tout)</span>
+                        @else
+                            <label class="flex items-center gap-2"><input type="checkbox" wire:model="plans.{{ $id }}.fonctionnalites.{{ $code }}"> {{ $libelle }}</label>
+                        @endif
+                    @endforeach
+                </div>
+
                 @unless ($plan['essai'])
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                         @foreach ($cycles as $cycle)

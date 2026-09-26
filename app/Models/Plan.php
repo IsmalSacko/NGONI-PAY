@@ -16,6 +16,17 @@ class Plan extends Model
 {
     public const ESSAI = 'essai';
 
+    /** Séances de caisse (fond d'ouverture, clôture, écart) : réservées au Pro. */
+    public const SEANCES_CAISSE = 'seances_caisse';
+
+    /**
+     * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
+     * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
+     */
+    public const FONCTIONNALITES = [
+        self::SEANCES_CAISSE => 'Séances de caisse et suivi des écarts',
+    ];
+
     protected $fillable = [
         'code', 'nom', 'description', 'fonctionnalites', 'jours_essai',
         'max_boutiques', 'max_membres', 'est_actif', 'ordre',
@@ -51,6 +62,18 @@ class Plan extends Model
     public function estEssai(): bool
     {
         return $this->code === self::ESSAI;
+    }
+
+    /** L'essai couvre tout ; un plan payant, ce qui est coché pour lui. */
+    public function inclut(string $fonctionnalite): bool
+    {
+        return $this->estEssai() || in_array($fonctionnalite, $this->fonctionnalites ?? [], true);
+    }
+
+    /** @return list<string> */
+    public function fonctionnalitesIncluses(): array
+    {
+        return array_values(array_filter(array_keys(self::FONCTIONNALITES), fn (string $f) => $this->inclut($f)));
     }
 
     public function joursEssai(): int

@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Boutique;
+use App\Models\Plan;
 use App\Models\SessionCaisse;
+use App\Services\AbonnementService;
 use App\Services\SessionCaisseService;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +34,17 @@ class SessionCaisseController extends Controller
 
     public function ouvrir(Request $request): JsonResponse
     {
+        // Réservé au Pro. Sans séance, la caisse encaisse quand même : la vente
+        // n'est simplement rattachée à aucune séance. Une séance déjà ouverte
+        // (pendant l'essai) peut toujours être clôturée.
+        $boutique = Boutique::find(app(TenantContext::class)->boutiqueId());
+        if (! app(AbonnementService::class)->permet($boutique, Plan::SEANCES_CAISSE)) {
+            return response()->json([
+                'message' => 'Les séances de caisse et le suivi des écarts sont inclus dans le plan Pro.',
+                'code' => 'FONCTION_PRO',
+            ], 403);
+        }
+
         $data = $request->validate([
             'fond_initial' => ['required', 'integer', 'min:0'],
         ]);

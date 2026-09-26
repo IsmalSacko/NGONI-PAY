@@ -37,6 +37,7 @@ class Plans extends Component
                 'est_actif' => $plan->est_actif,
                 'essai' => $plan->estEssai(),
                 'code' => $plan->code,
+                'fonctionnalites' => array_fill_keys($plan->fonctionnalites ?? [], true),
             ];
 
             if (! $plan->estEssai()) {
@@ -71,6 +72,11 @@ class Plans extends Component
                 'jours_essai' => $p['essai'] ? ($vide($p['jours_essai']) ?? 7) : null,
                 'max_boutiques' => $vide($p['max_boutiques']),
                 'max_membres' => $vide($p['max_membres']),
+                // L'essai couvre tout, sans case à cocher.
+                // update() par la requête ne passe pas par le cast : JSON à la main.
+                'fonctionnalites' => json_encode($p['essai'] ? [] : array_keys(array_filter(
+                    array_intersect_key($p['fonctionnalites'] ?? [], Plan::FONCTIONNALITES),
+                ))),
                 // L'essai reste toujours disponible : il est offert à l'inscription.
                 'est_actif' => $p['essai'] ? true : (bool) $p['est_actif'],
             ]);
@@ -94,6 +100,9 @@ class Plans extends Component
 
     public function render()
     {
-        return view('livewire.plateforme.plans', ['cycles' => CycleFacturation::cases()]);
+        return view('livewire.plateforme.plans', [
+            'cycles' => CycleFacturation::cases(),
+            'fonctionnalites' => Plan::FONCTIONNALITES,
+        ]);
     }
 }
