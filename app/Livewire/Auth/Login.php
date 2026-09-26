@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Auth;
 
 use App\Enums\Country;
-use App\Models\User;
-use App\Support\Phone\PhoneNumber;
+use App\Support\Auth\Identification;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -34,11 +32,9 @@ class Login extends Component
             'password' => ['required', 'string'],
         ]);
 
-        $candidats = PhoneNumber::candidates($this->telephone, Country::tryFrom($this->pays) ?? Country::default());
+        $user = Identification::connecter($this->telephone, $this->pays, $this->password);
 
-        $user = User::withoutGlobalScopes()->whereIn('phone', $candidats)->first();
-
-        if ($user === null || ! $user->is_active || ! Hash::check($this->password, $user->password)) {
+        if ($user === null) {
             $this->addError('telephone', 'Identifiants incorrects.');
 
             return;

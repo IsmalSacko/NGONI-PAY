@@ -83,6 +83,31 @@ class BackofficeTest extends TestCase
         $this->assertAuthenticatedAs($gerante);
     }
 
+    public function test_login_web_departage_deux_comptes_sur_le_meme_numero(): void
+    {
+        $local = User::create(['boutique_id' => $this->admin->boutique_id, 'name' => 'Compte local',
+            'phone' => '0605758494', 'password' => bcrypt('provisoire1')]);
+        User::create(['boutique_id' => $this->admin->boutique_id, 'name' => 'Doublon',
+            'phone' => '+33605758494', 'password' => bcrypt('autre-compte')]);
+
+        Livewire::test(Login::class)
+            ->set('pays', 'FR')
+            ->set('telephone', '0605758494')
+            ->set('password', 'provisoire1')
+            ->call('connexion')
+            ->assertRedirect(route('tableau-de-bord'));
+
+        $this->assertAuthenticatedAs($local);
+    }
+
+    public function test_la_page_de_connexion_propose_la_recherche_du_pays(): void
+    {
+        $this->get('/connexion')
+            ->assertOk()
+            ->assertSee('Rechercher un pays ou un indicatif')
+            ->assertSee('Côte d', false);
+    }
+
     public function test_dashboard_affiche_les_kpis_de_la_boutique(): void
     {
         $this->actingAs($this->admin);

@@ -20,3 +20,6 @@
     --color-danger-bg: #fde7e4;
     --color-danger-fg: #9b1c12;
 }
+
+/* Alpine : masqué jusqu’à son initialisation (liste des pays). */
+[x-cloak] { display: none !important; }

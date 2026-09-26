@@ -5,12 +5,7 @@
     <form wire:submit="connexion" class="flex flex-col gap-4">
         <div>
             <label for="pays" class="block text-sm font-semibold mb-1">Pays</label>
-            <select wire:model="pays" id="pays"
-                    class="w-full h-12 px-4 rounded-xl border border-[--color-border-strong] bg-white focus:outline-none focus:ring-2 focus:ring-accent">
-                @foreach ($listePays as $p)
-                    <option value="{{ $p->value }}">{{ $p->flag() }} {{ $p->label() }} (+{{ $p->dialingCode() }})</option>
-                @endforeach
-            </select>
+            <x-choix-pays :liste-pays="$listePays" />
         </div>
 
         <div>

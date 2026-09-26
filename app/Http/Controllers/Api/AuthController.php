@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\Country;
 use App\Http\Controllers\Controller;
 use App\Mail\CodeReinitialisationMail;
 use App\Models\PasswordResetCode;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
-use App\Support\Phone\PhoneNumber;
+use App\Support\Auth\Identification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -59,17 +58,7 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $pays = Country::tryFrom(strtoupper($data['pays'] ?? '')) ?? Country::default();
-        $candidats = PhoneNumber::candidates($data['telephone'], $pays);
-
-        // Un même numéro peut désigner deux comptes repris de Ngoni Pay :
-        // « 0605758494 » et « +33605758494 ». Le mot de passe départage ; à
-        // défaut, la forme la plus probable (ordre des candidats) passe d'abord.
-        $user = User::withoutGlobalScopes()
-            ->whereIn('phone', $candidats)
-            ->get()
-            ->sortBy(fn (User $u) => array_search($u->phone, $candidats, true))
-            ->first(fn (User $u) => $u->is_active && Hash::check($data['password'], $u->password));
+        $user = Identification::connecter($data['telephone'], $data['pays'] ?? null, $data['password']);
 
         if ($user === null) {
             throw ValidationException::withMessages([
@@ -193,8 +182,6 @@ class AuthController extends Controller
 
     private function utilisateurParTelephone(string $telephone, ?string $pays): ?User
     {
-        $country = Country::tryFrom(strtoupper($pays ?? '')) ?? Country::default();
-
-        return User::withoutGlobalScopes()->whereIn('phone', PhoneNumber::candidates($telephone, $country))->first();
+        return Identification::comptes($telephone, $pays)->first();
     }
 }
