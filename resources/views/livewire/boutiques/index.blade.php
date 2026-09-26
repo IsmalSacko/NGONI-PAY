@@ -6,7 +6,9 @@
                 Vous possédez {{ $possedees }} boutique{{ $possedees > 1 ? 's' : '' }}{{ $maxBoutiques ? " sur {$maxBoutiques} permise".($maxBoutiques > 1 ? 's' : '').' par votre plan' : '' }}.
             </span>
         </div>
-        <button wire:click="nouvelle" class="h-12 px-5 rounded-xl bg-accent text-white font-bold">+ Nouvelle boutique</button>
+        @if ($peutOuvrir)
+            <button wire:click="nouvelle" class="h-12 px-5 rounded-xl bg-accent text-white font-bold">+ Nouvelle boutique</button>
+        @endif
     </div>
 
     @if (session('info'))
@@ -16,7 +18,7 @@
         <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">
             {{ $alerte }} Le plan Pro permet jusqu’à 5 boutiques : abonnez-vous depuis l’application Ngoni Caisse.
         </p>
-    @elseif (! $peutCreer)
+    @elseif ($peutOuvrir && ! $peutCreer)
         <p class="rounded-xl bg-[--color-warn-bg] text-[--color-warn-fg] px-4 py-3 text-sm">
             Votre plan ne permet pas d’autre boutique. Le plan Pro en permet jusqu’à 5.
         </p>

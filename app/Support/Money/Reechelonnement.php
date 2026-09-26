@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Money;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Multiplie (ou divise) tous les montants d'une boutique : passage à une
@@ -69,7 +70,9 @@ class Reechelonnement
 
             DB::table('lignes_vente')
                 ->whereIn('vente_id', DB::table('ventes')->where('boutique_id', $boutiqueId)->select('id'))
-                ->update(['prix_unitaire' => $expression('prix_unitaire'), 'total_ligne' => $expression('total_ligne')]);
+                ->update(['prix_unitaire' => $expression('prix_unitaire'), 'total_ligne' => $expression('total_ligne')]
+                    // Colonne ajoutée plus tard : absente quand l'ancienne migration s'exécute.
+                    + (Schema::hasColumn('lignes_vente', 'prix_achat') ? ['prix_achat' => $expression('prix_achat')] : []));
         });
     }
 
@@ -88,7 +91,7 @@ class Reechelonnement
 
             DB::table('lignes_vente')
                 ->whereIn('vente_id', DB::table('ventes')->where('boutique_id', $boutiqueId)->select('id'))
-                ->update(['prix_unitaire' => $expression('prix_unitaire'), 'total_ligne' => $expression('total_ligne')]);
+                ->update(['prix_unitaire' => $expression('prix_unitaire'), 'prix_achat' => $expression('prix_achat'), 'total_ligne' => $expression('total_ligne')]);
         });
     }
 }

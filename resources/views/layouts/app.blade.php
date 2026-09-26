@@ -14,6 +14,7 @@
             ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
             ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
+            ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
             ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],
             ['route' => 'utilisateurs.index', 'label' => 'Équipe', 'permission' => 'utilisateurs.view'],
             ['route' => 'boutiques.index', 'label' => 'Boutiques', 'permission' => 'backoffice.access'],

@@ -57,6 +57,7 @@ class Index extends Component
 
     public function nouvelle(): void
     {
+        Auth::user()->peutOuvrirBoutique() || abort(403);
         $this->resetValidation();
         $this->reset(['nom', 'telephone', 'adresse', 'alerte']);
         $this->modaleOuverte = true;
@@ -139,6 +140,7 @@ class Index extends Component
             'boutiques' => $boutiques,
             'active' => $this->boutiqueActiveId(),
             'peutCreer' => $abonnements->peutCreerBoutique($user),
+            'peutOuvrir' => $user->peutOuvrirBoutique(),
             'listePays' => Country::cases(),
             'maxBoutiques' => $abonnements->planDe($user->abonnement()->first())?->max_boutiques,
             'possedees' => $user->boutiquesPossedees()->count(),

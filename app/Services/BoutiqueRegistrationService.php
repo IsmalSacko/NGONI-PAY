@@ -77,6 +77,13 @@ class BoutiqueRegistrationService
      */
     public function ajouterBoutique(User $proprietaire, array $data): Boutique
     {
+        if (! $proprietaire->peutOuvrirBoutique()) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Seul l’administrateur d’une boutique peut en ouvrir une nouvelle.',
+                'code' => 'ROLE_INSUFFISANT',
+            ], 403));
+        }
+
         $abonnements = app(AbonnementService::class);
 
         if (! $abonnements->peutCreerBoutique($proprietaire)) {

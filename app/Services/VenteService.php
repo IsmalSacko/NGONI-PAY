@@ -116,6 +116,7 @@ class VenteService
                     'nom' => $produit->nom,
                     'quantite' => $ligne['quantite'],
                     'prix_unitaire' => $produit->prix_vente,
+                    'prix_achat' => $produit->prix_achat,
                     'taux_tva' => $produit->taux_tva,
                     'total_ligne' => $totalLigne,
                 ];
@@ -167,6 +168,7 @@ class VenteService
                     'produit_id' => $l['produit']?->id,
                     'nom_produit' => $l['nom'],
                     'prix_unitaire' => $l['prix_unitaire'],
+                    'prix_achat' => $l['prix_achat'] ?? null,
                     'taux_tva' => $l['taux_tva'],
                     'quantite' => $l['quantite'],
                     'total_ligne' => $l['total_ligne'],

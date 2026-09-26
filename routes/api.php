@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\ProduitController;
+use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::delete('abonnement/demandes/{demande}', [AbonnementController::class, 'annuler'])->middleware('permission:abonnement.manage');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
+    Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');
 
     Route::get('categories', [CategorieProduitController::class, 'index'])->middleware('permission:categories.view');
     Route::post('categories', [CategorieProduitController::class, 'store'])->middleware(['permission:categories.create', 'abonnement']);

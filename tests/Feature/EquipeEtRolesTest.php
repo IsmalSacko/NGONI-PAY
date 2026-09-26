@@ -258,4 +258,23 @@ class EquipeEtRolesTest extends TestCase
 
         $composant->call('ouvrirReglages')->assertSet('reglagesOuverts', true)->assertSet('reglages.devise', 'XOF');
     }
+
+    public function test_seul_l_admin_ouvre_une_nouvelle_boutique(): void
+    {
+        $this->admin->abonnement()->update(['plan' => 'pro', 'fin' => now()->addMonth()->toDateString()]);
+
+        $this->api($this->caissier)->postJson('/api/boutiques', ['nom' => 'Ma boutique'])
+            ->assertForbidden()->assertJsonPath('code', 'ROLE_INSUFFISANT');
+        $this->api($this->gerant)->postJson('/api/boutiques', ['nom' => 'Ma boutique'])->assertForbidden();
+        $this->assertSame(1, Boutique::withoutGlobalScopes()->count());
+
+        $this->api($this->admin)->postJson('/api/boutiques', ['nom' => 'Annexe'])->assertCreated();
+
+        // Back-office : le gérant n'a ni le bouton ni l'action.
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->gerant);
+        $this->dansLaBoutique();
+        $this->get('/boutiques')->assertOk()->assertDontSee('+ Nouvelle boutique');
+        Livewire::test(BoutiquesIndex::class)->call('nouvelle')->assertForbidden();
+    }
 }

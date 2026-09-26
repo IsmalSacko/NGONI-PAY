@@ -60,6 +60,11 @@ Route::post('boutique-active', function () {
 
 Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
     Route::get('boutiques', \App\Livewire\Boutiques\Index::class)->name('boutiques.index');
+    Route::get('rapports', \App\Livewire\Rapports\Index::class)->name('rapports.index')->middleware('permission:rapports.view');
+    Route::get('rapports/imprimer', [\App\Http\Controllers\ExportController::class, 'imprimer'])->name('rapports.imprimer')->middleware('permission:rapports.view');
+    Route::get('exports/ventes', [\App\Http\Controllers\ExportController::class, 'ventes'])->name('exports.ventes')->middleware('permission:rapports.view');
+    Route::get('exports/stocks', [\App\Http\Controllers\ExportController::class, 'stocks'])->name('exports.stocks')->middleware('permission:rapports.view');
+    Route::get('exports/credits', [\App\Http\Controllers\ExportController::class, 'credits'])->name('exports.credits')->middleware('permission:rapports.view');
     Route::get('tableau-de-bord', Dashboard::class)->name('tableau-de-bord')->middleware('permission:dashboard.view');
 
     Route::get('produits', ProduitsIndex::class)->name('produits.index')->middleware('permission:produits.view');

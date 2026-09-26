@@ -89,6 +89,24 @@ class User extends Authenticatable
             ->all();
     }
 
+    /**
+     * Peut ouvrir une nouvelle boutique : un compte sans boutique (nouveau
+     * commerçant) ou admin d'au moins une. Un caissier ou un gérant, non.
+     */
+    public function peutOuvrirBoutique(): bool
+    {
+        if ($this->boutiqueIds() === []) {
+            return true;
+        }
+
+        return DB::table(config('permission.table_names.model_has_roles').' as mhr')
+            ->join(config('permission.table_names.roles').' as r', 'r.id', '=', 'mhr.role_id')
+            ->where('mhr.model_type', $this->getMorphClass())
+            ->where('mhr.'.config('permission.column_names.model_morph_key'), $this->getKey())
+            ->where('r.name', 'admin')
+            ->exists();
+    }
+
     public function appartientA(?string $boutiqueId): bool
     {
         return $boutiqueId !== null && in_array($boutiqueId, $this->boutiqueIds(), true);
