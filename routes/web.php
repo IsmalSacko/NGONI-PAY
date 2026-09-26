@@ -28,7 +28,8 @@ Route::get('telecharger', fn () => view('telecharger', [
 Route::redirect('login', '/connexion');
 Route::redirect('admin/{reste?}', '/plateforme')->where('reste', '.*');
 
-Route::get('/', fn () => redirect(auth()->user()?->est_admin_plateforme ? '/plateforme' : '/tableau-de-bord'));
+// Site vitrine pour les visiteurs ; un compte connecté va à son espace.
+Route::get('/', \App\Http\Controllers\VitrineController::class)->name('vitrine');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('connexion', Login::class)->name('connexion');

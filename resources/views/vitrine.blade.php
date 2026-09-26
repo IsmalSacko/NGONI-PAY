@@ -1,0 +1,306 @@
+{{--
+    Site vitrine de Ngoni Caisse : une page, servie à la racine du domaine aux
+    visiteurs non connectés. Les tarifs viennent des plans de la console :
+    un prix changé là-bas l'est ici aussi.
+--}}
+@php
+    $titre = 'Ngoni Caisse — La caisse de votre commerce, dans votre téléphone';
+    $description = "Encaissez, imprimez vos tickets, suivez vos stocks et votre équipe depuis votre téléphone, même sans réseau. Essai gratuit de {$essaiJours} jours.";
+    $apercu = asset('images/og-ngoni-caisse.jpg').'?v='.@filemtime(public_path('images/og-ngoni-caisse.jpg'));
+    $wa = \App\Support\WhatsApp::link($whatsapp);
+    $waMessage = $wa ? $wa.'?text='.rawurlencode('Bonjour, je voudrais en savoir plus sur Ngoni Caisse.') : null;
+    $prix = fn (?int $m) => $m === null ? null : number_format($m, 0, ',', ' ');
+    $donnees = [
+        '@context' => 'https://schema.org',
+        '@type' => 'SoftwareApplication',
+        'name' => 'Ngoni Caisse',
+        'description' => $description,
+        'url' => route('vitrine'),
+        'image' => $apercu,
+        'applicationCategory' => 'BusinessApplication',
+        'operatingSystem' => 'Android',
+        'inLanguage' => 'fr',
+        'softwareVersion' => $version,
+        'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'XOF', 'description' => "Essai gratuit de {$essaiJours} jours"],
+    ];
+    $fonctions = [
+        ['Caisse tactile', "Touchez vos articles, le total se calcule tout seul. Un service ou un article hors catalogue ? Saisissez un montant libre.", 'M3 3h18v4H3zM5 7v14h14V7M9 11h6M9 15h6'],
+        ['Tickets et reçus', "Ticket imprimé sur imprimante Bluetooth, ou reçu PDF envoyé au client par WhatsApp. Numéroté à votre nom : PLC-2026-0042.", 'M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4'],
+        ['Stocks et marges', "Stock mis à jour à chaque vente, alerte avant la rupture. Prix d'achat et marge par article, en un coup d'œil.", 'M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10'],
+        ['Même sans réseau', "Coupure internet ? Continuez à vendre. Les ventes partent d'elles-mêmes dès le retour de la connexion.", 'M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01'],
+        ['Votre équipe', "Ajoutez caissiers et gérants. Chacun voit ce qu'il doit voir : le caissier encaisse, le gérant pilote, vous gardez la main.", 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'],
+        ['Plusieurs boutiques', "Une pharmacie, une annexe, un dépôt : passez de l'une à l'autre en un geste, chacune avec son stock et son équipe.", 'M3 9l1-5h16l1 5M3 9h18v11H3zM3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 20v-6h6v6'],
+        ['Pilotage du jour', "Chiffre d'affaires, panier moyen, meilleures ventes, moyens de paiement : votre journée sur un seul écran.", 'M3 3v18h18M7 15l4-4 3 3 5-6'],
+        ['Back-office web', "Sur ordinateur, gérez tout le catalogue, les stocks, les ventes et l'équipe confortablement.", 'M3 4h18v12H3zM8 20h8M12 16v4'],
+    ];
+    $questions = [
+        ['Faut-il une connexion internet ?', "Non pour encaisser : les ventes sont gardées dans le téléphone et envoyées au retour du réseau. Il en faut une pour la première connexion et pour synchroniser."],
+        ['Quelle imprimante utiliser ?', "Une imprimante thermique Bluetooth de 58 ou 80 mm, comme on en trouve chez les revendeurs de matériel de caisse. Sans imprimante, le reçu PDF part par WhatsApp."],
+        ['Dans quelle monnaie ?', "Franc CFA par défaut, et toutes les devises courantes : euro, cedi, dirham… Les centimes sont gérés quand la devise en a."],
+        ['Comment payer l’abonnement ?', "Par Orange Money, Wave, Moov Money, espèces ou virement. Vous envoyez la preuve depuis l’application et l’abonnement est activé à réception."],
+        ['J’utilisais Ngoni Pay, et mes données ?', "Elles sont conservées : Ngoni Caisse est la nouvelle version de Ngoni Pay. Mettez à jour l’application et reconnectez-vous avec le même numéro et le même mot de passe."],
+        ['Et sur iPhone ?', "L’application est disponible sur Android. Le back-office fonctionne dans n’importe quel navigateur, iPhone compris."],
+    ];
+@endphp
+<!doctype html>
+<html lang="fr" class="scroll-smooth">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ $titre }}</title>
+    <meta name="description" content="{{ $description }}">
+    <link rel="canonical" href="{{ route('vitrine') }}">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0B6E4F">
+    <link rel="icon" href="{{ asset('images/e-caisse.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/e-caisse.png') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Ngoni Caisse">
+    <meta property="og:locale" content="fr_FR">
+    <meta property="og:url" content="{{ route('vitrine') }}">
+    <meta property="og:title" content="{{ $titre }}">
+    <meta property="og:description" content="{{ $description }}">
+    <meta property="og:image" content="{{ $apercu }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">@json($donnees, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)</script>
+    @vite(['resources/css/app.css'])
+</head>
+<body class="bg-paper text-ink font-sans antialiased">
+
+{{-- Navigation --}}
+<header class="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-border/70">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center gap-6">
+        <a href="{{ route('vitrine') }}" class="flex items-center gap-2 font-display font-extrabold text-lg">
+            <span class="w-9 h-9 rounded-xl bg-accent text-white flex items-center justify-center">N</span>
+            Ngoni Caisse
+        </a>
+        <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-muted">
+            <a href="#fonctions" class="hover:text-ink">Fonctions</a>
+            <a href="#tarifs" class="hover:text-ink">Tarifs</a>
+            <a href="#questions" class="hover:text-ink">Questions</a>
+        </nav>
+        <div class="flex-grow"></div>
+        <a href="{{ route('connexion') }}" class="hidden sm:inline-flex h-10 px-4 items-center rounded-xl font-bold text-sm hover:bg-white">Se connecter</a>
+        <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-10 px-4 items-center rounded-xl bg-accent text-white font-bold text-sm hover:bg-accent-dark">Télécharger</a>
+    </div>
+</header>
+
+<main>
+    {{-- Accroche --}}
+    <section class="relative overflow-hidden">
+        <div class="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-accent-soft blur-3xl opacity-70" aria-hidden="true"></div>
+        <div class="relative max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
+            <div>
+                <span class="inline-flex items-center gap-2 rounded-full bg-white border border-border px-3 py-1 text-xs font-bold text-accent-dark">
+                    <span class="w-2 h-2 rounded-full bg-accent"></span> Nouveau : Ngoni Pay devient Ngoni Caisse
+                </span>
+                <h1 class="mt-5 font-display font-extrabold text-4xl md:text-6xl leading-[1.05] tracking-tight">
+                    La caisse de votre commerce, <span class="text-accent">dans votre téléphone.</span>
+                </h1>
+                <p class="mt-5 text-lg text-muted max-w-xl">
+                    Encaissez en quelques secondes, imprimez vos tickets, suivez vos stocks, vos marges et votre équipe —
+                    même quand le réseau coupe. Pour la boutique de quartier comme pour la supérette.
+                </p>
+                <div class="mt-8 flex flex-wrap gap-3">
+                    <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex items-center gap-3 h-14 pl-4 pr-6 rounded-2xl bg-ink text-white hover:bg-black">
+                        <svg viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true"><path fill="#34A853" d="M3.6 1.8 13.3 12l-9.7 10.2c-.4-.2-.6-.7-.6-1.2V3c0-.5.2-1 .6-1.2z"/><path fill="#FBBC04" d="m16.8 8.5-3.5 3.5 3.5 3.5 3.9-2.2c.8-.5.8-2.1 0-2.6z"/><path fill="#4285F4" d="M3.6 1.8c.3-.2.8-.2 1.2 0l12 6.7-3.5 3.5z"/><path fill="#EA4335" d="m13.3 12 3.5 3.5-12 6.7c-.4.2-.9.2-1.2 0z"/></svg>
+                        <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">Disponible sur</span><span class="font-bold text-lg">Google Play</span></span>
+                    </a>
+                    <a href="#tarifs" class="inline-flex items-center h-14 px-6 rounded-2xl border-2 border-ink/80 font-bold hover:bg-white">Essai gratuit {{ $essaiJours }} jours</a>
+                </div>
+                <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+                    <li class="flex items-center gap-2"><span class="text-accent font-bold">✓</span> Sans engagement</li>
+                    <li class="flex items-center gap-2"><span class="text-accent font-bold">✓</span> Orange Money, Wave, Moov</li>
+                    <li class="flex items-center gap-2"><span class="text-accent font-bold">✓</span> Fonctionne hors ligne</li>
+                </ul>
+            </div>
+
+            {{-- Téléphone dessiné en HTML : l'écran de caisse, sans image à charger. --}}
+            <div class="relative mx-auto w-[290px] md:w-[320px]" aria-label="Aperçu de l'écran de caisse de Ngoni Caisse" role="img">
+                <div class="absolute -inset-6 rounded-[56px] bg-accent/10 rotate-3" aria-hidden="true"></div>
+                <div class="relative rounded-[44px] bg-ink p-3 shadow-2xl">
+                    <div class="rounded-[34px] bg-paper overflow-hidden">
+                        <div class="h-7 flex items-center justify-center"><span class="w-20 h-4 rounded-full bg-ink"></span></div>
+                        <div class="px-4 pb-3">
+                            <div class="text-[11px] font-semibold text-muted">PHARMACIE LES CASTORS · Awa</div>
+                            <div class="mt-2 h-8 rounded-lg bg-white border border-border text-[11px] text-muted flex items-center px-3">Scanner ou rechercher…</div>
+                            <div class="mt-2 flex gap-1.5 text-[10px] font-bold">
+                                <span class="rounded-full bg-ink text-white px-2.5 py-1">Tous</span>
+                                <span class="rounded-full bg-white border border-border px-2.5 py-1">Aliments</span>
+                                <span class="rounded-full bg-white border border-border px-2.5 py-1">Boissons</span>
+                            </div>
+                            <div class="mt-3 grid grid-cols-2 gap-2">
+                                @foreach ([['Riz parfumé', '4 750', 'RI'], ['Huile 1 L', '1 500', 'HU'], ['Sucre 1 kg', '900', 'SU'], ['Lait en poudre', '2 800', 'LA']] as [$nom, $p, $c])
+                                    <div class="rounded-xl bg-white border border-border p-2.5">
+                                        <span class="inline-flex w-6 h-6 rounded-md bg-accent-soft text-accent-dark text-[9px] font-bold items-center justify-center">{{ $c }}</span>
+                                        <div class="mt-1.5 text-[11px] font-bold leading-tight">{{ $nom }}</div>
+                                        <div class="text-[12px] font-extrabold">{{ $p }} F</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="mt-3 rounded-xl bg-white border border-border p-3">
+                                <div class="flex justify-between text-[11px] text-muted"><span>3 articles</span><span>Espèces</span></div>
+                                <div class="flex justify-between items-baseline mt-1"><span class="text-[11px] font-semibold">Total à payer</span><span class="font-display font-extrabold text-lg">9 150 F</span></div>
+                                <div class="mt-2 h-9 rounded-lg bg-accent text-white text-[12px] font-bold flex items-center justify-center">Encaisser 9 150 F</div>
+                            </div>
+                        </div>
+                        <div class="h-14 bg-white border-t border-border flex items-center justify-around text-[9px] text-muted relative">
+                            <span>Pilotage</span><span>Stocks</span>
+                            <span class="w-12 h-12 -mt-7 rounded-full bg-accent border-4 border-white shadow-lg"></span>
+                            <span>Ventes</span><span>Plus</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="absolute -left-12 -bottom-5 hidden sm:flex items-center gap-2 rounded-2xl bg-white shadow-xl border border-border px-3 py-2">
+                    <span class="w-8 h-8 rounded-full bg-accent-soft text-accent-dark flex items-center justify-center font-bold">✓</span>
+                    <span class="text-xs"><span class="font-bold block">Ticket PLC-2026-0042</span><span class="text-muted">envoyé par WhatsApp</span></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- Pour qui --}}
+    <section class="border-y border-border bg-white">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 py-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-semibold text-muted">
+            <span class="text-ink">Pensé pour :</span>
+            @foreach (['Boutiques de quartier', 'Pharmacies', 'Supérettes', 'Pressings', 'Quincailleries', 'Salons', 'Restaurants'] as $metier)
+                <span>{{ $metier }}</span>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- Fonctions --}}
+    <section id="fonctions" class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div class="max-w-2xl">
+            <p class="text-sm font-bold text-accent uppercase tracking-wider">Fonctions</p>
+            <h2 class="mt-2 font-display font-extrabold text-3xl md:text-4xl">Tout ce qu’il faut pour tenir sa caisse, rien de compliqué.</h2>
+        </div>
+        <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            @foreach ($fonctions as [$nom, $texte, $icone])
+                <div class="rounded-2xl bg-white border border-border p-6 hover:shadow-lg hover:-translate-y-0.5 transition">
+                    <span class="w-11 h-11 rounded-xl bg-accent-soft text-accent-dark flex items-center justify-center">
+                        <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ $icone }}"/></svg>
+                    </span>
+                    <h3 class="mt-4 font-display font-bold text-lg">{{ $nom }}</h3>
+                    <p class="mt-2 text-sm text-muted leading-relaxed">{{ $texte }}</p>
+                </div>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- Comment ça marche --}}
+    <section class="bg-ink text-white">
+        <div class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+            <p class="text-sm font-bold text-accent-soft uppercase tracking-wider">En 3 minutes</p>
+            <h2 class="mt-2 font-display font-extrabold text-3xl md:text-4xl">Votre caisse prête avant le prochain client.</h2>
+            <ol class="mt-10 grid md:grid-cols-3 gap-6">
+                @foreach ([
+                    ['Installez l’application', 'Depuis le Play Store, gratuitement. Créez votre boutique avec votre numéro de téléphone.'],
+                    ['Ajoutez vos articles', 'Nom, prix, stock. Ou commencez tout de suite avec le montant libre, sans catalogue.'],
+                    ['Encaissez', 'Touchez, encaissez, imprimez ou envoyez le reçu. Votre journée se retrouve dans le pilotage.'],
+                ] as $i => [$etape, $texte])
+                    <li class="rounded-2xl bg-white/5 border border-white/10 p-6">
+                        <span class="font-display font-extrabold text-4xl text-accent-soft">{{ $i + 1 }}</span>
+                        <h3 class="mt-3 font-bold text-lg">{{ $etape }}</h3>
+                        <p class="mt-2 text-sm text-white/70 leading-relaxed">{{ $texte }}</p>
+                    </li>
+                @endforeach
+            </ol>
+        </div>
+    </section>
+
+    {{-- Tarifs --}}
+    <section id="tarifs" class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div class="text-center max-w-2xl mx-auto">
+            <p class="text-sm font-bold text-accent uppercase tracking-wider">Tarifs</p>
+            <h2 class="mt-2 font-display font-extrabold text-3xl md:text-4xl">Commencez gratuitement, payez quand ça vous sert.</h2>
+            <p class="mt-3 text-muted">{{ $essaiJours }} jours d’essai avec toutes les fonctions, sans carte bancaire. Ensuite, l’offre qui vous correspond.</p>
+        </div>
+        <div class="mt-10 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            @foreach ($plans as $plan)
+                @php($pro = $plan['code'] === 'pro')
+                <div class="relative rounded-3xl p-7 md:p-8 {{ $pro ? 'bg-accent text-white shadow-2xl' : 'bg-white border border-border' }}">
+                    @if ($pro)
+                        <span class="absolute -top-3 right-6 rounded-full bg-ink text-white text-xs font-bold px-3 py-1">Le plus complet</span>
+                    @endif
+                    <h3 class="font-display font-extrabold text-2xl">{{ $plan['nom'] }}</h3>
+                    <p class="mt-1 text-sm {{ $pro ? 'text-white/80' : 'text-muted' }}">{{ $plan['description'] }}</p>
+                    @if ($plan['mensuel'])
+                        <p class="mt-6"><span class="font-display font-extrabold text-4xl">{{ $prix($plan['mensuel']) }}</span> <span class="font-semibold">F CFA / mois</span></p>
+                    @endif
+                    @if ($plan['annuel'])
+                        <p class="mt-1 text-sm {{ $pro ? 'text-white/80' : 'text-muted' }}">ou {{ $prix($plan['annuel']) }} F CFA par an</p>
+                    @endif
+                    <ul class="mt-6 flex flex-col gap-2.5 text-sm">
+                        <li>✓ {{ $plan['max_boutiques'] === null ? 'Boutiques illimitées' : ($plan['max_boutiques'] === 1 ? '1 boutique' : "Jusqu’à {$plan['max_boutiques']} boutiques") }}</li>
+                        <li>✓ {{ $plan['max_membres'] === null ? 'Équipe illimitée' : "{$plan['max_membres']} membres par boutique" }}</li>
+                        <li>✓ Caisse, tickets, reçus PDF</li>
+                        <li>✓ Stocks, marges, clients</li>
+                        <li>✓ Hors ligne et back-office web</li>
+                        <li class="{{ $plan['seances'] ? '' : 'opacity-50' }}">{{ $plan['seances'] ? '✓' : '—' }} Séances de caisse et écarts{{ $plan['seances'] ? '' : ' (Pro)' }}</li>
+                    </ul>
+                    <a href="{{ $storeUrl }}" rel="noopener"
+                       class="mt-8 flex h-12 items-center justify-center rounded-xl font-bold {{ $pro ? 'bg-white text-accent-dark hover:bg-accent-soft' : 'bg-ink text-white hover:bg-black' }}">
+                        Essayer gratuitement
+                    </a>
+                </div>
+            @endforeach
+        </div>
+        <p class="mt-6 text-center text-sm text-muted">Paiement par Orange Money, Wave, Moov Money, espèces ou virement. Tarifs trimestriels et semestriels dans l’application.</p>
+    </section>
+
+    {{-- Questions --}}
+    <section id="questions" class="bg-white border-y border-border">
+        <div class="max-w-3xl mx-auto px-4 md:px-6 py-16 md:py-24">
+            <h2 class="font-display font-extrabold text-3xl md:text-4xl text-center">Questions fréquentes</h2>
+            <div class="mt-10 flex flex-col gap-3">
+                @foreach ($questions as [$question, $reponse])
+                    <details class="group rounded-2xl border border-border bg-paper px-5 py-4">
+                        <summary class="flex cursor-pointer items-center justify-between gap-4 font-bold list-none">
+                            {{ $question }}
+                            <span class="text-accent text-xl transition group-open:rotate-45">+</span>
+                        </summary>
+                        <p class="mt-3 text-muted leading-relaxed">{{ $reponse }}</p>
+                    </details>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
+    {{-- Appel final --}}
+    <section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div class="rounded-3xl bg-accent text-white px-6 py-12 md:px-14 md:py-16 grid md:grid-cols-[1fr_auto] gap-8 items-center overflow-hidden relative">
+            <div class="absolute -right-20 -bottom-24 w-80 h-80 rounded-full bg-white/10" aria-hidden="true"></div>
+            <div class="relative">
+                <h2 class="font-display font-extrabold text-3xl md:text-4xl">Prêt à tenir votre caisse autrement ?</h2>
+                <p class="mt-3 text-white/85 max-w-xl">Installez Ngoni Caisse et encaissez votre première vente aujourd’hui. Une question ? Écrivez-nous, on vous répond.</p>
+            </div>
+            <div class="relative flex flex-wrap gap-3">
+                <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl bg-white text-accent-dark font-bold hover:bg-accent-soft">Télécharger l’application</a>
+                @if ($waMessage)
+                    <a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl border-2 border-white font-bold hover:bg-white/10">WhatsApp</a>
+                @endif
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="border-t border-border">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between text-sm text-muted">
+        <div class="flex items-center gap-2 font-display font-extrabold text-ink">
+            <span class="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center">N</span> Ngoni Caisse
+        </div>
+        <nav class="flex flex-wrap gap-x-6 gap-y-2">
+            <a href="#fonctions" class="hover:text-ink">Fonctions</a>
+            <a href="#tarifs" class="hover:text-ink">Tarifs</a>
+            <a href="{{ route('connexion') }}" class="hover:text-ink">Back-office</a>
+            <a href="{{ url('/privacy') }}" class="hover:text-ink">Confidentialité</a>
+            @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener" class="hover:text-ink">Contact</a>@endif
+        </nav>
+        <span>© {{ now()->year }} Ngoni Caisse</span>
+    </div>
+</footer>
+</body>
+</html>
