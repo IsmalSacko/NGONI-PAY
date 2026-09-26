@@ -23,7 +23,6 @@ class SubscriptionPlan extends Model
         'description',
         'features',
         'trial_days',
-        'monthly_online_payments',
         'is_active',
         'sort_order',
     ];
@@ -33,7 +32,6 @@ class SubscriptionPlan extends Model
         return [
             'features' => 'array',
             'trial_days' => 'integer',
-            'monthly_online_payments' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
@@ -48,18 +46,6 @@ class SubscriptionPlan extends Model
     public function trialDays(): int
     {
         return $this->trial_days ?? 7;
-    }
-
-    /**
-     * Le plan autorise-t-il un paiement en ligne de plus ce mois-ci ?
-     *
-     * `monthly_online_payments` à `null` vaut « sans limite ».
-     */
-    public function allowsOnlinePayment(int $usedThisMonth): bool
-    {
-        $quota = $this->monthly_online_payments;
-
-        return $quota === null || $usedThisMonth < $quota;
     }
 
     /**
@@ -79,13 +65,11 @@ class SubscriptionPlan extends Model
     }
 
     /**
-     * Le plan est-il gratuit ?
-     *
-     * Un plan sans tarif actif ne se paie pas : c'est l'essai.
+     * Le plan est-il l'essai ? Il ne se vend pas : il est offert à la création.
      */
-    public function isFree(): bool
+    public function isTrial(): bool
     {
-        return $this->code === 'free';
+        return $this->code === Subscription::PLAN_TRIAL;
     }
 
     /**
@@ -110,7 +94,7 @@ class SubscriptionPlan extends Model
      *
      * Le tarif mensuel s'il est proposé ; sinon le moins cher au mois parmi les
      * durées ouvertes — un plan vendu au trimestre seulement a bien une valeur
-     * mensuelle. Zéro pour un plan gratuit : un essai n'a rien coûté.
+     * mensuelle. Zéro pour l'essai : il n'a rien coûté.
      */
     public function monthlyRate(): float
     {

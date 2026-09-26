@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Admin\Businesses\Show as BusinessesShow;
+use App\Livewire\Admin\Subscriptions\Row as SubscriptionRow;
 use App\Livewire\Admin\Users\Index as UsersIndex;
 use App\Models\Business;
 use App\Models\Client;
@@ -111,7 +112,7 @@ test('grantSubscription force un plan manuel identique à AdminSubscriptionContr
         ->and($subscription->granted_by)->toBe($admin->id);
 });
 
-test('revokeSubscription repasse en free et retire is_manual', function () {
+test('revokeSubscription met fin à l’abonnement tout de suite et retire is_manual', function () {
     $admin = makeAdmin();
     $business = makeBusinessWithOwner();
 
@@ -131,7 +132,8 @@ test('revokeSubscription repasse en free et retire is_manual', function () {
 
     $subscription = $business->fresh()->subscription;
 
-    expect($subscription->plan)->toBe('free')
+    expect($subscription->plan)->toBe('pro')
+        ->and($subscription->isCurrentlyActive())->toBeFalse()
         ->and($subscription->is_manual)->toBeFalse()
         ->and($subscription->granted_by)->toBeNull();
 });
@@ -245,4 +247,76 @@ test('la console signale les demandes à instruire', function () {
         ->get(route('admin.dashboard'))
         ->assertOk()
         ->assertSee('1 demande(s) en attente');
+});
+
+test('la liste des abonnements affiche « expiré le » pour un essai terminé', function () {
+    $business = makeBusinessWithOwner();
+    Subscription::create([
+        'business_id' => $business->id,
+        'plan' => 'trial',
+        'starts_at' => '2026-08-14',
+        'ends_at' => '2026-08-21',
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs(makeAdmin())
+        ->test(SubscriptionRow::class, ['business' => $business->load('owner', 'subscription')])
+        ->assertSee('expiré le 21/08/2026')
+        ->assertSee('essai')
+        ->assertDontSee("jusqu'au");
+});
+
+test('la liste des abonnements affiche « actif jusqu’au » pour un essai en cours', function () {
+    $business = makeBusinessWithOwner();
+    $end = now()->addDays(3);
+    Subscription::create([
+        'business_id' => $business->id,
+        'plan' => 'trial',
+        'starts_at' => now()->subDays(4),
+        'ends_at' => $end,
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs(makeAdmin())
+        ->test(SubscriptionRow::class, ['business' => $business->load('owner', 'subscription')])
+        ->assertSee("actif jusqu'au " . $end->format('d/m/Y'), false);
+});
+
+test('révoquer depuis la liste rend l’abonnement expiré immédiatement', function () {
+    $business = makeBusinessWithOwner();
+    $sub = Subscription::create([
+        'business_id' => $business->id,
+        'plan' => 'pro',
+        'starts_at' => now()->subDays(4),
+        'ends_at' => null,
+        'is_active' => true,
+        'is_manual' => true,
+    ]);
+
+    Livewire::actingAs(makeAdmin())
+        ->test(SubscriptionRow::class, ['business' => $business->load('owner', 'subscription')])
+        ->call('revoke')
+        ->assertSee('expiré le');
+
+    expect($sub->fresh()->isCurrentlyActive())->toBeFalse();
+});
+
+test('la liste des abonnements propose d’écrire au propriétaire sur WhatsApp', function () {
+    $business = makeBusinessWithOwner(); // propriétaire : +22371111111
+
+    Livewire::actingAs(makeAdmin())
+        ->test(SubscriptionRow::class, ['business' => $business->load('owner', 'subscription')])
+        ->assertSee('+22371111111')
+        ->assertSeeHtml('href="https://wa.me/22371111111"');
+});
+
+test('un numéro sans indicatif est affiché sans lien WhatsApp', function () {
+    $business = makeBusinessWithOwner();
+    $business->owner->update(['phone' => '0758071816']);
+
+    Livewire::actingAs(makeAdmin())
+        ->test(SubscriptionRow::class, ['business' => $business->fresh()->load('owner', 'subscription')])
+        ->assertSee('0758071816')
+        ->assertSee('sans indicatif')
+        ->assertDontSeeHtml('wa.me/');
 });

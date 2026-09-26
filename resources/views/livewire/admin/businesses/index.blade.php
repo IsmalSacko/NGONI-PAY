@@ -28,11 +28,15 @@
                             </a>
                         </td>
                         <td class="px-4 py-3 text-slate-600">{{ \App\Enums\BusinessType::labelFor($business->type) }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ $business->owner?->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-slate-600">
+                            <div>{{ $business->owner?->name ?? '—' }}</div>
+                            <x-admin.phone :phone="$business->owner?->phone" class="text-xs text-slate-500 mt-0.5" />
+                        </td>
                         <td class="px-4 py-3">
                             <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                                {{ $business->subscription?->plan ?? 'free' }}
+                                {{ $business->subscription?->plan === 'trial' ? 'essai' : ($business->subscription?->plan ?? '—') }}
                             </span>
+                            <x-admin.subscription-status :subscription="$business->subscription" />
                         </td>
                         <td class="px-4 py-3">
                             @if ($business->is_active)

@@ -18,27 +18,6 @@ class Index extends Component
         $this->resetPage();
     }
 
-    private function summary(): array
-    {
-        $total = Business::count();
-        $byPlan = Subscription::selectRaw('plan, COUNT(*) as c')
-            ->groupBy('plan')
-            ->pluck('c', 'plan');
-
-        $pro = (int) ($byPlan['pro'] ?? 0);
-        $basic = (int) ($byPlan['basic'] ?? 0);
-        $freePlan = (int) ($byPlan['free'] ?? 0);
-        $withSub = $pro + $basic + $freePlan;
-
-        return [
-            'total_businesses' => $total,
-            'total_subscriptions' => $withSub,
-            'pro' => $pro,
-            'basic' => $basic,
-            'free' => $freePlan + max(0, $total - $withSub),
-        ];
-    }
-
     public function render()
     {
         $needle = '%' . mb_strtolower($this->search) . '%';
@@ -60,7 +39,7 @@ class Index extends Component
 
         return view('livewire.admin.subscriptions.index', [
             'businesses' => $businesses,
-            'summary' => $this->summary(),
+            'summary' => Subscription::adminSummary(),
         ])->layout('components.layouts.admin', ['title' => 'Abonnements']);
     }
 }

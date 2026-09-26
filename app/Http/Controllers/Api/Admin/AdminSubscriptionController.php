@@ -108,33 +108,7 @@ class AdminSubscriptionController extends Controller
             ->paginate(20);
 
         return AdminBusinessResource::collection($businesses)
-            ->additional(['summary' => $this->summary()]);
-    }
-
-    /**
-     * Compteurs globaux : total business (= total abonnements attendus)
-     * et répartition par plan.
-     */
-    private function summary(): array
-    {
-        $total = Business::count();
-        $byPlan = Subscription::selectRaw('plan, COUNT(*) as c')
-            ->groupBy('plan')
-            ->pluck('c', 'plan');
-
-        $pro = (int) ($byPlan['pro'] ?? 0);
-        $basic = (int) ($byPlan['basic'] ?? 0);
-        $freePlan = (int) ($byPlan['free'] ?? 0);
-        $withSub = $pro + $basic + $freePlan;
-
-        return [
-            'total_businesses' => $total,
-            'total_subscriptions' => $withSub,
-            'pro' => $pro,
-            'basic' => $basic,
-            // Free explicite + business sans abonnement encore créé.
-            'free' => $freePlan + max(0, $total - $withSub),
-        ];
+            ->additional(['summary' => Subscription::adminSummary()]);
     }
 
     /**
@@ -178,29 +152,16 @@ class AdminSubscriptionController extends Controller
     }
 
     /**
-     * Retire l'override manuel : repasse le business en Free expiré
-     * et rend la main à la logique automatique d'abonnement.
+     * Met fin à l'abonnement immédiatement : l'entreprise ne peut plus encaisser.
      */
     public function revoke(Request $request, Business $business)
     {
-        $subscription = $business->subscription;
-
-        if ($subscription) {
-            $subscription->update([
-                'plan' => Subscription::PLAN_FREE,
-                'is_active' => true,
-                'is_manual' => false,
-                'granted_by' => null,
-                'admin_note' => null,
-                'starts_at' => now(),
-                'ends_at' => now(), // Free expiré, aucune prolongation.
-            ]);
-        }
+        $business->subscription?->expireNow();
 
         return (new AdminBusinessResource(
             $business->fresh(['owner', 'subscription'])
         ))->additional([
-            'message' => 'Override retiré.',
+            'message' => 'Abonnement révoqué.',
         ]);
     }
 }

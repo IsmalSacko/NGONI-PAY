@@ -42,7 +42,7 @@ beforeEach(function () {
 
     Subscription::create([
         'business_id' => $this->business->id,
-        'plan' => 'free',
+        'plan' => 'trial',
         'starts_at' => now()->subDay(),
         'ends_at' => now()->addDays(5),
         'is_active' => true,
@@ -106,7 +106,7 @@ test('refuser une demande laisse le plan inchangé', function () {
     $this->demande->refresh();
 
     expect($this->demande->status->value)->toBe('refused')
-        ->and($this->business->fresh()->subscription->plan)->toBe('free');
+        ->and($this->business->fresh()->subscription->plan)->toBe('trial');
 });
 
 test('une demande déjà tranchée ne se retranche pas', function () {

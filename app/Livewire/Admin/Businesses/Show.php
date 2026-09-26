@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\User;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,7 +21,7 @@ class Show extends Component
     public string $staffRole = 'seller';
 
     // Formulaire abonnement (grant)
-    public string $plan = 'free';
+    public string $plan = Subscription::PLAN_BASIC;
     public bool $lifetime = false;
     public ?string $endsAt = null;
     public ?string $adminNote = null;
@@ -28,7 +29,7 @@ class Show extends Component
     public function mount(Business $business): void
     {
         $this->business = $business;
-        $this->plan = $business->subscription?->plan ?? 'free';
+        $this->plan = $business->subscription?->plan ?? Subscription::PLAN_BASIC;
     }
 
     public function toggleActive(): void
@@ -94,7 +95,7 @@ class Show extends Component
     public function grantSubscription(): void
     {
         $data = $this->validate([
-            'plan' => ['required', 'in:free,basic,pro'],
+            'plan' => ['required', Rule::in(Subscription::PLANS)],
             'lifetime' => ['boolean'],
             'endsAt' => ['nullable', 'date'],
             'adminNote' => ['nullable', 'string', 'max:255'],
@@ -119,22 +120,10 @@ class Show extends Component
 
     public function revokeSubscription(): void
     {
-        $subscription = $this->business->subscription;
-
-        if ($subscription) {
-            $subscription->update([
-                'plan' => Subscription::PLAN_FREE,
-                'is_active' => true,
-                'is_manual' => false,
-                'granted_by' => null,
-                'admin_note' => null,
-                'starts_at' => now(),
-                'ends_at' => now(),
-            ]);
-        }
+        $this->business->subscription?->expireNow();
 
         $this->business->refresh();
-        session()->flash('status', 'Override retiré.');
+        session()->flash('status', 'Abonnement révoqué : encaissement bloqué.');
     }
 
     public function cancelPayment(int $paymentId): void

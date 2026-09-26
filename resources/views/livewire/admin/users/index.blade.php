@@ -31,7 +31,7 @@
                 @forelse ($users as $user)
                     <tr class="hover:bg-slate-50/60">
                         <td class="px-4 py-3 font-medium text-slate-900">{{ $user->name }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ $user->phone ?? '—' }}</td>
+                        <td class="px-4 py-3 text-slate-600"><x-admin.phone :phone="$user->phone" /></td>
                         <td class="px-4 py-3 text-slate-600">{{ $user->email ?? '—' }}</td>
                         <td class="px-4 py-3">
                             <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">

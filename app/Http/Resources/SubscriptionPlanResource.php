@@ -23,7 +23,8 @@ class SubscriptionPlanResource extends JsonResource
             'description' => $this->description,
             'features' => $this->features ?? [],
             'trial_days' => $this->trial_days,
-            'is_free' => $this->isFree(),
+            // L'essai figure au catalogue pour sa durée, mais ne se demande pas.
+            'is_trial' => $this->isTrial(),
             'prices' => $this->prices
                 ->where('is_active', true)
                 ->sortBy(fn (SubscriptionPlanPrice $price) => $price->months())

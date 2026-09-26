@@ -121,40 +121,6 @@ test('la même clé sur deux entreprises différentes reste valide', function ()
     expect(Payment::count())->toBe(2);
 });
 
-test('un rejeu n’est pas refusé par le quota mensuel du plan basic', function () {
-    // Le plan basic limite les paiements en ligne à 5 par mois. Un rejeu porte
-    // sur un paiement déjà compté : il doit renvoyer l'existant, pas un 403.
-    Subscription::where('business_id', $this->business->id)->update(['plan' => 'basic']);
-
-    for ($i = 0; $i < 5; $i++) {
-        Payment::create([
-            'business_id' => $this->business->id,
-            'client_id' => Client::create([
-                'business_id' => $this->business->id,
-                'phone' => '7100000'.$i,
-                'name' => 'C'.$i,
-            ])->id,
-            'user_id' => $this->owner->id,
-            'amount' => 100,
-            'currency' => 'XOF',
-            'method' => 'wave',
-            'provider' => 'paydunya',
-            'purpose' => 'sale',
-            'transaction_ref' => 'TX-'.$i,
-            'status' => 'success',
-            'paid_at' => now(),
-        ]);
-    }
-
-    // Un encaissement espèces déjà enregistré avec sa clé.
-    $first = encaisser(key: 'np-quota')->assertSuccessful();
-
-    // Rejeu : doit renvoyer l'existant.
-    $replay = encaisser(key: 'np-quota');
-    $replay->assertSuccessful();
-    expect($replay->json('data.id'))->toBe($first->json('data.id'));
-});
-
 test('une clé trop longue est refusée plutôt que tronquée', function () {
     encaisser(key: str_repeat('a', 129))->assertStatus(422);
 

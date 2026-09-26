@@ -6,9 +6,7 @@ use App\Enums\BillingCycle;
 use App\Http\Resources\SubscriptionRequestResource;
 use App\Models\Business;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionRequestService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SubscriptionResource;
@@ -19,119 +17,36 @@ class SubscriptionController extends Controller
 {
     public function __construct(private readonly SubscriptionRequestService $requests) {}
 
+    /**
+     * Abonnement de l'entreprise. Le tout premier appel démarre l'essai ; ensuite
+     * il n'est jamais prolongé ni recréé. Un essai ou un plan expiré est renvoyé
+     * tel quel (`is_currently_active` à false) : l'application bloque l'encaissement.
+     */
     public function show(Business $business, Request $request)
     {
         $this->authorizeManager($business, $request);
 
-        $subscription = $business->subscription;
-        $now = Carbon::now();
+        $subscription = $business->subscription ?? Subscription::startTrial($business);
 
-        // La durée de l'essai est celle que l'exploitant a fixée sur le plan
-        // gratuit. Elle était écrite en dur à trois endroits : la changer depuis
-        // la console n'avait aucun effet.
-        $essai = SubscriptionPlan::byCode('free')?->trialDays() ?? 7;
-
-        if (! $subscription) {
-            $subscription = Subscription::create([
-                'business_id' => $business->id,
-                'plan' => 'free',
-                'is_active' => true,
-                'starts_at' => $now,
-                'ends_at' => $now->copy()->addDays($essai),
-            ]);
-            return new SubscriptionResource($subscription);
-        }
-
-        // Abonnement accordé manuellement par un admin : ne jamais le rétrograder
-        // ni recadrer automatiquement (ends_at NULL = à vie).
-        if ($subscription->is_manual) {
-            return new SubscriptionResource($subscription);
-        }
-
-        if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->lt($now)) {
-            if ($subscription->plan !== 'free') {
-                $subscription->update([
-                    'plan' => 'free',
-                    'is_active' => true,
-                    'starts_at' => $now,
-                    // Downgrade vers Free sans relancer une nouvelle période d'essai.
-                    'ends_at' => $now,
-                ]);
-            }
-        }
-
-        if ($subscription->plan === 'free' && $subscription->ends_at) {
-            // L'essai ne doit jamais dépasser la durée du plan, comptée depuis
-            // `starts_at`.
-            $trialMax = Carbon::parse($subscription->starts_at)->copy()->addDays($essai);
-            if (Carbon::parse($subscription->ends_at)->gt($trialMax)) {
-                $subscription->update([
-                    'ends_at' => $trialMax,
-                ]);
-            }
-        }
-
-        return new SubscriptionResource($subscription->fresh());
+        return new SubscriptionResource($subscription);
     }
 
+    /**
+     * Souscription à un plan payant : toujours une demande à instruire.
+     *
+     * Le règlement se fait hors application (espèces, mobile money, virement) et
+     * aucun canal ne prouve à lui seul que l'argent est arrivé. L'exploitant est
+     * prévenu, constate le paiement, puis approuve depuis la console.
+     */
     public function store(StoreSubscriptionRequest $request, Business $business)
     {
         $this->authorizeManager($business, $request);
-        // Pour le cas d'un abonnement gratuit: essai unique, non renouvelable.
-        if ($request->plan === 'free') {
-            $existing = Subscription::where('business_id', $business->id)->first();
 
-            if (! $existing) {
-                $subscription = Subscription::create([
-                    'business_id' => $business->id,
-                    'plan' => 'free',
-                    'is_active' => true,
-                    'starts_at' => now(),
-                    'ends_at' => now()->addDays(
-                        SubscriptionPlan::byCode('free')?->trialDays() ?? 7,
-                    ),
-                ]);
-
-                return new SubscriptionResource($subscription);
-            }
-
-            // Si l'essai est déjà passé, on bascule/maintient en Free expiré (sans prolongation).
-            $now = now();
-            $currentEnd = $existing->ends_at ? Carbon::parse($existing->ends_at) : null;
-            $isFreeTrialStillRunning = $existing->plan === 'free' && $currentEnd && $currentEnd->isAfter($now);
-
-            if ($isFreeTrialStillRunning) {
-                return new SubscriptionResource($existing);
-            }
-
-            $existing->update([
-                'plan' => 'free',
-                'is_active' => true,
-                'starts_at' => $now,
-                'ends_at' => $now, // aucune nouvelle semaine d'essai
-            ]);
-
-            return new SubscriptionResource($existing->fresh());
-        }
-        // 🔹 PLANS PAYANTS → demande à instruire, quel que soit le moyen
-        //
-        // Le règlement se fait hors application, et aucun canal ne prouve à lui
-        // seul que l'argent est arrivé : « espèces » activait le plan sur simple
-        // déclaration. Toute souscription payante devient donc une demande, que
-        // l'exploitant approuve quand il a constaté le paiement.
-        //
-        // Le paiement en ligne reste possible, mais il est en pause faute de clés
-        // de production : voir `services.paydunya.subscriptions_enabled`. Quand il
-        // sera rallumé, le mobile money repassera par le fournisseur, dont le
-        // rappel active le plan sans intervention ({@see PaymentCallbackController})
-        // — les espèces continueront de passer par une demande.
         $demande = $this->requests->submit(
             business: $business,
             plan: (string) $request->plan,
             requestedBy: $request->user(),
             method: $request->input('method'),
-            // La durée était perdue par ce chemin : toute demande valait un mois,
-            // même celle d'un commerçant qui réglait son année.
             cycle: BillingCycle::tryFrom((string) $request->input('cycle'))
                 ?? BillingCycle::Monthly,
         );

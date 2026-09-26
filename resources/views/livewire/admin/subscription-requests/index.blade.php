@@ -59,7 +59,7 @@
                         </div>
                         <div class="mt-1 text-sm text-slate-500">
                             {{ $demande->business->owner?->name ?? '—' }}
-                            · {{ $demande->contact_phone ?: ($demande->business->phone ?: '—') }}
+                            · <x-admin.phone :phone="$demande->contact_phone ?: ($demande->business->owner?->phone ?: $demande->business->phone)" />
                             · {{ $demande->created_at->diffForHumans() }}
                         </div>
                         @if ($demande->note)

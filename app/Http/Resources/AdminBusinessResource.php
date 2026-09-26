@@ -39,7 +39,7 @@ class AdminBusinessResource extends JsonResource
                 'is_active' => (bool) $subscription->is_active,
                 'is_manual' => (bool) $subscription->is_manual,
                 'is_lifetime' => $subscription->ends_at === null,
-                'grants_pro_access' => $subscription->grantsProAccess(),
+                'is_currently_active' => $subscription->isCurrentlyActive(),
                 'admin_note' => $subscription->admin_note,
             ] : null,
         ];

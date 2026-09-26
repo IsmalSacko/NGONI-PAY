@@ -16,10 +16,10 @@ class StoreSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => 'required|in:free,basic,pro',
-            'starts_at' => 'required|date',
-            'ends_at' => 'nullable|date|after_or_equal:starts_at',
-            'method' => 'required_unless:plan,free|in:cash,orange_money,moov_money,wave,bank_transfer',
+            // Seuls les plans payants se demandent : l'essai démarre tout seul.
+            'plan' => 'required|in:basic,pro',
+            // Moyen annoncé par le commerçant, à titre indicatif pour l'exploitant.
+            'method' => 'nullable|in:cash,orange_money,moov_money,wave,bank_transfer',
             // Durée souscrite. Facultative : les versions de l'application déjà
             // installées ne l'envoient pas, et retombent sur le mensuel.
             'cycle' => ['sometimes', Rule::enum(BillingCycle::class)],

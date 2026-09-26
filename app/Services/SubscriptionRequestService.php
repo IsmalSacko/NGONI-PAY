@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionRequestStatus;
+use App\Mail\SubscriptionRequestedMail;
 use App\Models\Business;
 use App\Models\Client;
 use App\Models\Payment;
@@ -15,6 +16,8 @@ use App\Models\SubscriptionRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -81,7 +84,7 @@ class SubscriptionRequestService
     ): SubscriptionRequest {
         $modele = $this->planFor($plan);
 
-        if ($modele === null || $modele->isFree()) {
+        if ($modele === null || $modele->isTrial()) {
             throw ValidationException::withMessages([
                 'plan' => ["Seuls les plans payants font l'objet d'une demande."],
             ]);
@@ -123,7 +126,7 @@ class SubscriptionRequestService
             ]);
         }
 
-        return SubscriptionRequest::create([
+        $demande = SubscriptionRequest::create([
             'business_id' => $business->id,
             'requested_by_user_id' => $requestedBy?->id,
             'plan' => $modele->code,
@@ -140,6 +143,27 @@ class SubscriptionRequestService
             'proof_note' => $proofNote,
             'status' => SubscriptionRequestStatus::Pending,
         ]);
+
+        $this->alertOperator($demande);
+
+        return $demande;
+    }
+
+    /**
+     * Prévient l'exploitant par mail. Un échec d'envoi ne doit pas faire perdre
+     * la demande au commerçant : elle est enregistrée, et reste visible dans la console.
+     */
+    private function alertOperator(SubscriptionRequest $demande): void
+    {
+        try {
+            Mail::to(config('subscriptions.request_notification_email'))
+                ->send(new SubscriptionRequestedMail($demande));
+        } catch (\Throwable $e) {
+            Log::error('Mail de demande d\'abonnement non envoyé', [
+                'subscription_request_id' => $demande->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -279,8 +303,7 @@ class SubscriptionRequestService
 
         $tauxDemande = $demande->monthlyRate();
 
-        // Plan demandé gratuit — cas écarté au dépôt — ou tarif nul : rien à
-        // diviser.
+        // Plan demandé sans tarif — l'essai, écarté au dépôt — : rien à diviser.
         if ($tauxDemande <= 0) {
             return 0;
         }

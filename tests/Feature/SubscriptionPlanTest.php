@@ -48,7 +48,7 @@ beforeEach(function () {
 
     Subscription::create([
         'business_id' => $this->business->id,
-        'plan' => 'free',
+        'plan' => 'trial',
         'starts_at' => now()->subDay(),
         'ends_at' => now()->addDays(6),
         'is_active' => true,
@@ -62,9 +62,10 @@ it('publie le catalogue des plans sans authentification', function () {
 
     $plans = collect($reponse->json('data'))->keyBy('code');
 
-    expect($plans->keys())->toContain('free', 'basic', 'pro')
-        ->and($plans['free']['is_free'])->toBeTrue()
-        ->and($plans['free']['trial_days'])->toBe(7);
+    expect($plans->keys())->toContain('trial', 'basic', 'pro')
+        ->not->toContain('free')
+        ->and($plans['trial']['is_trial'])->toBeTrue()
+        ->and($plans['trial']['trial_days'])->toBe(7);
 
     // Quatre durées par plan payant : le mensuel seul obligeait un commerçant
     // qui voulait régler son année à revenir douze fois.
@@ -138,12 +139,12 @@ it('refuse un plan que l’exploitant a retiré', function () {
     )->assertStatus(422)->assertJsonValidationErrors('plan');
 });
 
-it('ne propose pas de payer le plan gratuit', function () {
+it('ne vend pas l’essai, et ne connaît plus de plan gratuit', function (string $plan) {
     $this->postJson(
         "/api/businesses/{$this->business->id}/subscription/requests",
-        ['plan' => 'free'],
+        ['plan' => $plan],
     )->assertStatus(422)->assertJsonValidationErrors('plan');
-});
+})->with(['trial', 'free']);
 
 it('retient le mensuel quand aucune durée n’est précisée', function () {
     // Les versions de l'application déjà installées n'envoient pas de durée.
@@ -169,38 +170,11 @@ it('décrit chaque durée du catalogue', function () {
         ->and(BillingCycle::Yearly->months())->toBe(12);
 });
 
-it('garde le paiement en ligne des abonnements en pause', function () {
-    // Faute de clés de production : une souscription lancée sans elles
-    // échouerait chez le commerçant. Le code reste, l'interrupteur est ouvert.
-    expect(config('services.paydunya.subscriptions_enabled'))->toBeFalsy();
-});
-
-it('applique le quota de paiements en ligne que porte le plan', function () {
-    // Le quota était écrit dans le contrôleur — « Basic → 5 » — tandis que la
-    // description du plan vit en base : les deux pouvaient se contredire.
-    $plan = SubscriptionPlan::where('code', 'basic')->firstOrFail();
-
-    expect($plan->monthly_online_payments)->toBe(5)
-        ->and($plan->allowsOnlinePayment(4))->toBeTrue()
-        ->and($plan->allowsOnlinePayment(5))->toBeFalse();
-
-    // Ajusté depuis la console, il vaut aussitôt.
-    $plan->update(['monthly_online_payments' => 10]);
-
-    expect($plan->fresh()->allowsOnlinePayment(5))->toBeTrue();
-
-    // `null` vaut « sans limite » : c'est le cas de Pro.
-    $pro = SubscriptionPlan::where('code', 'pro')->firstOrFail();
-
-    expect($pro->monthly_online_payments)->toBeNull()
-        ->and($pro->allowsOnlinePayment(9999))->toBeTrue();
-});
-
-it('prend la durée de l’essai sur le plan gratuit', function () {
+it('prend la durée de l’essai sur le plan trial', function () {
     // Elle était écrite en dur à trois endroits : la changer depuis la console
     // n'avait aucun effet.
-    $free = SubscriptionPlan::where('code', 'free')->firstOrFail();
-    $free->update(['trial_days' => 14]);
+    $essai = SubscriptionPlan::where('code', 'trial')->firstOrFail();
+    $essai->update(['trial_days' => 14]);
 
     $business = Business::create([
         'owner_id' => $this->owner->id,
@@ -227,7 +201,6 @@ it('transmet la durée par l’ancien chemin de souscription', function () {
         'plan' => 'pro',
         'method' => 'cash',
         'cycle' => 'yearly',
-        'starts_at' => now()->toDateString(),
     ])->assertStatus(202);
 
     expect($reponse->json('request.cycle'))->toBe('yearly')
@@ -328,10 +301,10 @@ it('convertit les jours restants à la valeur du plan demandé, à la baisse', f
         ->and(now()->diffInDays($fin))->toBeLessThan(126);
 });
 
-it('ne convertit rien depuis un essai gratuit', function () {
+it('ne convertit rien depuis un essai', function () {
     // Un essai n'a rien coûté : il n'y a pas de valeur à reporter.
     $this->business->subscription->update([
-        'plan' => 'free',
+        'plan' => 'trial',
         'starts_at' => now()->subDays(2),
         'ends_at' => now()->addDays(5),
         'is_active' => true,

@@ -14,7 +14,7 @@ class UpdateSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => 'sometimes|in:free,basic,pro',
+            'plan' => 'sometimes|in:trial,basic,pro',
             'starts_at' => 'sometimes|date',
             'ends_at' => 'sometimes|nullable|date|after_or_equal:starts_at',
             'is_active' => 'sometimes|boolean',

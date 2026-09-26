@@ -56,14 +56,14 @@ class InvoiceResource extends JsonResource
         ];
     }
 
-    private function planFromAmount($amount): string
+    private function planFromAmount($amount): ?string
     {
         $value = (int) round((float) $amount);
 
         return match ($value) {
             5000 => 'basic',
             15000 => 'pro',
-            default => 'free',
+            default => null,
         };
     }
 }

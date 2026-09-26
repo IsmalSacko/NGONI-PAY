@@ -12,7 +12,6 @@ use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\BusinessUserController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
-use App\Http\Controllers\Api\PaymentCallbackController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SubscriptionPlanController;
 use App\Http\Controllers\Api\SubscriptionRequestController;
@@ -122,11 +121,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/businesses/{business}/payments/{payment}', [PaymentController::class, 'destroy']);
 });
 
-// Payment Callback (Mobile Money) - No auth
-Route::post(
-    '/payments/callback',
-    [PaymentCallbackController::class, 'handle']
-);
 
 // Version de l'app mobile - No auth (appelé avant/sans connexion)
 Route::get('/app-version', function () {

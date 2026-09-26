@@ -16,11 +16,7 @@ class GrantSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => ['required', Rule::in([
-                Subscription::PLAN_FREE,
-                Subscription::PLAN_BASIC,
-                Subscription::PLAN_PRO,
-            ])],
+            'plan' => ['required', Rule::in(Subscription::PLANS)],
             // À vie : ignore ends_at.
             'lifetime' => ['sometimes', 'boolean'],
             'starts_at' => ['nullable', 'date'],

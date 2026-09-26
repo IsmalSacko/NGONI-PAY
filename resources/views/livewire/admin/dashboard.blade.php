@@ -37,8 +37,8 @@
             <p class="text-sm text-slate-500 mb-2">Abonnements</p>
             <div class="space-y-1.5">
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-slate-500">Free</span>
-                    <span class="font-medium text-slate-700">{{ $plans['free'] ?? 0 }}</span>
+                    <span class="text-slate-500">Essai</span>
+                    <span class="font-medium text-slate-700">{{ $plans['trial'] ?? 0 }}</span>
                 </div>
                 <div class="flex items-center justify-between text-sm">
                     <span class="text-slate-500">Basic</span>

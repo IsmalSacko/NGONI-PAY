@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Subscriptions;
 use App\Models\Business;
 use App\Models\Subscription;
 use App\Services\SubscriptionRequestService;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class Row extends Component
@@ -12,7 +13,7 @@ class Row extends Component
     public Business $business;
 
     public bool $open = false;
-    public string $plan = 'free';
+    public string $plan = Subscription::PLAN_BASIC;
     public bool $lifetime = false;
     public ?string $endsAt = null;
     public ?string $adminNote = null;
@@ -23,7 +24,7 @@ class Row extends Component
     public function mount(Business $business): void
     {
         $this->business = $business;
-        $this->plan = $business->subscription?->plan ?? 'free';
+        $this->plan = $business->subscription?->plan ?? Subscription::PLAN_BASIC;
     }
 
     public function toggleOpen(): void
@@ -35,7 +36,7 @@ class Row extends Component
     public function grant(): void
     {
         $data = $this->validate([
-            'plan' => ['required', 'in:free,basic,pro'],
+            'plan' => ['required', Rule::in(Subscription::PLANS)],
             'lifetime' => ['boolean'],
             'endsAt' => ['nullable', 'date'],
             'adminNote' => ['nullable', 'string', 'max:255'],
@@ -72,23 +73,10 @@ class Row extends Component
 
     public function revoke(): void
     {
-        $subscription = $this->business->subscription;
-
-        if ($subscription) {
-            $subscription->update([
-                'plan' => Subscription::PLAN_FREE,
-                'is_active' => true,
-                'is_manual' => false,
-                'granted_by' => null,
-                'admin_note' => null,
-                'starts_at' => now(),
-                'ends_at' => now(),
-            ]);
-        }
+        $this->business->subscription?->expireNow();
 
         $this->business->refresh();
-        $this->plan = 'free';
-        $this->message = "Override retiré.";
+        $this->message = 'Abonnement révoqué : encaissement bloqué.';
         $this->messageType = 'status';
     }
 

@@ -14,6 +14,8 @@ class SubscriptionResource extends JsonResource
             'starts_at' => $this->starts_at,
             'ends_at' => $this->ends_at,
             'is_active' => $this->is_active,
+            // Source de vérité pour l'app : false => plus aucun encaissement.
+            'is_currently_active' => $this->isCurrentlyActive(),
         ];
     }
 }

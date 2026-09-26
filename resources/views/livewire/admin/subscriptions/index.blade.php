@@ -1,4 +1,15 @@
 <div>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-xl border border-emerald-200 p-4">
+            <p class="text-xs text-slate-500">Actifs (essai ou plan en cours)</p>
+            <p class="text-xl font-semibold text-emerald-600 mt-1">{{ $summary['active'] }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-red-200 p-4">
+            <p class="text-xs text-slate-500">Expirés (encaissement bloqué)</p>
+            <p class="text-xl font-semibold text-red-600 mt-1">{{ $summary['expired'] }}</p>
+        </div>
+    </div>
+
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <div class="bg-white rounded-xl border border-slate-200 p-4">
             <p class="text-xs text-slate-500">Entreprises</p>
@@ -9,8 +20,8 @@
             <p class="text-xl font-semibold text-slate-900 mt-1">{{ $summary['total_subscriptions'] }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">Free</p>
-            <p class="text-xl font-semibold text-slate-500 mt-1">{{ $summary['free'] }}</p>
+            <p class="text-xs text-slate-500">Essai</p>
+            <p class="text-xl font-semibold text-slate-500 mt-1">{{ $summary['trial'] }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4">
             <p class="text-xs text-slate-500">Basic</p>

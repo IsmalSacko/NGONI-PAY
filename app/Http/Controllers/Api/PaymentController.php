@@ -5,11 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Models\Client;
 use App\Models\Payment;
 use App\Models\Business;
-use App\Models\SubscriptionPlan;
 use App\Enums\Country;
 use App\Support\Money\Currencies;
 use App\Support\Phone\PhoneNumber;
-use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -18,11 +16,10 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Http\Requests\Payment\StorePaymentRequest;
-use App\Services\Payments\PayDunyaClient;
 
 class PaymentController extends Controller
 {
-    public function store(StorePaymentRequest $request, Business $business,PayDunyaClient $payDunyaCli)
+    public function store(StorePaymentRequest $request, Business $business)
     {
         // Sécurité : seul le propriétaire ou un membre du staff peut encaisser.
         $this->authorizeMember($business, $request);
@@ -30,7 +27,7 @@ class PaymentController extends Controller
         // Idempotence : le client mobile rejoue la même requête quand la réponse
         // s'est perdue (réseau instable, file hors ligne). Si ce paiement a déjà
         // été enregistré, on renvoie l'existant au lieu d'en créer un second.
-        // Le contrôle passe AVANT les quotas d'abonnement : un rejeu ne doit pas
+        // Le contrôle passe AVANT celui de l'abonnement : un rejeu ne doit pas
         // être refusé par une limite que la création initiale a déjà consommée.
         $idempotencyKey = $this->idempotencyKey($request);
 
@@ -40,6 +37,19 @@ class PaymentController extends Controller
             if ($existing) {
                 return new PaymentResource($existing->load('client'));
             }
+        }
+
+        // Pas d'abonnement en cours (essai terminé, plan expiré ou révoqué) :
+        // aucun encaissement, quel que soit le moyen. Il n'y a pas de palier gratuit.
+        $subscription = $business->subscription;
+
+        if (! $subscription || ! $subscription->isCurrentlyActive()) {
+            return response()->json([
+                'message' => $subscription?->isTrial()
+                    ? 'Votre essai gratuit est terminé. Abonnez-vous pour continuer à encaisser.'
+                    : 'Votre abonnement a expiré. Renouvelez-le pour continuer à encaisser.',
+                'code' => 'SUBSCRIPTION_EXPIRED',
+            ], 403);
         }
 
         // Client existant
@@ -67,75 +77,8 @@ class PaymentController extends Controller
                 'method' => ["Le champ 'method' est requis."],
             ]);
         }
-        $subscription = $business->subscription;
-
-        // Aucun abonnement actif
-        if (! $subscription || ! $subscription->is_active) {
-            abort(403, 'Aucun abonnement actif');
-        }
-
-        // Si abonnement expiré, rétrograder immédiatement en Free sans relancer d'essai.
-        if ($subscription->ends_at && Carbon::parse($subscription->ends_at)->endOfDay()->lt(Carbon::now())) {
-            if ($subscription->plan !== 'free') {
-                $subscription->update([
-                    'plan' => 'free',
-                    'is_active' => true,
-                    'starts_at' => now(),
-                    'ends_at' => now(),
-                ]);
-                $subscription->refresh();
-            }
-        }
-
-        $isFreePlan = $subscription->plan === 'free';
-        $isFreeTrialExpired = $isFreePlan
-            && $subscription->ends_at
-            && Carbon::parse($subscription->ends_at)->endOfDay()->lt(Carbon::now());
-
-        if ($isFreeTrialExpired && $method !== 'cash') {
-            return response()->json([
-                'message' => 'Période d’essai Free expirée. Passez au plan Basic ou Pro pour les paiements en ligne.',
-                'code' => 'FREE_TRIAL_EXPIRED',
-            ], 403);
-        }
-
-        $provider = ($method === 'cash' || $isFreePlan) ? null : 'paydunya';
-
-        // FREE → pas de PayDunya (paiement enregistré comme offline)
-
-        // Quota mensuel de paiements en ligne, tenu par le plan.
-        //
-        // Il était écrit ici — « Basic → 5 » — tandis que la description du plan
-        // vit en base depuis que l'exploitant la tient : un plan annonçant dix
-        // paiements en aurait laissé passer cinq. `null` vaut « sans limite ».
-        $plan = SubscriptionPlan::byCode($subscription->plan);
-
-        // La condition porte sur `$provider`, pas sur la méthode : un plan
-        // gratuit enregistre un paiement mobile money **hors ligne**, sans
-        // passer par le fournisseur, et n'a donc aucun quota à consommer.
-        if ($plan !== null && $provider === 'paydunya') {
-            $usedThisMonth = Payment::where('business_id', $business->id)
-                ->where('purpose', Payment::PURPOSE_SALE)
-                ->where('provider', 'paydunya')
-                ->where('status', 'success')
-                ->whereBetween('paid_at', [
-                    Carbon::now()->startOfMonth(),
-                    Carbon::now()->endOfMonth(),
-                ])
-                ->count();
-
-            if (! $plan->allowsOnlinePayment($usedThisMonth)) {
-                $quota = $plan->monthly_online_payments;
-
-                return response()->json([
-                    'message' => $quota === 0
-                        ? "Le plan {$plan->name} n'inclut pas les paiements en ligne."
-                        : "Limite mensuelle atteinte ($quota paiements en ligne).",
-                    'code' => 'PAYMENT_LIMIT_REACHED',
-                ], 403);
-            }
-        }
-
+        // Tous les moyens (espèces, Orange Money, Wave, Moov, virement) sont de
+        // simples déclarations : aucun appel à un prestataire, paiement réussi d'office.
         try {
             $payment = Payment::create([
                 'business_id' => $business->id,
@@ -149,11 +92,11 @@ class PaymentController extends Controller
                 // Conakry.
                 'currency' => Currencies::normalize($business->currency),
                 'method' => $method,
-                'provider' => $provider,
+                'provider' => null,
                 'transaction_ref' => (string) Str::uuid(),
                 'idempotency_key' => $idempotencyKey,
-                'status' => $provider === null ? 'success' : 'pending',
-                'paid_at' => $provider === null ? now() : null,
+                'status' => 'success',
+                'paid_at' => now(),
             ]);
         } catch (UniqueConstraintViolationException $e) {
             // Deux requêtes portant la même clé sont arrivées en parallèle : la
@@ -169,44 +112,14 @@ class PaymentController extends Controller
             return new PaymentResource($existing->load('client'));
         }
 
-               if ($provider === 'paydunya') {
-            $response = $payDunyaCli->createInvoice($payment, $client);
-
-            if (! $response['successful']) {
-                Log::warning('PayDunya invoice creation failed', [
-                    'payment_id' => $payment->id,
-                    'status' => $response['status'],
-                    'response' => $response['data'],
-                ]);
-
-                throw ValidationException::withMessages([
-                    'payment' => [
-                        data_get($response, 'data.message')
-                        ?? data_get($response, 'data.response_text')
-                            ?? data_get($response, 'data.response_code')
-                            ?? 'Impossible de créer la facture PayDunya pour le moment.',
-                    ],
-                ]);
-
-            }
-
-            $payment->update([
-                'provider_reference' => data_get($response['data'], 'token')
-                    ?? data_get($response['data'], 'response_code'),
-                'provider_checkout_url' => data_get($response['data'], 'invoice_url')
-                    ?? data_get($response['data'], 'redirect_url')
-                    ?? data_get($response['data'], 'response_text'),
-            ]);
-        } else {
-            $payment->invoice()->firstOrCreate(
-                ['payment_id' => $payment->id],
-                [
-                    'invoice_number' => 'NGONI-FACTURE-' . now()->format('Ymd') . '-' . $payment->id,
-                    'total_amount' => $payment->amount,
-                    'sent_via' => 'none',
-                ]
-            );
-        }
+        $payment->invoice()->firstOrCreate(
+            ['payment_id' => $payment->id],
+            [
+                'invoice_number' => 'NGONI-FACTURE-' . now()->format('Ymd') . '-' . $payment->id,
+                'total_amount' => $payment->amount,
+                'sent_via' => 'none',
+            ]
+        );
 
         return new PaymentResource($payment->load('client'));
     }

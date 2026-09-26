@@ -28,7 +28,7 @@ beforeEach(function () {
 
     Subscription::create([
         'business_id' => $this->business->id,
-        'plan' => 'free',
+        'plan' => 'trial',
         'starts_at' => now()->subDay(),
         'ends_at' => now()->addDays(5),
         'is_active' => true,

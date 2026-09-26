@@ -13,8 +13,9 @@
             <h2 class="font-semibold text-slate-900 mb-3">Informations</h2>
             <dl class="text-sm space-y-2">
                 <div class="flex justify-between"><dt class="text-slate-500">Secteur</dt><dd class="text-slate-700">{{ \App\Enums\BusinessType::labelFor($business->type) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-500">Téléphone</dt><dd class="text-slate-700">{{ $business->phone ?? '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-500">Téléphone</dt><dd class="text-slate-700"><x-admin.phone :phone="$business->phone" /></dd></div>
                 <div class="flex justify-between"><dt class="text-slate-500">Propriétaire</dt><dd class="text-slate-700">{{ $business->owner?->name ?? '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-500">Tél. propriétaire</dt><dd class="text-slate-700"><x-admin.phone :phone="$business->owner?->phone" /></dd></div>
                 <div class="flex justify-between items-center"><dt class="text-slate-500">Statut</dt>
                     <dd>
                         @if ($business->is_active)
@@ -40,13 +41,9 @@
             <p class="text-sm text-slate-500 mb-4">
                 Actuel :
                 <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 align-middle">
-                    {{ $business->subscription?->plan ?? 'free' }}
+                    {{ $business->subscription?->plan === 'trial' ? 'essai' : ($business->subscription?->plan ?? '—') }}
                 </span>
-                @if ($business->subscription?->ends_at)
-                    <span class="text-slate-400">— jusqu'au {{ \Illuminate\Support\Carbon::parse($business->subscription->ends_at)->format('d/m/Y') }}</span>
-                @elseif ($business->subscription?->is_manual)
-                    <span class="text-slate-400">— à vie</span>
-                @endif
+                <x-admin.subscription-status :subscription="$business->subscription" />
             </p>
 
             <form wire:submit="grantSubscription" class="space-y-3">
@@ -54,7 +51,7 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-500 mb-1">Plan</label>
                         <select wire:model="plan" class="w-full rounded-lg border-slate-300 px-3 py-2 text-base sm:text-sm focus:border-indigo-500 focus:ring-indigo-500/20">
-                            <option value="free">Free</option>
+                            <option value="trial">Essai (prolonger)</option>
                             <option value="basic">Basic</option>
                             <option value="pro">Pro</option>
                         </select>
@@ -77,9 +74,9 @@
                     <button type="submit" class="rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:from-violet-500 hover:to-indigo-500 transition">
                         Accorder / mettre à jour
                     </button>
-                    <button type="button" wire:click="revokeSubscription" wire:confirm="Retirer l'override et repasser en free ?"
+                    <button type="button" wire:click="revokeSubscription" wire:confirm="Mettre fin à l'abonnement maintenant ? L'entreprise ne pourra plus encaisser."
                             class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
-                        Révoquer l'override
+                        Révoquer l'abonnement
                     </button>
                 </div>
             </form>
@@ -117,7 +114,7 @@
                     @forelse ($staff as $member)
                         <tr class="hover:bg-slate-50/60">
                             <td class="px-4 py-2.5 text-slate-900 font-medium">{{ $member->name }}</td>
-                            <td class="px-4 py-2.5 text-slate-600">{{ $member->phone ?? '—' }}</td>
+                            <td class="px-4 py-2.5 text-slate-600"><x-admin.phone :phone="$member->phone" /></td>
                             <td class="px-4 py-2.5">
                                 <span class="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">{{ $member->pivot->role }}</span>
                             </td>

@@ -38,7 +38,7 @@ beforeEach(function () {
 
     Subscription::create([
         'business_id' => $this->business->id,
-        'plan' => 'free',
+        'plan' => 'trial',
         'starts_at' => now()->subDays(2),
         'ends_at' => now()->addDays(5),
         'is_active' => true,
@@ -51,21 +51,19 @@ it('n’active pas un plan payant sur une déclaration de paiement en espèces',
     $response = $this->postJson("/api/businesses/{$this->business->id}/subscription", [
         'plan' => 'pro',
         'method' => 'cash',
-        'starts_at' => now()->toDateString(),
     ]);
 
     $response->assertStatus(202)
         ->assertJsonPath('code', 'SUBSCRIPTION_PENDING_VALIDATION');
 
     // Le plan n'a pas bougé : il s'activait pour un mois, gratuitement.
-    expect($this->business->fresh()->subscription->plan)->toBe('free');
+    expect($this->business->fresh()->subscription->plan)->toBe('trial');
 });
 
 it('enregistre une demande à instruire, et aucun encaissement', function () {
     $this->postJson("/api/businesses/{$this->business->id}/subscription", [
         'plan' => 'basic',
         'method' => 'cash',
-        'starts_at' => now()->toDateString(),
     ])->assertStatus(202);
 
     // La demande existe — l'exploitant doit la retrouver — avec le montant figé
@@ -94,7 +92,7 @@ it('refuse au propriétaire de modifier son propre abonnement', function () {
         ['plan' => 'pro', 'is_active' => true, 'ends_at' => '2030-01-01'],
     )->assertStatus(403);
 
-    expect($subscription->fresh()->plan)->toBe('free');
+    expect($subscription->fresh()->plan)->toBe('trial');
 });
 
 it('laisse un administrateur accorder un plan', function () {
@@ -282,7 +280,7 @@ it('active le plan quand l’administrateur approuve, et pas avant', function ()
 
     $demandeId = $reponse->json('data.id');
 
-    expect($this->business->fresh()->subscription->plan)->toBe('free');
+    expect($this->business->fresh()->subscription->plan)->toBe('trial');
 
     $admin = User::factory()->create(['role' => 'system_admin']);
     Sanctum::actingAs($admin);
@@ -321,7 +319,7 @@ it('refuse une demande avec un motif que le commerçant verra', function () {
         ->assertJsonPath('data.status', 'refused')
         ->assertJsonPath('data.decision_note', 'Aucun paiement reçu');
 
-    expect($this->business->fresh()->subscription->plan)->toBe('free');
+    expect($this->business->fresh()->subscription->plan)->toBe('trial');
 });
 
 it('ne tranche pas deux fois la même demande', function () {
@@ -350,7 +348,7 @@ it('interdit à un commerçant d’instruire une demande', function () {
     $this->postJson("/api/admin/subscription-requests/{$demandeId}/approve")
         ->assertStatus(403);
 
-    expect($this->business->fresh()->subscription->plan)->toBe('free');
+    expect($this->business->fresh()->subscription->plan)->toBe('trial');
 });
 
 it('laisse le commerçant retirer sa demande', function () {
