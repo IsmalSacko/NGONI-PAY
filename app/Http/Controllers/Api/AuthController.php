@@ -87,7 +87,12 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load('boutique');
+        $user = $request->user();
+        $boutiqueId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+
+        // `boutique` : la boutique active de la requête (en-tête X-Boutique),
+        // pas forcément celle par défaut du compte.
+        $user->setRelation('boutique', \App\Models\Boutique::find($boutiqueId));
 
         return response()->json([
             'user' => $user,

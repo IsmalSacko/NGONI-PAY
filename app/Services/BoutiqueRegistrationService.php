@@ -58,8 +58,53 @@ class BoutiqueRegistrationService
             ]);
             $user->assignRole('admin');
 
-            return ['boutique' => $boutique, 'user' => $user->fresh()];
+            $boutique->update(['proprietaire_id' => $user->id]);
+
+            return ['boutique' => $boutique->fresh(), 'user' => $user->fresh()];
         });
+    }
+
+    /**
+     * Nouvelle boutique pour un compte existant, qui en devient propriétaire et
+     * administrateur. Sa boutique par défaut ne change pas.
+     *
+     * @param  array{nom: string, pays: ?string, telephone: ?string, email: ?string, adresse: ?string}  $data
+     */
+    public function ajouterBoutique(User $proprietaire, array $data): Boutique
+    {
+        $equipePrecedente = app(PermissionRegistrar::class)->getPermissionsTeamId();
+        $tenantPrecedent = $this->tenant->boutiqueId();
+
+        try {
+            return DB::transaction(function () use ($proprietaire, $data): Boutique {
+                $pays = Country::tryFrom(strtoupper((string) ($data['pays'] ?? ''))) ?? Country::default();
+
+                $boutique = Boutique::create([
+                    'proprietaire_id' => $proprietaire->id,
+                    'nom' => $data['nom'],
+                    'pays' => $pays->value,
+                    'devise' => $pays->currency(),
+                    'telephone' => filled($data['telephone'] ?? null)
+                        ? PhoneNumber::normalize((string) $data['telephone'], $pays)
+                        : $proprietaire->phone,
+                    'email' => $data['email'] ?? $proprietaire->email,
+                    'adresse' => $data['adresse'] ?? null,
+                ]);
+
+                $this->tenant->setBoutique($boutique->id);
+                app(PermissionRegistrar::class)->setPermissionsTeamId($boutique->id);
+
+                $this->provisionnerRoles($boutique);
+                $proprietaire->unsetRelation('roles')->assignRole('admin');
+
+                return $boutique;
+            });
+        } finally {
+            // La requête continue dans la boutique où elle avait commencé.
+            $this->tenant->setBoutique($tenantPrecedent);
+            app(PermissionRegistrar::class)->setPermissionsTeamId($equipePrecedente);
+            $proprietaire->unsetRelation('roles')->unsetRelation('permissions');
+        }
     }
 
     private function provisionnerRoles(Boutique $boutique): void

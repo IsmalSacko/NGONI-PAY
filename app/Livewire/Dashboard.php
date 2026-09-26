@@ -8,7 +8,6 @@ use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\LigneVente;
 use App\Models\Produit;
 use App\Models\Vente;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -19,7 +18,7 @@ class Dashboard extends Component
 
     public function render()
     {
-        $boutique = Auth::user()->boutique;
+        $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
         $ventesJour = Vente::whereDate('created_at', today())->get();
 
         $total = (int) $ventesJour->sum('total');

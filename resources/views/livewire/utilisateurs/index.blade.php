@@ -7,13 +7,25 @@
         <button wire:click="nouveauCompte" class="h-12 px-5 rounded-xl bg-accent text-white font-bold">+ Nouveau compte</button>
     </div>
 
+    @if ($info)
+        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $info }}</p>
+    @endif
+    @if ($alerte)
+        <p class="rounded-xl bg-[--color-danger-bg] text-[--color-danger-fg] px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>
+    @endif
+
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_120px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_220px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Nom</span><span>Téléphone</span><span>Rôle</span><span>Statut</span><span></span>
         </div>
         @foreach ($membres as $membre)
-            <div class="grid grid-cols-[2fr_1fr_1fr_1fr_120px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
-                <span class="font-bold">{{ $membre->name }}</span>
+            <div class="grid grid-cols-[2fr_1fr_1fr_1fr_220px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+                <span class="font-bold">
+                    {{ $membre->name }}
+                    @if ($membre->id === $proprietaireId)
+                        <span class="ml-1 text-xs font-bold text-[--color-muted]">(propriétaire)</span>
+                    @endif
+                </span>
                 <span>{{ $membre->phone }}</span>
                 <span>{{ $membre->roles->pluck('name')->map(fn ($r) => ['admin' => 'Admin', 'gerant' => 'Gérant', 'caissier' => 'Caissier'][$r] ?? $r)->join(', ') ?: '—' }}</span>
                 <span>
@@ -23,10 +35,16 @@
                         <span class="text-xs font-bold rounded px-2 py-1 bg-[#F1EDE4] text-[--color-muted]">Désactivé</span>
                     @endif
                 </span>
-                @if ($membre->id !== auth()->id())
-                    <button wire:click="basculerActivation('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold justify-self-end">
-                        {{ $membre->is_active ? 'Désactiver' : 'Réactiver' }}
-                    </button>
+                @if ($membre->id !== auth()->id() && $membre->id !== $proprietaireId)
+                    <div class="flex gap-2 justify-self-end">
+                        <button wire:click="retirer('{{ $membre->id }}')" wire:confirm="Retirer {{ $membre->name }} de l’équipe de cette boutique ?"
+                                class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Retirer</button>
+                        <button wire:click="basculerActivation('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">
+                            {{ $membre->is_active ? 'Désactiver' : 'Réactiver' }}
+                        </button>
+                    </div>
+                @else
+                    <span></span>
                 @endif
             </div>
         @endforeach
@@ -48,7 +66,7 @@
                         @error('telephone') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-1">Mot de passe</label>
+                        <label class="block text-sm font-semibold mb-1">Mot de passe <span class="font-normal text-[--color-muted]">(inutile si le numéro a déjà un compte)</span></label>
                         <input wire:model="password" type="password" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
                         @error('password') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>

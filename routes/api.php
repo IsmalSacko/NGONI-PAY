@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
@@ -22,6 +23,12 @@ Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiser
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
+
+    // Boutiques du compte. Toute personne connectée peut voir les siennes et en
+    // créer une (elle en devient propriétaire) ; les limites viennent du plan.
+    Route::get('boutiques', [BoutiqueController::class, 'index']);
+    Route::post('boutiques', [BoutiqueController::class, 'store']);
+    Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
 

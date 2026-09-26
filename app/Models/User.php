@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -43,5 +45,41 @@ class User extends Authenticatable
     public function boutique(): BelongsTo
     {
         return $this->belongsTo(Boutique::class);
+    }
+
+    /**
+     * Boutiques où ce compte a un rôle (admin, gérant ou caissier).
+     *
+     * L'appartenance EST le rôle : Spatie range les rôles par boutique
+     * (équipe), si bien qu'un même compte peut être admin de sa boutique et
+     * caissier d'une autre.
+     *
+     * @return list<string>
+     */
+    public function boutiqueIds(): array
+    {
+        return DB::table(config('permission.table_names.model_has_roles'))
+            ->where('model_type', $this->getMorphClass())
+            ->where(config('permission.column_names.model_morph_key'), $this->getKey())
+            ->distinct()
+            ->pluck(config('permission.column_names.team_foreign_key'))
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    public function appartientA(?string $boutiqueId): bool
+    {
+        return $boutiqueId !== null && in_array($boutiqueId, $this->boutiqueIds(), true);
+    }
+
+    /**
+     * Boutiques dont ce compte est propriétaire.
+     *
+     * @return HasMany<Boutique, $this>
+     */
+    public function boutiquesPossedees(): HasMany
+    {
+        return $this->hasMany(Boutique::class, 'proprietaire_id');
     }
 }

@@ -27,6 +27,20 @@ Route::post('deconnexion', function () {
     return redirect()->route('connexion');
 })->middleware('auth')->name('deconnexion');
 
+// Change la boutique de travail du back-office (gardée en session), si le compte
+// y a un rôle. Elle devient aussi sa boutique par défaut.
+Route::post('boutique-active', function () {
+    $boutique = (string) request('boutique');
+    $user = Auth::user();
+
+    abort_unless($user->appartientA($boutique), 403, 'Vous n’avez pas accès à cette boutique.');
+
+    session([\App\Support\Tenancy\BoutiqueActive::CLE_SESSION => $boutique]);
+    $user->update(['boutique_id' => $boutique]);
+
+    return redirect()->route('tableau-de-bord');
+})->middleware('auth')->name('boutique-active');
+
 Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::get('tableau-de-bord', Dashboard::class)->name('tableau-de-bord')->middleware('permission:dashboard.view');
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
@@ -21,11 +22,21 @@ use Illuminate\Support\Facades\Storage;
  * pour la même raison que {@see User} : elle EST le tenant, elle ne lui
  * appartient pas.
  */
-#[Fillable(['nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo'])]
+#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo'])]
 class Boutique extends Model
 {
     /** @use HasFactory<BoutiqueFactory> */
     use HasFactory, HasUuids, SoftDeletes;
+
+    /**
+     * Compte propriétaire : il porte l'abonnement de toutes ses boutiques.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function proprietaire(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'proprietaire_id');
+    }
 
     /**
      * @return HasMany<User, $this>

@@ -43,6 +43,27 @@
         </nav>
 
         <main class="flex-grow min-w-0 p-8">
+            @php
+                $boutiqueActiveId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+                $mesBoutiques = \App\Models\Boutique::whereIn('id', auth()->user()->boutiqueIds())->orderBy('nom')->get(['id', 'nom']);
+            @endphp
+            {{-- Boutique de travail : un compte peut en gérer plusieurs. --}}
+            <div class="flex justify-end mb-4">
+                @if ($mesBoutiques->count() > 1)
+                    <form method="POST" action="{{ route('boutique-active') }}" class="flex items-center gap-2 text-sm">
+                        @csrf
+                        <label for="boutique-active" class="text-[--color-muted] font-semibold">Boutique</label>
+                        <select id="boutique-active" name="boutique" onchange="this.form.submit()"
+                                class="h-10 px-3 rounded-xl border border-[--color-border-strong] bg-white font-semibold">
+                            @foreach ($mesBoutiques as $b)
+                                <option value="{{ $b->id }}" @selected($b->id === $boutiqueActiveId)>{{ $b->nom }}</option>
+                            @endforeach
+                        </select>
+                    </form>
+                @else
+                    <span class="text-sm font-semibold text-[--color-muted]">{{ $mesBoutiques->first()?->nom }}</span>
+                @endif
+            </div>
             {{ $slot }}
         </main>
     </div>

@@ -75,11 +75,12 @@ class Index extends Component
         Auth::user()->can($this->produitId ? 'produits.update' : 'produits.create') || abort(403);
 
         $data = $this->validate([
-            'categorie_produit_id' => ['nullable', 'uuid', 'exists:categories_produits,id'],
+            // Filtrée par boutique : `exists` seul accepterait la catégorie d'une autre.
+            'categorie_produit_id' => ['nullable', 'uuid', Rule::exists('categories_produits', 'id')->where('boutique_id', $this->boutiqueActiveId())->whereNull('deleted_at')],
             'nom' => ['required', 'string', 'max:255'],
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
-            'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', Auth::user()->boutique_id)->ignore($this->produitId)],
+            'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', $this->boutiqueActiveId())->ignore($this->produitId)],
             'prix_vente' => ['required', 'integer', 'min:0'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'integer', 'min:0'],

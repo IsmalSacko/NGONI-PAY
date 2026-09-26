@@ -4,36 +4,34 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\BoutiqueActive;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
-use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Établit le contexte tenant après authentification Sanctum.
+ * Établit le contexte tenant après authentification.
  *
- * Lit la boutique de l'utilisateur authentifié, l'injecte dans le
- * {@see TenantContext} (utilisé par le Global Scope) et dans Spatie
- * (équipe = boutique) pour l'isolation des rôles/permissions entre
- * boutiques.
+ * API : la boutique demandée par l'en-tête `X-Boutique` (refusée si le compte
+ * n'y a pas de rôle). Back-office : celle gardée en session. À défaut, la
+ * boutique par défaut du compte. Voir {@see BoutiqueActive}.
  */
 class SetTenantContext
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly BoutiqueActive $boutiqueActive) {}
 
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if ($user !== null && $user->boutique_id !== null) {
-            $this->tenant->setBoutique($user->boutique_id);
+        if ($user !== null) {
+            $enTete = $request->header(BoutiqueActive::EN_TETE);
 
-            if (App::bound(PermissionRegistrar::class)) {
-                app(PermissionRegistrar::class)
-                    ->setPermissionsTeamId($user->boutique_id);
-            }
+            $this->boutiqueActive->poser(
+                $user,
+                $enTete ?? ($request->hasSession() ? $request->session()->get(BoutiqueActive::CLE_SESSION) : null),
+                strict: $enTete !== null,
+            );
         }
 
         return $next($request);
