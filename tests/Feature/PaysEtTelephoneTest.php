@@ -57,4 +57,17 @@ class PaysEtTelephoneTest extends TestCase
             ->assertJsonFragment(['code' => 'CI', 'indicatif' => '225', 'devise' => 'XOF'])
             ->assertJsonFragment(['code' => 'GN', 'devise' => 'GNF']);
     }
+
+    public function test_la_version_d_application_garde_le_format_de_ngoni_pay(): void
+    {
+        // Les applications Ngoni Pay 1.x lisent ces trois champs pour proposer,
+        // puis imposer, la mise à jour.
+        $this->getJson('/api/app-version')
+            ->assertOk()
+            ->assertExactJson([
+                'latest_version' => '2.0.0',
+                'store_url' => 'https://play.google.com/store/apps/details?id=com.ismaeldev.ngonipay',
+                'minimum_version' => '2.0.0',
+            ]);
+    }
 }

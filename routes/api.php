@@ -15,6 +15,15 @@ use App\Http\Controllers\Api\VenteController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('pays', [PaysController::class, 'index']);
+
+// Version de l'application. Même adresse et même format que Ngoni Pay : c'est
+// ce qui annonce aux applications Ngoni Pay 1.x qu'elles doivent se mettre à
+// jour (et devenir e-caisse) après la bascule.
+Route::get('app-version', fn () => response()->json([
+    'latest_version' => config('mobile.latest_version'),
+    'store_url' => config('mobile.store_url'),
+    'minimum_version' => config('mobile.minimum_version'),
+]));
 // Catalogue public des plans : l'écran d'abonnement s'affiche même abonnement expiré.
 Route::get('plans', [AbonnementController::class, 'plans']);
 Route::post('inscription', [AuthController::class, 'register']);
