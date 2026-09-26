@@ -15,22 +15,23 @@
     </div>
 
     <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher un article…"
-           class="w-96 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
+           class="w-full md:w-96 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
-        <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
+        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span>Catégorie</span><span class="text-right">Vente</span><span class="text-right">TVA</span><span class="text-right">Stock</span><span></span>
         </div>
         @foreach ($produits as $produit)
-            <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            {{-- Téléphone : nom et prix, puis stock et actions. --}}
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <div class="flex flex-col">
                     <span class="font-bold">{{ $produit->nom }}</span>
                     <span class="text-xs text-[--color-muted]">{{ $produit->format }}</span>
                 </div>
-                <span>{{ $produit->categorie?->nom ?? '—' }}</span>
+                <span class="hidden md:block">{{ $produit->categorie?->nom ?? '—' }}</span>
                 <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}</span>
-                <span class="text-right">{{ rtrim(rtrim((string) $produit->taux_tva, '0'), '.') ?: '0' }} %</span>
-                <span class="text-right font-semibold {{ $produit->estEnRupture() ? 'text-danger-fg' : ($produit->stockFaible() ? 'text-warn-fg' : '') }}">{{ $produit->stock }}</span>
+                <span class="hidden md:block text-right">{{ rtrim(rtrim((string) $produit->taux_tva, '0'), '.') ?: '0' }} %</span>
+                <span class="md:text-right font-semibold {{ $produit->estEnRupture() ? 'text-danger-fg' : ($produit->stockFaible() ? 'text-warn-fg' : '') }}"><span class="md:hidden font-normal text-[--color-muted]">Stock </span>{{ $produit->stock }}</span>
                 <div class="flex gap-2 justify-end">
                     @can('produits.update')
                         <button wire:click="modifier('{{ $produit->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Modifier</button>

@@ -5,7 +5,7 @@
             <p class="text-sm text-muted">Tous les comptes de la plateforme.</p>
         </div>
         <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Nom, téléphone, e-mail…"
-               class="w-80 h-11 px-4 rounded-xl border border-border-strong">
+               class="w-full md:w-80 h-11 px-4 rounded-xl border border-border-strong">
     </div>
 
     @if ($alerte)<p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>@endif

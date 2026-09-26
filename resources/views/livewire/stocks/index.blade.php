@@ -19,10 +19,10 @@
         </div>
     </div>
 
-    <div class="flex gap-3 items-center">
+    <div class="flex flex-wrap gap-3 items-center">
         <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher un article…"
-               class="w-80 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
-        <div class="flex gap-2">
+               class="w-full md:w-80 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
+        <div class="flex flex-wrap gap-2">
             @foreach (['tous' => 'Tous', 'bas' => 'Stock bas', 'rupture' => 'Ruptures'] as $valeur => $label)
                 <button wire:click="$set('filtre', '{{ $valeur }}')"
                         class="h-11 px-4 rounded-full text-sm font-bold {{ $filtre === $valeur ? 'bg-ink text-white' : 'bg-white border border-[--color-border-strong]' }}">
@@ -32,15 +32,16 @@
         </div>
     </div>
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
-        <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
+        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span class="text-right">Stock</span><span class="text-right">Seuil</span><span>Statut</span><span></span>
         </div>
         @forelse ($produits as $produit)
-            <div class="grid min-w-[680px] grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            {{-- Téléphone : une carte par article (nom, stock / seuil, statut, Ajuster). --}}
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_100px] gap-x-3 gap-y-1 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <span class="font-bold">{{ $produit->nom }}</span>
-                <span class="text-right font-semibold">{{ $produit->stock }}</span>
-                <span class="text-right text-[--color-muted]">{{ $produit->seuil_alerte }}</span>
+                <span class="text-right font-semibold"><span class="md:hidden text-[--color-muted] font-normal">Stock </span>{{ $produit->stock }}</span>
+                <span class="hidden md:block text-right text-[--color-muted]">{{ $produit->seuil_alerte }}</span>
                 <span>
                     @if ($produit->estEnRupture())
                         <span class="text-xs font-bold rounded px-2 py-1 bg-danger-bg text-danger-fg">Rupture</span>

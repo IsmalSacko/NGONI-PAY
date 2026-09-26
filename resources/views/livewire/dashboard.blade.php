@@ -28,13 +28,14 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <section class="lg:col-span-2 bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold text-base mb-3">Ventes par heure</h2>
-            <div class="flex items-end gap-2 h-40">
+            <div class="flex items-end gap-1 md:gap-2 h-40">
                 @foreach ($ventesParHeure as $point)
-                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                    <div class="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-1">
                         <div class="w-full rounded-t {{ $point['total'] === $maxHeure && $point['total'] > 0 ? 'bg-accent' : 'bg-accent-soft' }}"
                              style="height: {{ $maxHeure > 0 ? max(2, round($point['total'] / $maxHeure * 100)) : 0 }}%"
                              title="{{ $point['heure'] }}h : {{ \App\Support\Money\Montant::format($point['total']) }}"></div>
-                        <span class="text-[10px] text-[--color-muted]">{{ $point['heure'] }}h</span>
+                        {{-- Téléphone : une heure sur trois, sinon les libellés se chevauchent. --}}
+                        <span class="text-[10px] text-[--color-muted] {{ $loop->index % 3 === 0 ? '' : 'invisible md:visible' }}">{{ $point['heure'] }}h</span>
                     </div>
                 @endforeach
             </div>

@@ -4,14 +4,14 @@
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Comptes</h1>
             <p class="text-sm text-muted">Propriétaires, leurs boutiques et leur abonnement.</p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
             <select wire:model.live="filtre" class="h-11 px-3 rounded-xl border border-border-strong bg-white">
                 <option value="">Tous</option>
                 <option value="actifs">Actifs</option>
                 <option value="expires">Expirés</option>
             </select>
             <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Nom, téléphone, e-mail, boutique…"
-                   class="w-80 h-11 px-4 rounded-xl border border-border-strong">
+                   class="w-full md:w-80 h-11 px-4 rounded-xl border border-border-strong">
         </div>
     </div>
 

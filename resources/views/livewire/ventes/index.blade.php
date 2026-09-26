@@ -4,17 +4,18 @@
         <span class="text-[--color-muted] text-sm">Historique des tickets encaissés.</span>
     </div>
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
-        <div class="grid min-w-[680px] grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
+        <div class="hidden md:grid grid-cols-[150px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>N°</span><span>Caissier</span><span>Client</span><span>Moyen</span><span class="text-right">Total</span><span></span>
         </div>
         @forelse ($ventes as $vente)
-            <div class="grid min-w-[680px] grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            {{-- Téléphone : numéro et moyen de paiement, puis total et détail. --}}
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[150px_1fr_1fr_1fr_1fr_100px] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
                 <span class="font-mono">{{ $vente->numeroFormate() }}@if ($vente->estAnnulee()) <span class="ml-1 rounded bg-danger-bg px-1.5 text-xs font-bold text-danger-fg">annulée</span>@endif</span>
-                <span>{{ $vente->caissier->name }}</span>
-                <span>{{ $vente->client->nom ?? '—' }}</span>
-                <span>{{ $vente->moyen_paiement->label() }}</span>
-                <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($vente->total) }}</span>
+                <span class="hidden md:block">{{ $vente->caissier->name }}</span>
+                <span class="hidden md:block">{{ $vente->client->nom ?? '—' }}</span>
+                <span class="text-right md:text-left text-[--color-muted] md:text-inherit">{{ $vente->moyen_paiement->label() }}</span>
+                <span class="md:text-right font-bold">{{ \App\Support\Money\Montant::format($vente->total) }}</span>
                 <button wire:click="voir('{{ $vente->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold justify-self-end">Détail</button>
             </div>
         @empty
