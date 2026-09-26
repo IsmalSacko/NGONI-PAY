@@ -13,6 +13,21 @@ use App\Livewire\Ventes\Index as VentesIndex;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
+// Pages publiques reprises de Ngoni Pay : la politique de confidentialité est
+// celle que cite la fiche Play Store, et les annonces pointent sur /telecharger.
+Route::view('privacy', 'privacy')->name('confidentialite');
+
+Route::get('telecharger', fn () => view('telecharger', [
+    'titre' => 'e-caisse — La caisse de votre commerce',
+    'description' => 'Ventes, stocks, reçus et équipe depuis votre téléphone, même hors ligne.',
+    'version' => config('mobile.latest_version'),
+    'storeUrl' => config('mobile.store_url'),
+]))->name('telecharger');
+
+// Anciennes adresses du panneau Ngoni Pay, gardées en favoris.
+Route::redirect('login', '/connexion');
+Route::redirect('admin/{reste?}', '/plateforme')->where('reste', '.*');
+
 Route::get('/', fn () => redirect(auth()->user()?->est_admin_plateforme ? '/plateforme' : '/tableau-de-bord'));
 
 Route::middleware('guest')->group(function (): void {
