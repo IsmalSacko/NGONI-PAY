@@ -7,8 +7,10 @@ namespace App\Services;
 use App\Enums\MoyenPaiement;
 use App\Enums\TypeMouvementStock;
 use App\Models\Boutique;
+use App\Models\Client;
 use App\Models\MouvementStock;
 use App\Models\Produit;
+use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
@@ -207,6 +209,32 @@ class VenteService
 
             if ($vente->estAnnulee()) {
                 throw ValidationException::withMessages(['vente' => ['Cette vente est déjà annulée.']]);
+            }
+
+            // Des chiffres déjà arrêtés ne doivent jamais bouger après coup :
+            // - une journée passée (chiffre d'affaires, rapports) ;
+            if (! $vente->created_at->isSameDay(now())) {
+                throw ValidationException::withMessages(['vente' => [
+                    'Seules les ventes du jour s’annulent : les chiffres des jours précédents sont arrêtés.',
+                ]]);
+            }
+
+            // - une séance de caisse fermée (son écart a été compté) ;
+            $session = $vente->session_caisse_id ? SessionCaisse::find($vente->session_caisse_id) : null;
+            if ($session !== null && ! $session->estOuverte()) {
+                throw ValidationException::withMessages(['vente' => [
+                    'La séance de caisse de cette vente est fermée : son fond a déjà été compté.',
+                ]]);
+            }
+
+            // - une dette déjà remboursée (le client aurait payé pour rien).
+            if ($vente->moyen_paiement === MoyenPaiement::CreditClient && $vente->client_id !== null) {
+                $client = Client::find($vente->client_id);
+                if ($client !== null && $client->soldeDu() < $vente->total) {
+                    throw ValidationException::withMessages(['vente' => [
+                        'Le client a déjà remboursé une partie de ses achats à crédit : annuler cette vente fausserait sa dette.',
+                    ]]);
+                }
             }
 
             $vente->update([

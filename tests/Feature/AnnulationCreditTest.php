@@ -143,4 +143,31 @@ class AnnulationCreditTest extends TestCase
             ->set('reglementMontant', '4000')->call('enregistrerReglement')->assertHasNoErrors();
         $this->assertSame(6000, $fatou->fresh()->soldeDu());
     }
+
+    public function test_une_annulation_ne_touche_jamais_des_chiffres_arretes(): void
+    {
+        // Journée passée.
+        $hier = $this->vendre($this->admin)->json('id');
+        \App\Models\Vente::withoutGlobalScopes()->whereKey($hier)->update(['created_at' => now()->subDay()]);
+        $this->api($this->admin)->postJson("/api/ventes/{$hier}/annuler", ['motif' => 'x'])
+            ->assertUnprocessable()->assertJsonPath('errors.vente.0', 'Seules les ventes du jour s’annulent : les chiffres des jours précédents sont arrêtés.');
+
+        // Séance fermée.
+        $this->api($this->caissier)->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
+        $vente = $this->vendre($this->caissier)->json('id');
+        $session = $this->api($this->caissier)->getJson('/api/sessions-caisse/courante')->json('id');
+        $this->api($this->caissier)->putJson("/api/sessions-caisse/{$session}/fermer", ['fond_final' => 20000])->assertOk();
+        $this->api($this->admin)->postJson("/api/ventes/{$vente}/annuler", ['motif' => 'x'])->assertUnprocessable();
+
+        // Dette déjà en partie remboursée.
+        $this->dans();
+        $fatou = Client::create(['nom' => 'Fatou']);
+        $credit = $this->vendre($this->admin, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->json('id');
+        $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 3000, 'moyen_paiement' => 'especes'])->assertCreated();
+        $this->api($this->admin)->postJson("/api/ventes/{$credit}/annuler", ['motif' => 'x'])->assertUnprocessable();
+
+        // Aucun de ces refus n'a touché au stock ni aux chiffres.
+        $this->assertSame(4, $this->riz->fresh()->stock);
+        $this->assertSame(0, \App\Models\Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
+    }
 }
