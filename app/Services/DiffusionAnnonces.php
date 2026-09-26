@@ -1,0 +1,99 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Mail\AnnonceMail;
+use App\Models\Abonnement;
+use App\Models\Annonce;
+use App\Models\NotificationApp;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+
+/**
+ * Diffuse une annonce : une notification dans l'application pour chaque
+ * destinataire (le canal qui atteint tout le monde), et un e-mail à ceux qui
+ * en ont une adresse si l'annonce le demande.
+ */
+class DiffusionAnnonces
+{
+    /** @return Builder<User> */
+    public function destinataires(Annonce $annonce): Builder
+    {
+        $requete = User::query()->where('is_active', true)->where('est_admin_plateforme', false);
+
+        $abonnes = fn (callable $filtre) => $requete->whereIn('id', Abonnement::query()->tap($filtre)->select('user_id'));
+        $enCours = fn ($q) => $q->where('est_actif', true)->where(fn ($d) => $d->whereNull('fin')->orWhereDate('fin', '>=', today()));
+
+        return match ($annonce->audience) {
+            'selection' => $requete->whereIn('id', $annonce->cibles()->select('users.id')),
+            'essai', 'basic', 'pro' => $abonnes(fn ($q) => $enCours($q->where('plan', $annonce->audience))),
+            'expires' => $abonnes(fn ($q) => $q->where(fn ($e) => $e->where('est_actif', false)->orWhereDate('fin', '<', today()))),
+            default => $requete,
+        };
+    }
+
+    /** @return array{notifies: int, emails: int, echecs: int} */
+    public function diffuser(Annonce $annonce): array
+    {
+        $notifies = $emails = $echecs = 0;
+
+        $this->destinataires($annonce)->orderBy('id')->chunk(200, function ($users) use ($annonce, &$notifies, &$emails, &$echecs): void {
+            foreach ($users as $user) {
+                NotificationApp::create([
+                    'user_id' => $user->id,
+                    'annonce_id' => $annonce->id,
+                    'type' => $annonce->type,
+                    'titre' => $annonce->titre,
+                    'message' => $annonce->version ? "Version {$annonce->version} disponible. {$annonce->message}" : $annonce->message,
+                    'lien' => $annonce->lien,
+                ]);
+                $notifies++;
+
+                if (! $annonce->par_email || blank($user->email)) {
+                    continue;
+                }
+
+                try {
+                    Mail::to($user->email)->send(new AnnonceMail($annonce, $user->name));
+                    $emails++;
+                } catch (\Throwable $e) {
+                    $echecs++;
+                    Log::error("Annonce {$annonce->id} : e-mail non envoyé", ['user_id' => $user->id, 'erreur' => $e->getMessage()]);
+                }
+            }
+        });
+
+        $prochaine = match ($annonce->recurrence) {
+            'hebdomadaire' => now()->addWeek(),
+            'mensuelle' => now()->addMonth(),
+            default => null,
+        };
+
+        $annonce->update([
+            'statut' => $prochaine ? 'programmee' : 'envoyee',
+            'programmee_le' => $prochaine,
+            'derniere_diffusion' => now(),
+            'nb_notifies' => $annonce->nb_notifies + $notifies,
+            'nb_emails' => $annonce->nb_emails + $emails,
+            'nb_echecs' => $annonce->nb_echecs + $echecs,
+        ]);
+
+        return ['notifies' => $notifies, 'emails' => $emails, 'echecs' => $echecs];
+    }
+
+    /** Annonces programmées arrivées à échéance (appelé chaque minute). */
+    public function diffuserLesEcheances(): int
+    {
+        $dues = Annonce::where('statut', 'programmee')->whereNotNull('programmee_le')->where('programmee_le', '<=', now())->get();
+
+        foreach ($dues as $annonce) {
+            $this->diffuser($annonce);
+        }
+
+        return $dues->count();
+    }
+}

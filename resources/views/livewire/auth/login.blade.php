@@ -27,6 +27,8 @@
             @error('password') <p class="text-sm text-[--color-danger-fg] mt-1">{{ $message }}</p> @enderror
         </div>
 
+        <a href="{{ route('mot-de-passe-oublie') }}" class="self-end -mt-2 text-sm text-accent font-semibold">Mot de passe oublié ?</a>
+
         <button type="submit"
                 class="h-12 rounded-xl bg-accent text-white font-bold hover:bg-accent-dark"
                 wire:loading.attr="disabled" wire:target="connexion">

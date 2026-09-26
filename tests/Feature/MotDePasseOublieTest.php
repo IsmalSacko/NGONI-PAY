@@ -136,4 +136,30 @@ class MotDePasseOublieTest extends TestCase
 
         $this->demander()->assertStatus(429);
     }
+
+    public function test_le_site_propose_le_code_par_email_et_whatsapp(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $user = \App\Models\User::factory()->create(['phone' => '+22376123456', 'email' => 'web@example.com']);
+
+        $this->get('/connexion')->assertSee('Mot de passe oublié ?');
+        $this->get('/mot-de-passe-oublie')->assertOk()->assertSee('WhatsApp');
+
+        $code = null;
+        $composant = \Livewire\Livewire::test(\App\Livewire\Auth\MotDePasseOublie::class)
+            ->set('pays', 'ML')->set('telephone', '76 12 34 56')
+            ->call('demander')->assertSet('etape', 'code');
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\CodeReinitialisationMail::class, function ($mail) use (&$code) {
+            $code = $mail->code;
+
+            return $mail->hasTo('web@example.com');
+        });
+
+        $composant->set('code', '000000')->set('password', 'nouveau123')->set('password_confirmation', 'nouveau123')
+            ->call('reinitialiser')->assertHasErrors('code')
+            ->set('code', $code)->call('reinitialiser')->assertHasNoErrors()->assertSet('etape', 'termine');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('nouveau123', $user->fresh()->password));
+    }
 }

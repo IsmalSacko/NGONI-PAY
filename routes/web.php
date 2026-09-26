@@ -32,6 +32,7 @@ Route::get('/', fn () => redirect(auth()->user()?->est_admin_plateforme ? '/plat
 
 Route::middleware('guest')->group(function (): void {
     Route::get('connexion', Login::class)->name('connexion');
+    Route::get('mot-de-passe-oublie', \App\Livewire\Auth\MotDePasseOublie::class)->name('mot-de-passe-oublie');
 });
 
 Route::post('deconnexion', function () {
@@ -75,6 +76,7 @@ Route::middleware(['auth', 'plateforme'])->prefix('plateforme')->name('plateform
     Route::get('demandes', \App\Livewire\Plateforme\Demandes::class)->name('demandes');
     Route::get('plans', \App\Livewire\Plateforme\Plans::class)->name('plans');
     Route::get('utilisateurs', \App\Livewire\Plateforme\Utilisateurs::class)->name('utilisateurs');
+    Route::get('annonces', \App\Livewire\Plateforme\Annonces::class)->name('annonces');
 
     // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
     Route::get('demandes/{demande}/preuve', function (\App\Models\DemandeAbonnement $demande) {

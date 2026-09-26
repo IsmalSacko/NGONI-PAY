@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EquipeController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\SessionCaisseController;
@@ -36,6 +37,10 @@ Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiser
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
+
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/tout-lu', [NotificationController::class, 'toutLu']);
+    Route::post('notifications/{notification}/lue', [NotificationController::class, 'lue'])->whereNumber('notification');
 
     // Boutiques du compte. Toute personne connectée peut voir les siennes et en
     // créer une (elle en devient propriétaire) ; les limites viennent du plan.

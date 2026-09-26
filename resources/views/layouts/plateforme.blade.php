@@ -22,6 +22,7 @@
                     ['route' => 'plateforme.demandes', 'label' => 'Demandes', 'badge' => $enAttente],
                     ['route' => 'plateforme.plans', 'label' => 'Plans et tarifs'],
                     ['route' => 'plateforme.utilisateurs', 'label' => 'Utilisateurs'],
+                    ['route' => 'plateforme.annonces', 'label' => 'Annonces'],
                 ];
             @endphp
             <nav class="order-last md:order-none w-full md:w-auto flex gap-1 text-sm font-semibold overflow-x-auto whitespace-nowrap">

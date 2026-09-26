@@ -5,16 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Mail\CodeReinitialisationMail;
-use App\Models\PasswordResetCode;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ReinitialisationMotDePasse;
 use App\Support\Auth\Identification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -111,24 +107,7 @@ class AuthController extends Controller
             'pays' => ['nullable', 'string', 'size:2'],
         ]);
 
-        $user = $this->utilisateurParTelephone($data['telephone'], $data['pays'] ?? null);
-
-        if ($user !== null && $user->is_active && filled($user->email)) {
-            $code = (string) random_int(100000, 999999);
-
-            PasswordResetCode::where('user_id', $user->id)->delete();
-            PasswordResetCode::create([
-                'user_id' => $user->id,
-                'code_hash' => Hash::make($code),
-                'expires_at' => now()->addMinutes(PasswordResetCode::VALIDITY_MINUTES),
-            ]);
-
-            try {
-                Mail::to($user->email)->send(new CodeReinitialisationMail($code, $user->name));
-            } catch (\Throwable $e) {
-                Log::error('Code de réinitialisation non envoyé', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-            }
-        }
+        app(ReinitialisationMotDePasse::class)->demander($data['telephone'], $data['pays'] ?? null);
 
         return response()->json([
             'message' => 'Si ce numéro correspond à un compte avec une adresse e-mail, un code vient '
@@ -151,37 +130,8 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $invalide = ValidationException::withMessages([
-            'code' => ['Code invalide ou expiré. Demandez-en un nouveau.'],
-        ]);
-
-        $user = $this->utilisateurParTelephone($data['telephone'], $data['pays'] ?? null);
-
-        if ($user === null || ! $user->is_active) {
-            throw $invalide;
-        }
-
-        $demande = PasswordResetCode::where('user_id', $user->id)->latest('id')->first();
-
-        if ($demande === null || $demande->expires_at->isPast() || $demande->attempts >= PasswordResetCode::MAX_ATTEMPTS) {
-            throw $invalide;
-        }
-
-        if (! Hash::check($data['code'], $demande->code_hash)) {
-            $demande->increment('attempts');
-
-            throw $invalide;
-        }
-
-        $user->forceFill(['password' => $data['password']])->save();
-        $user->tokens()->delete();
-        PasswordResetCode::where('user_id', $user->id)->delete();
+        app(ReinitialisationMotDePasse::class)->reinitialiser($data['telephone'], $data['pays'] ?? null, $data['code'], $data['password']);
 
         return response()->json(['message' => 'Mot de passe réinitialisé. Connectez-vous avec le nouveau.']);
-    }
-
-    private function utilisateurParTelephone(string $telephone, ?string $pays): ?User
-    {
-        return Identification::comptes($telephone, $pays)->first();
     }
 }
