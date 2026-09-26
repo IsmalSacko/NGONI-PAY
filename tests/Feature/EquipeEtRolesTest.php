@@ -83,7 +83,10 @@ class EquipeEtRolesTest extends TestCase
             ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $venteCaissier);
         $this->api($this->caissier)->getJson("/api/ventes/{$venteAdmin}")->assertNotFound();
 
-        $this->api($this->gerant)->getJson('/api/ventes')->assertOk()->assertJsonCount(2, 'data');
+        $this->api($this->gerant)->getJson('/api/ventes')->assertOk()->assertJsonCount(2, 'data')
+            // Pressing Awa → PA, année, rang dans la boutique.
+            ->assertJsonPath('data.0.numero_facture', 'PA-'.now()->format('Y').'-0002')
+            ->assertJsonPath('data.1.numero_facture', 'PA-'.now()->format('Y').'-0001');
     }
 
     public function test_le_caissier_n_a_ni_pilotage_ni_equipe(): void
@@ -236,5 +239,23 @@ class EquipeEtRolesTest extends TestCase
 
         $this->actingAs($this->gerant);
         Livewire::test(BoutiquesIndex::class)->call('ouvrirReglages')->assertForbidden();
+    }
+
+    /**
+     * Les actions Livewire (/livewire/update) ne passent pas par le
+     * middleware `tenant` : le composant doit reposer le contexte lui-même.
+     */
+    public function test_les_actions_du_back_office_retrouvent_la_boutique_active(): void
+    {
+        $this->actingAs($this->admin);
+        $this->dansLaBoutique();
+        $composant = Livewire::test(BoutiquesIndex::class);
+
+        // Requête suivante : plus aucun contexte, comme en production.
+        app(TenantContext::class)->forget();
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+        $this->admin->unsetRelation('roles')->unsetRelation('permissions');
+
+        $composant->call('ouvrirReglages')->assertSet('reglagesOuverts', true)->assertSet('reglages.devise', 'XOF');
     }
 }

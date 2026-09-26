@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Boutiques;
 
 use App\Enums\Country;
+use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Boutique;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
@@ -25,6 +26,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use EstScopeParBoutique;
+
     public bool $modaleOuverte = false;
 
     public string $nom = '';
@@ -61,7 +64,7 @@ class Index extends Component
     public function ouvrirReglages(): void
     {
         Auth::user()->can('boutique.update') || abort(403);
-        $b = Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
 
         $this->resetValidation();
         $this->reglages = [
@@ -76,7 +79,7 @@ class Index extends Component
     public function enregistrerReglages(ReglagesBoutique $service): void
     {
         Auth::user()->can('boutique.update') || abort(403);
-        $b = Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
 
         try {
             $donnees = array_map(fn ($v) => $v === '' ? null : $v, $this->reglages);
@@ -132,7 +135,7 @@ class Index extends Component
 
         return view('livewire.boutiques.index', [
             'boutiques' => $boutiques,
-            'active' => app(\App\Support\Tenancy\TenantContext::class)->boutiqueId(),
+            'active' => $this->boutiqueActiveId(),
             'peutCreer' => $abonnements->peutCreerBoutique($user),
             'listePays' => Country::cases(),
             'maxBoutiques' => $abonnements->planDe($user->abonnement()->first())?->max_boutiques,

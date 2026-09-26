@@ -19,7 +19,7 @@ class VenteController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Vente::with(['lignes', 'client', 'caissier'])->latest();
+        $query = Vente::with(['lignes', 'client', 'caissier'])->latest()->orderByDesc('numero');
 
         // Sans view_all (caissier) : ses propres ventes seulement.
         if (! $request->user()->can('ventes.view_all')) {
