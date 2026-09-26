@@ -13,7 +13,7 @@ use App\Livewire\Ventes\Index as VentesIndex;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/tableau-de-bord');
+Route::get('/', fn () => redirect(auth()->user()?->est_admin_plateforme ? '/plateforme' : '/tableau-de-bord'));
 
 Route::middleware('guest')->group(function (): void {
     Route::get('connexion', Login::class)->name('connexion');
@@ -50,4 +50,20 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::get('ventes', VentesIndex::class)->name('ventes.index')->middleware('permission:ventes.view');
     Route::get('clients', ClientsIndex::class)->name('clients.index')->middleware('permission:clients.view');
     Route::get('utilisateurs', UtilisateursIndex::class)->name('utilisateurs.index')->middleware('permission:utilisateurs.view');
+});
+
+// Console de l'exploitant : comptes, abonnements, demandes, plans, utilisateurs.
+Route::middleware(['auth', 'plateforme'])->prefix('plateforme')->name('plateforme.')->group(function (): void {
+    Route::get('/', \App\Livewire\Plateforme\Tableau::class)->name('tableau');
+    Route::get('comptes', \App\Livewire\Plateforme\Comptes::class)->name('comptes');
+    Route::get('demandes', \App\Livewire\Plateforme\Demandes::class)->name('demandes');
+    Route::get('plans', \App\Livewire\Plateforme\Plans::class)->name('plans');
+    Route::get('utilisateurs', \App\Livewire\Plateforme\Utilisateurs::class)->name('utilisateurs');
+
+    // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
+    Route::get('demandes/{demande}/preuve', function (\App\Models\DemandeAbonnement $demande) {
+        abort_unless($demande->preuveExiste(), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($demande->preuve_chemin);
+    })->name('preuve');
 });

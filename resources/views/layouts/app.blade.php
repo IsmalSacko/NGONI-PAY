@@ -69,8 +69,8 @@
                     ->pourBoutique(\App\Models\Boutique::find($boutiqueActiveId));
             @endphp
             @if (! $abonnementCourant?->estEnCours())
-                <div class="mb-5 rounded-2xl border border-[--color-danger-fg]/30 bg-[--color-danger-bg] px-5 py-4 text-sm">
-                    <p class="font-bold text-[--color-danger-fg]">
+                <div class="mb-5 rounded-2xl border border-danger-fg/30 bg-danger-bg px-5 py-4 text-sm">
+                    <p class="font-bold text-danger-fg">
                         {{ $abonnementCourant?->estEssai() ? 'Essai gratuit terminé' : 'Abonnement expiré' }}
                         @if ($abonnementCourant?->fin) le {{ $abonnementCourant->fin->format('d/m/Y') }} @endif
                     </p>
@@ -78,7 +78,7 @@
                 </div>
             @endif
             @if (session('abonnement_expire'))
-                <p class="mb-4 rounded-xl bg-[--color-danger-bg] text-[--color-danger-fg] px-4 py-3 text-sm font-semibold">{{ session('abonnement_expire') }}</p>
+                <p class="mb-4 rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ session('abonnement_expire') }}</p>
             @endif
             {{ $slot }}
         </main>

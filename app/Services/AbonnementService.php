@@ -265,6 +265,48 @@ class AbonnementService
         return $restants <= 0 ? 0 : (int) floor($restants * $actuel->tarifMensuel() / $tauxVise);
     }
 
+    /**
+     * Accord manuel par l'exploitant (paiement reçu hors demande, geste
+     * commercial, prolongation d'essai). `$fin` NULL = sans échéance. Une
+     * demande en attente du même compte est soldée.
+     */
+    public function accorder(User $proprietaire, string $plan, ?Carbon $fin, User $exploitant, ?string $note = null): Abonnement
+    {
+        if (Plan::parCode($plan) === null) {
+            throw ValidationException::withMessages(['plan' => ['Plan inconnu.']]);
+        }
+
+        return DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note): Abonnement {
+            $abonnement = Abonnement::updateOrCreate(
+                ['user_id' => $proprietaire->id],
+                [
+                    'plan' => $plan,
+                    'debut' => now()->toDateString(),
+                    'fin' => $fin?->toDateString(),
+                    'est_actif' => true,
+                    'est_manuel' => true,
+                    'accorde_par' => $exploitant->id,
+                    'note_admin' => $note,
+                ],
+            );
+
+            DemandeAbonnement::where('user_id', $proprietaire->id)->enAttente()->update([
+                'statut' => StatutDemande::Approuvee->value,
+                'decide_le' => now(),
+                'decide_par' => $exploitant->id,
+                'note_decision' => 'Accordé manuellement depuis la console.',
+            ]);
+
+            return $abonnement;
+        });
+    }
+
+    /** Fin immédiate : plus aucune action possible dans ses boutiques. */
+    public function revoquer(User $proprietaire): void
+    {
+        $proprietaire->abonnement()->first()?->expirerMaintenant();
+    }
+
     private function exigerEnAttente(DemandeAbonnement $demande): void
     {
         if ($demande->statut->estTranchee()) {

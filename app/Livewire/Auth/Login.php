@@ -47,7 +47,11 @@ class Login extends Component
         Auth::login($user, remember: true);
         session()->regenerate();
 
-        $this->redirect(route('tableau-de-bord'), navigate: false);
+        // L'exploitant arrive sur sa console ; un commerçant sur sa boutique.
+        $this->redirect(
+            $user->est_admin_plateforme ? route('plateforme.tableau') : route('tableau-de-bord'),
+            navigate: false,
+        );
     }
 
     public function render()

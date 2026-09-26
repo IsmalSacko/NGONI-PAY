@@ -11,7 +11,7 @@
         <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $info }}</p>
     @endif
     @if ($alerte)
-        <p class="rounded-xl bg-[--color-danger-bg] text-[--color-danger-fg] px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>
+        <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>
     @endif
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
