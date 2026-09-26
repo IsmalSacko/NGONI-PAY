@@ -116,7 +116,7 @@ class Annonces extends Component
 
         if ($data['quand'] === 'maintenant') {
             $r = $diffusion->diffuser($annonce);
-            $this->info = "« {$annonce->titre} » envoyée : {$r['notifies']} notification(s), {$r['emails']} e-mail(s)"
+            $this->info = "« {$annonce->titre} » envoyée : {$r['notifies']} notification(s), {$r['pushs']} push, {$r['emails']} e-mail(s)"
                 .($r['echecs'] ? ", {$r['echecs']} échec(s)" : '').'.';
         } else {
             $this->info = "« {$annonce->titre} » programmée le {$annonce->programmee_le->format('d/m/Y à H:i')}.";

@@ -36,14 +36,15 @@ class DiffusionAnnonces
         };
     }
 
-    /** @return array{notifies: int, emails: int, echecs: int} */
+    /** @return array{notifies: int, emails: int, echecs: int, pushs: int} */
     public function diffuser(Annonce $annonce): array
     {
-        $notifies = $emails = $echecs = 0;
+        $notifies = $emails = $echecs = $pushs = 0;
+        $push = app(PushFirebase::class);
 
-        $this->destinataires($annonce)->orderBy('id')->chunk(200, function ($users) use ($annonce, &$notifies, &$emails, &$echecs): void {
+        $this->destinataires($annonce)->orderBy('id')->chunk(200, function ($users) use ($annonce, $push, &$notifies, &$emails, &$echecs, &$pushs): void {
             foreach ($users as $user) {
-                NotificationApp::create([
+                $notification = NotificationApp::create([
                     'user_id' => $user->id,
                     'annonce_id' => $annonce->id,
                     'type' => $annonce->type,
@@ -52,6 +53,15 @@ class DiffusionAnnonces
                     'lien' => $annonce->lien,
                 ]);
                 $notifies++;
+
+                // Push instantané vers ses téléphones (si Firebase est configuré).
+                $pushs += $push->envoyerAuxComptes([$user->id], [
+                    'notification_id' => (string) $notification->id,
+                    'titre' => $notification->titre,
+                    'message' => $notification->message,
+                    'lien' => (string) $notification->lien,
+                    'type' => $notification->type,
+                ]);
 
                 if (! $annonce->par_email || blank($user->email)) {
                     continue;
@@ -82,7 +92,7 @@ class DiffusionAnnonces
             'nb_echecs' => $annonce->nb_echecs + $echecs,
         ]);
 
-        return ['notifies' => $notifies, 'emails' => $emails, 'echecs' => $echecs];
+        return ['notifies' => $notifies, 'emails' => $emails, 'echecs' => $echecs, 'pushs' => $pushs];
     }
 
     /** Annonces programmées arrivées à échéance (appelé chaque minute). */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AbonnementController;
+use App\Http\Controllers\Api\AppareilController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
@@ -38,6 +39,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
 
+    Route::post('appareils', [AppareilController::class, 'store']);
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/tout-lu', [NotificationController::class, 'toutLu']);
     Route::post('notifications/{notification}/lue', [NotificationController::class, 'lue'])->whereNumber('notification');

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+
+    // Clé du compte de service Firebase (notifications push), hors du dépôt.
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
 ];

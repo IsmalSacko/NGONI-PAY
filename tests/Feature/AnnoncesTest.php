@@ -51,7 +51,7 @@ class AnnoncesTest extends TestCase
             ->set('version', '3.0.0')
             ->call('enregistrer')
             ->assertHasNoErrors()
-            ->assertSet('info', fn ($i) => str_contains($i, '2 notification(s), 1 e-mail(s)'));
+            ->assertSet('info', fn ($i) => str_contains($i, '2 notification(s), 0 push, 1 e-mail(s)'));
 
         Mail::assertSent(AnnonceMail::class, fn (AnnonceMail $m) => $m->hasTo('awa@example.com'));
         Mail::assertSentCount(1);
