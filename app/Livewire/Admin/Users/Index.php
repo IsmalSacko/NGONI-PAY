@@ -12,6 +12,11 @@ class Index extends Component
 
     public string $search = '';
 
+    /** Mot de passe provisoire à communiquer, affiché une seule fois. */
+    public ?string $temporaryPassword = null;
+    public ?string $temporaryPasswordFor = null;
+    public ?string $temporaryPasswordWhatsApp = null;
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -51,6 +56,46 @@ class Index extends Component
         $notifier->accountReactivated($user);
 
         session()->flash('status', "Compte réactivé. {$user->name} peut se reconnecter.");
+    }
+
+    /**
+     * Mot de passe provisoire, pour un commerçant qui a perdu le sien et n'a pas
+     * d'e-mail : l'exploitant le lui transmet (WhatsApp), le commerçant le change
+     * ensuite depuis son profil. Toutes ses sessions sont fermées.
+     */
+    public function resetPassword(int $userId): void
+    {
+        $user = User::findOrFail($userId);
+
+        if ($user->role === User::ROLE_SYSTEM_ADMIN && (int) $user->id !== (int) auth()->id()) {
+            session()->flash('error', 'Impossible de réinitialiser ce compte protégé.');
+            return;
+        }
+
+        // Lisible et facile à dicter : pas de 0/O ni de 1/l.
+        $alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+        $motDePasse = '';
+        for ($i = 0; $i < 8; $i++) {
+            $motDePasse .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        $user->forceFill(['password' => \Illuminate\Support\Facades\Hash::make($motDePasse)])->save();
+        $user->tokens()->delete();
+
+        $message = "Bonjour {$user->name}, votre mot de passe Ngoni Pay provisoire est : {$motDePasse}\n"
+            . 'Connectez-vous puis changez-le depuis votre profil.';
+        $lien = \App\Support\WhatsApp::link($user->phone);
+
+        $this->temporaryPassword = $motDePasse;
+        $this->temporaryPasswordFor = $user->name . ' · ' . $user->phone;
+        $this->temporaryPasswordWhatsApp = $lien === null ? null : $lien . '?text=' . rawurlencode($message);
+    }
+
+    public function dismissTemporaryPassword(): void
+    {
+        $this->temporaryPassword = null;
+        $this->temporaryPasswordFor = null;
+        $this->temporaryPasswordWhatsApp = null;
     }
 
     public function delete(int $userId): void

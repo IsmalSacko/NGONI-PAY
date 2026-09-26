@@ -9,9 +9,13 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
 
 use App\Models\User;
+use App\Models\PasswordResetCode;
+use App\Mail\PasswordResetCodeMail;
 use App\Services\PhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -185,48 +189,133 @@ class AuthController extends Controller
         return response()->json(['message' => 'Mot de passe mis à jour.'], 200);
     }
 
+    /**
+     * Étape 1 : demander un code de réinitialisation.
+     *
+     * L'ancienne version changeait le mot de passe sur simple numéro de
+     * téléphone : n'importe qui pouvait prendre un compte. Désormais, un code
+     * est envoyé à l'adresse e-mail du compte. Sans e-mail, la réinitialisation
+     * passe par le support (mot de passe provisoire donné depuis la console).
+     *
+     * La réponse est la même que le compte existe ou non, pour ne pas laisser
+     * tester des numéros au hasard.
+     */
     public function forgotPassword(Request $req, PhoneService $phoneService)
+    {
+        // Application antérieure : elle envoie directement le nouveau mot de passe.
+        if ($req->filled('new_password') && ! $req->filled('code')) {
+            return response()->json([
+                'message' => 'Mettez à jour l’application pour réinitialiser votre mot de passe, '
+                    . 'ou contactez le support sur WhatsApp au ' . config('subscriptions.support_whatsapp') . '.',
+                'code' => 'RESET_REQUIRES_CODE',
+                'support_whatsapp' => config('subscriptions.support_whatsapp'),
+            ], 422);
+        }
+
+        $req->validate([
+            'phone' => 'required|string',
+            'country' => ['sometimes', 'nullable', Rule::enum(Country::class)],
+        ]);
+
+        $user = $this->userByPhone($req, $phoneService);
+
+        // Réinitialiser le mot de passe d'un compte désactivé n'y donnerait pas
+        // accès, et laisserait croire le contraire.
+        if ($user && ! $user->is_active) {
+            return $this->deactivatedResponse();
+        }
+
+        if ($user && filled($user->email)) {
+            $code = (string) random_int(100000, 999999);
+
+            PasswordResetCode::where('user_id', $user->id)->delete();
+            PasswordResetCode::create([
+                'user_id' => $user->id,
+                'code_hash' => Hash::make($code),
+                'expires_at' => now()->addMinutes(15),
+            ]);
+
+            try {
+                Mail::to($user->email)->send(new PasswordResetCodeMail($code, $user->name));
+            } catch (\Throwable $e) {
+                Log::error('Code de réinitialisation non envoyé', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Si ce numéro correspond à un compte avec une adresse e-mail, un code vient '
+                . 'de vous être envoyé par e-mail. Sinon, contactez le support sur WhatsApp pour '
+                . 'réinitialiser votre mot de passe.',
+            'code' => 'RESET_CODE_REQUESTED',
+            'support_whatsapp' => config('subscriptions.support_whatsapp'),
+        ]);
+    }
+
+    /**
+     * Étape 2 : choisir un nouveau mot de passe avec le code reçu par e-mail.
+     * Cinq essais par code ; toutes les sessions ouvertes sont fermées ensuite.
+     */
+    public function resetPassword(Request $req, PhoneService $phoneService)
     {
         $req->validate([
             'phone' => 'required|string',
             'country' => ['sometimes', 'nullable', Rule::enum(Country::class)],
-            'email' => 'nullable|email',
+            'code' => 'required|digits:6',
             'new_password' => 'required|string|min:6|confirmed',
         ]);
 
-        // Même tolérance qu'à la connexion : le numéro saisi peut ne pas être
-        // écrit comme il a été enregistré.
-        $country = Country::tryFrom(strtoupper((string) $req->input('country')))
-            ?? Country::default();
+        $invalide = response()->json([
+            'message' => 'Code invalide ou expiré. Demandez-en un nouveau.',
+            'code' => 'RESET_CODE_INVALID',
+        ], 422);
 
-        $user = User::whereIn('phone', $phoneService->candidates($req->phone, $country))->first();
-
-        if (!$user) {
-            return response()->json(['message' => 'Compte introuvable.'], 404);
+        $user = $this->userByPhone($req, $phoneService);
+        if (! $user) {
+            return $invalide;
         }
-
-        // Réinitialiser le mot de passe d'un compte désactivé n'y donnerait pas
-        // accès, et laisserait croire le contraire.
         if (! $user->is_active) {
-            return response()->json([
-                'message' => 'Votre compte a été désactivé. Contactez le service '
-                    . 'client pour le réactiver.',
-                'code' => 'ACCOUNT_DEACTIVATED',
-            ], 403);
+            return $this->deactivatedResponse();
         }
 
-        if ($req->filled('email')) {
-            $inputEmail = strtolower(trim((string) $req->email));
-            $userEmail = strtolower(trim((string) $user->email));
-            if ($inputEmail !== $userEmail) {
-                return response()->json(['message' => 'Email non valide pour ce compte.'], 422);
-            }
+        $demande = PasswordResetCode::where('user_id', $user->id)->latest('id')->first();
+
+        if (! $demande || $demande->expires_at->isPast() || $demande->attempts >= PasswordResetCode::MAX_ATTEMPTS) {
+            return $invalide;
+        }
+
+        if (! Hash::check((string) $req->code, $demande->code_hash)) {
+            $demande->increment('attempts');
+
+            return $invalide;
         }
 
         $user->password = Hash::make($req->new_password);
         $user->save();
+        $user->tokens()->delete();
+        PasswordResetCode::where('user_id', $user->id)->delete();
 
-        return response()->json(['message' => 'Mot de passe réinitialisé avec succès.'], 200);
+        return response()->json(['message' => 'Mot de passe réinitialisé. Connectez-vous avec le nouveau.'], 200);
+    }
+
+    /**
+     * Même tolérance qu'à la connexion : le numéro saisi peut ne pas être
+     * écrit comme il a été enregistré.
+     */
+    private function userByPhone(Request $req, PhoneService $phoneService): ?User
+    {
+        $country = Country::tryFrom(strtoupper((string) $req->input('country')))
+            ?? Country::default();
+
+        return User::whereIn('phone', $phoneService->candidates((string) $req->phone, $country))->first();
+    }
+
+    private function deactivatedResponse()
+    {
+        return response()->json([
+            'message' => 'Votre compte a été désactivé. Contactez le service '
+                . 'client pour le réactiver.',
+            'code' => 'ACCOUNT_DEACTIVATED',
+        ], 403);
     }
 
     public function destroy(Request $req)

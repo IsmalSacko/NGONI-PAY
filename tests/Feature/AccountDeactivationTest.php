@@ -63,8 +63,6 @@ it('ne laisse pas réinitialiser le mot de passe d’un compte désactivé', fun
 
     $this->postJson('/api/auth/forgot-password', [
         'phone' => '76008201',
-        'new_password' => 'nouveau123',
-        'new_password_confirmation' => 'nouveau123',
     ])->assertStatus(403)->assertJsonPath('code', 'ACCOUNT_DEACTIVATED');
 });
 

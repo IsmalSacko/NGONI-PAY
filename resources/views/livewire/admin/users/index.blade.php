@@ -2,6 +2,19 @@
     @if (session('status'))
         <div class="mb-4 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700">{{ session('status') }}</div>
     @endif
+    @if ($temporaryPassword)
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p class="font-medium">Mot de passe provisoire pour {{ $temporaryPasswordFor }}</p>
+            <p class="mt-1 font-mono text-lg tracking-wider select-all">{{ $temporaryPassword }}</p>
+            <p class="mt-1 text-xs">Affiché une seule fois. Ses sessions ont été fermées ; il le changera depuis son profil.</p>
+            <div class="mt-2 flex gap-3">
+                @if ($temporaryPasswordWhatsApp)
+                    <a href="{{ $temporaryPasswordWhatsApp }}" target="_blank" rel="noopener" class="font-medium text-emerald-700 hover:underline">Envoyer sur WhatsApp</a>
+                @endif
+                <button wire:click="dismissTemporaryPassword" class="text-amber-800 hover:underline">Fermer</button>
+            </div>
+        </div>
+    @endif
     @if (session('error'))
         <div class="mb-4 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">{{ session('error') }}</div>
     @endif
@@ -47,6 +60,10 @@
                         </td>
                         <td class="px-4 py-3 text-slate-500">{{ $user->created_at?->format('d/m/Y') ?? '—' }}</td>
                         <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+                            <button wire:click="resetPassword({{ $user->id }})" wire:confirm="Générer un mot de passe provisoire pour {{ $user->name }} ? Son mot de passe actuel ne fonctionnera plus."
+                                    class="text-slate-500 hover:text-indigo-600 text-sm font-medium">
+                                Mot de passe
+                            </button>
                             <button wire:click="toggleActive({{ $user->id }})" class="text-slate-500 hover:text-indigo-600 text-sm font-medium">
                                 {{ $user->is_active ? 'Désactiver' : 'Activer' }}
                             </button>
