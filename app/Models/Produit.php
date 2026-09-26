@@ -20,6 +20,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class Produit extends Model
 {
+    /** Adresse de la photo, pour la caisse. */
+    protected $appends = ['photo_url'];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        return $this->photo ? route('image.produit', ['produit' => $this->id, 'v' => $this->updated_at?->timestamp]) : null;
+    }
+
     /** @use HasFactory<ProduitFactory> */
     use BelongsToBoutique, HasFactory, HasUuids, SoftDeletes;
 

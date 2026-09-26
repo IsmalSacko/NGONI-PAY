@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
  * Boutiques du compte, et l'ouverture d'une nouvelle — dans la limite du plan
@@ -26,7 +27,28 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
-    use EstScopeParBoutique;
+    use EstScopeParBoutique, WithFileUploads;
+
+    /** Nouveau logo choisi (fichier temporaire Livewire). */
+    public $logo = null;
+
+    public function envoyerLogo(\App\Services\Images $images): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $this->validate(['logo' => \App\Services\Images::REGLES], [], ['logo' => 'logo']);
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
+        $b->update(['logo' => $images->enregistrer($this->logo, 'logos', $b->id, $b->logo)]);
+        $this->reset('logo');
+        session()->flash('info', 'Logo enregistré : il apparaît sur les tickets.');
+    }
+
+    public function supprimerLogo(\App\Services\Images $images): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
+        $images->supprimer($b->logo);
+        $b->update(['logo' => null]);
+    }
 
     public bool $modaleOuverte = false;
 

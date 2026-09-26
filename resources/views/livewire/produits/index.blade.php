@@ -24,9 +24,12 @@
         @foreach ($produits as $produit)
             {{-- Téléphone : nom et prix, puis stock et actions. --}}
             <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+                <div class="flex items-center gap-3">
+                    @if ($produit->photo_url)<img src="{{ $produit->photo_url }}" alt="" class="w-10 h-10 rounded-lg object-cover border border-[--color-border]">@endif
                 <div class="flex flex-col">
                     <span class="font-bold">{{ $produit->nom }}</span>
                     <span class="text-xs text-[--color-muted]">{{ $produit->format }}</span>
+                </div>
                 </div>
                 <span class="hidden md:block">{{ $produit->categorie?->nom ?? '—' }}</span>
                 <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}</span>
@@ -74,6 +77,18 @@
                         </div>
                     </div>
 
+                    <div class="flex items-center gap-3">
+                        @if ($photo && str_starts_with((string) $photo->getMimeType(), 'image/'))
+                            <img src="{{ $photo->temporaryUrl() }}" alt="" class="w-14 h-14 rounded-lg object-cover border border-[--color-border]">
+                        @elseif ($produitId && ($p = \App\Models\Produit::find($produitId))?->photo_url)
+                            <img src="{{ $p->photo_url }}" alt="" class="w-14 h-14 rounded-lg object-cover border border-[--color-border]">
+                        @endif
+                        <label class="text-sm font-bold text-accent cursor-pointer">
+                            Photo de l’article <span class="font-normal text-[--color-muted]">(facultatif, montrée dans la caisse)</span>
+                            <input type="file" wire:model="photo" accept="image/png,image/jpeg,image/webp" class="hidden">
+                        </label>
+                    </div>
+                    @error('photo') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
                     @php($devise = \App\Support\Money\Montant::deviseActive())
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>

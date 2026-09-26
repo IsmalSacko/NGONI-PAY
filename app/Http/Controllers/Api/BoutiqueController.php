@@ -71,6 +71,25 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $reglages->mettreAJour($boutique, $request->all())]);
     }
 
+    /** Logo de la boutique active, imprimé sur les tickets. */
+    public function logo(Request $request, \App\Services\Images $images): JsonResponse
+    {
+        $request->validate(['logo' => \App\Services\Images::REGLES]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->update(['logo' => $images->enregistrer($request->file('logo'), 'logos', $boutique->id, $boutique->logo)]);
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    public function supprimerLogo(\App\Services\Images $images): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $images->supprimer($boutique->logo);
+        $boutique->update(['logo' => null]);
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
     /** Boutique ouverte par défaut à la connexion. */
     public function parDefaut(Request $request, string $boutique): JsonResponse
     {

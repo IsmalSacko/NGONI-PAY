@@ -25,6 +25,14 @@ use Illuminate\Support\Facades\Storage;
 #[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket'])]
 class Boutique extends Model
 {
+    /** Adresse du logo, pour l'application et les tickets. */
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->logo ? route('image.logo', ['boutique' => $this->id, 'v' => $this->updated_at?->timestamp]) : null;
+    }
+
     /** @use HasFactory<BoutiqueFactory> */
     use HasFactory, HasUuids, SoftDeletes;
 

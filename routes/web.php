@@ -24,6 +24,10 @@ Route::get('telecharger', fn () => view('telecharger', [
     'storeUrl' => config('mobile.store_url'),
 ]))->name('telecharger');
 
+// Logo et photos d'articles, sans session (tickets, application).
+Route::get('images/logos/{boutique}', [\App\Http\Controllers\ImageController::class, 'logo'])->name('image.logo');
+Route::get('images/produits/{produit}', [\App\Http\Controllers\ImageController::class, 'photo'])->name('image.produit');
+
 // Anciennes adresses du panneau Ngoni Pay, gardées en favoris.
 Route::redirect('login', '/connexion');
 Route::redirect('admin/{reste?}', '/plateforme')->where('reste', '.*');

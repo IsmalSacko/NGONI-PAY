@@ -13,12 +13,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
-    use EstScopeParBoutique, WithPagination;
+    use EstScopeParBoutique, WithFileUploads, WithPagination;
 
     public string $recherche = '';
 
@@ -40,6 +41,9 @@ class Index extends Component
 
     public string $prix_achat = '';
 
+    /** Photo choisie pour l'article (fichier temporaire Livewire). */
+    public $photo = null;
+
     public string $taux_tva = '18';
 
     public string $stock = '0';
@@ -49,7 +53,7 @@ class Index extends Component
     public function nouveauProduit(): void
     {
         $this->resetValidation();
-        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock']);
+        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock', 'photo']);
         $this->taux_tva = '18';
         $this->seuil_alerte = '10';
         $this->modaleOuverte = true;
@@ -92,11 +96,13 @@ class Index extends Component
             // Saisi dans la devise (« 2,50 » en euros), stocké en unités mineures.
             'prix_vente' => ['required', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
             'prix_achat' => ['nullable', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:3072'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'integer', 'min:0'],
             'seuil_alerte' => ['required', 'integer', 'min:0'],
         ]);
 
+        unset($data['photo']);
         $data['categorie_produit_id'] = $data['categorie_produit_id'] ?: null;
         // Champs facultatifs vides : NULL, jamais '' — le code-barres est unique
         // par boutique, deux articles sans code entraient en conflit (erreur 500).
@@ -120,7 +126,12 @@ class Index extends Component
                 app(StockService::class)->ajuster($produit, $nouveauStock, Auth::user(), 'Modification de la fiche article');
             }
         } else {
-            Produit::create($data);
+            $produit = Produit::create($data);
+        }
+
+        if ($this->photo) {
+            $produit->forceFill(['photo' => app(\App\Services\Images::class)->enregistrer($this->photo, 'produits', $produit->id, $produit->photo)])->save();
+            $this->reset('photo');
         }
 
         $this->modaleOuverte = false;

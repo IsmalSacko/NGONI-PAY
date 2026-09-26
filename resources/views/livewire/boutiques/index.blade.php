@@ -37,6 +37,23 @@
                 @if ($b->adresse)<span class="text-sm">{{ $b->adresse }}</span>@endif
                 <span class="text-xs text-[--color-muted]">{{ $b->proprietaire_id === auth()->id() ? 'Vous en êtes propriétaire' : 'Membre de l’équipe' }}</span>
                 @if ($b->id === $active && $peutRegler)
+                    <div class="flex items-center gap-3 mt-1">
+                        @if ($b->logo_url)
+                            <img src="{{ $b->logo_url }}" alt="Logo" class="w-12 h-12 rounded-lg object-contain border border-[--color-border] bg-white">
+                        @endif
+                        <label class="text-xs font-bold text-accent cursor-pointer">
+                            {{ $b->logo_url ? 'Changer le logo' : '+ Ajouter un logo (tickets)' }}
+                            <input type="file" wire:model="logo" accept="image/png,image/jpeg,image/webp" class="hidden">
+                        </label>
+                        @if ($logo)
+                            <button wire:click="envoyerLogo" class="h-8 px-3 rounded-lg bg-accent text-white text-xs font-bold">Enregistrer le logo</button>
+                        @elseif ($b->logo_url)
+                            <button wire:click="supprimerLogo" wire:confirm="Retirer le logo ?" class="text-xs text-danger-fg font-bold">Retirer</button>
+                        @endif
+                    </div>
+                    @error('logo') <span class="text-xs text-danger-fg">{{ $message }}</span> @enderror
+                @endif
+                @if ($b->id === $active && $peutRegler)
                     <button wire:click="ouvrirReglages" class="mt-1 self-start h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Réglages (nom, pays, devise…)</button>
                 @endif
                 @if ($b->id !== $active && in_array($b->id, auth()->user()->boutiquesBackOffice(), true))

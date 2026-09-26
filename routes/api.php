@@ -51,6 +51,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('boutiques', [BoutiqueController::class, 'index']);
     Route::post('boutiques', [BoutiqueController::class, 'store']);
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
+    Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
+    Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;
@@ -72,6 +74,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('produits', [ProduitController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('produits/{produit}', [ProduitController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
     Route::post('produits/{produit}/ajuster-stock', [ProduitController::class, 'ajusterStock'])->middleware(['permission:stocks.update', 'abonnement']);
+    Route::post('produits/{produit}/photo', [ProduitController::class, 'photo'])->middleware(['permission:produits.update', 'abonnement']);
+    Route::delete('produits/{produit}/photo', [ProduitController::class, 'supprimerPhoto'])->middleware('permission:produits.update');
     Route::delete('produits/{produit}', [ProduitController::class, 'destroy'])->middleware(['permission:produits.delete', 'abonnement']);
 
     Route::get('clients', [ClientController::class, 'index'])->middleware('permission:clients.view');

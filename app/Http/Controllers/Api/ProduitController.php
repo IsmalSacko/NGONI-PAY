@@ -70,6 +70,23 @@ class ProduitController extends Controller
         return response()->json($produit->load('categorie'));
     }
 
+    /** Photo de l'article, montrée dans la caisse. */
+    public function photo(Request $request, Produit $produit, \App\Services\Images $images): JsonResponse
+    {
+        $request->validate(['photo' => \App\Services\Images::REGLES]);
+        $produit->forceFill(['photo' => $images->enregistrer($request->file('photo'), 'produits', $produit->id, $produit->photo)])->save();
+
+        return response()->json($produit->fresh()->load('categorie'));
+    }
+
+    public function supprimerPhoto(Produit $produit, \App\Services\Images $images): JsonResponse
+    {
+        $images->supprimer($produit->photo);
+        $produit->forceFill(['photo' => null])->save();
+
+        return response()->json($produit->fresh()->load('categorie'));
+    }
+
     public function destroy(Produit $produit): JsonResponse
     {
         // Libère le code-barres : l'index d'unicité (boutique, code_barre)
