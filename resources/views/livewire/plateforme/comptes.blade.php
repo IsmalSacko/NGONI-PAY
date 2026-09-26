@@ -30,9 +30,25 @@
                             <x-telephone :numero="$proprietaire?->phone" />
                             @if ($proprietaire?->email) · {{ $proprietaire->email }} @endif
                         </p>
-                        <p class="text-sm mt-1">
-                            {{ $proprietaire?->boutiquesPossedees->pluck('nom')->join(', ') ?: 'aucune boutique' }}
+                        <p class="text-xs text-muted mt-1">
+                            Inscrit le {{ $proprietaire?->created_at?->format('d/m/Y à H:i') }}
+                            · {{ $proprietaire?->derniere_app ? 'actif dans l’app '.\Illuminate\Support\Carbon::parse($proprietaire->derniere_app)->locale('fr')->diffForHumans() : 'jamais connecté à l’app' }}
                         </p>
+                        <ul class="mt-2 flex flex-col gap-1 text-sm">
+                            @forelse ($proprietaire?->boutiquesPossedees ?? [] as $b)
+                                <li>
+                                    <span class="font-semibold">{{ $b->nom }}</span>
+                                    <span class="text-xs text-muted">
+                                        · créée le {{ $b->created_at?->format('d/m/Y') }}
+                                        · {{ $b->nb_ventes }} vente{{ $b->nb_ventes > 1 ? 's' : '' }}
+                                        @if ($b->derniere_vente) · dernière le {{ \Illuminate\Support\Carbon::parse($b->derniere_vente)->format('d/m/Y') }} @endif
+                                        · 30 j : {{ \App\Support\Money\Montant::format((int) $b->total_30j, $b->devise) }} {{ $b->devise }}
+                                    </span>
+                                </li>
+                            @empty
+                                <li class="text-muted">aucune boutique</li>
+                            @endforelse
+                        </ul>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="rounded-full bg-[#F1EDE4] px-2.5 py-0.5 text-xs font-bold">{{ $abonnement->estEssai() ? 'essai' : $abonnement->plan }}</span>

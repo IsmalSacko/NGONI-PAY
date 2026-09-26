@@ -162,4 +162,18 @@ class ConsolePlateformeTest extends TestCase
         $this->assertSame(0, $this->awa->tokens()->count());
         $composant->assertSee($provisoire)->assertSee('wa.me/22376008201');
     }
+
+    public function test_la_console_montre_inscription_activite_et_usage(): void
+    {
+        $this->awa->createToken('app')->accessToken->forceFill(['last_used_at' => now()->subHours(2)])->save();
+
+        $this->actingAs($this->exploitant)->get('/plateforme/utilisateurs')->assertOk()
+            ->assertSee('Inscrit le '.$this->awa->created_at->format('d/m/Y'))
+            ->assertSee('actif il y a 2 heures')
+            ->assertSee('0 vente');
+
+        $this->actingAs($this->exploitant)->get('/plateforme/comptes')->assertOk()
+            ->assertSee('créée le')
+            ->assertSee('actif dans l’app il y a 2 heures', false);
+    }
 }

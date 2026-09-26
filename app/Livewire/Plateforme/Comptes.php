@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AbonnementService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -94,7 +95,12 @@ class Comptes extends Component
         $needle = '%'.mb_strtolower($this->recherche).'%';
 
         $abonnements = Abonnement::query()
-            ->with(['proprietaire.boutiquesPossedees'])
+            ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
+                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
+            ]), 'proprietaire.boutiquesPossedees' => fn ($q) => $q
+                ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
+                ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
+                ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
             ->when($this->recherche !== '', fn ($q) => $q->whereHas('proprietaire', function ($u) use ($needle) {
                 $u->whereRaw('LOWER(name) LIKE ?', [$needle])
                     ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])

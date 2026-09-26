@@ -4,8 +4,14 @@
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Utilisateurs</h1>
             <p class="text-sm text-muted">Tous les comptes de la plateforme.</p>
         </div>
-        <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Nom, téléphone, e-mail…"
-               class="w-full md:w-80 h-11 px-4 rounded-xl border border-border-strong">
+        <div class="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
+            <select wire:model.live="tri" class="h-11 px-3 rounded-xl border border-border-strong bg-white">
+                <option value="recents">Derniers inscrits</option>
+                <option value="nom">Par nom</option>
+            </select>
+            <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Nom, téléphone, e-mail…"
+                   class="w-full md:w-80 h-11 px-4 rounded-xl border border-border-strong">
+        </div>
     </div>
 
     @if ($alerte)<p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>@endif
@@ -24,8 +30,21 @@
 
     <section class="bg-white border border-border rounded-2xl overflow-x-auto">
         @foreach ($users as $user)
-            <div class="grid min-w-[680px] grid-cols-[1.5fr_1.5fr_1fr_0.8fr_220px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm" wire:key="u-{{ $user->id }}">
-                <span class="font-bold">{{ $user->name }}@if ($user->est_admin_plateforme) <span class="text-xs text-muted">(exploitant)</span>@endif</span>
+            <div class="grid min-w-[820px] grid-cols-[2.4fr_1.3fr_1fr_0.8fr_220px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm" wire:key="u-{{ $user->id }}">
+                @php
+                    $activite = collect([$user->derniere_app ? \Illuminate\Support\Carbon::parse($user->derniere_app) : null,
+                        $user->derniere_web ? \Illuminate\Support\Carbon::createFromTimestamp((int) $user->derniere_web) : null])->filter()->max();
+                @endphp
+                <span class="flex flex-col">
+                    <span class="font-bold">{{ $user->name }}@if ($user->est_admin_plateforme) <span class="text-xs text-muted">(exploitant)</span>@endif</span>
+                    <span class="text-xs text-muted">
+                        Inscrit le {{ $user->created_at?->format('d/m/Y à H:i') }}
+                        · {{ $activite ? 'actif '.$activite->locale('fr')->diffForHumans() : 'jamais connecté' }}
+                        · {{ $user->nb_ventes }} vente{{ $user->nb_ventes > 1 ? 's' : '' }}
+                        · push {{ $user->nb_appareils > 0 ? '✓' : '✗' }}
+                        · e-mail {{ $user->email ? '✓' : '✗' }}
+                    </span>
+                </span>
                 <x-telephone :numero="$user->phone" />
                 <span class="truncate">{{ $user->boutique?->nom ?? '—' }}</span>
                 <span>
