@@ -31,6 +31,7 @@ class Identification
 
         return User::withoutGlobalScopes()
             ->whereIn('phone', $candidats)
+            ->whereNull('deleted_at')
             ->get()
             ->sortBy(fn (User $u) => array_search($u->phone, $candidats, true))
             ->values();
