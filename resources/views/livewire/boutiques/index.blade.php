@@ -31,9 +31,12 @@
                         <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-[#0B4F39]">Active</span>
                     @endif
                 </div>
-                <span class="text-sm text-[--color-muted]">{{ \App\Enums\Country::tryFrom((string) $b->pays)?->label() }} · {{ $b->devise }}</span>
+                <span class="text-sm text-[--color-muted]">{{ \App\Enums\Country::tryFrom((string) $b->pays)?->label() }} · devise <strong>{{ $b->devise }}</strong></span>
                 @if ($b->adresse)<span class="text-sm">{{ $b->adresse }}</span>@endif
                 <span class="text-xs text-[--color-muted]">{{ $b->proprietaire_id === auth()->id() ? 'Vous en êtes propriétaire' : 'Membre de l’équipe' }}</span>
+                @if ($b->id === $active && $peutRegler)
+                    <button wire:click="ouvrirReglages" class="mt-1 self-start h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Réglages (nom, pays, devise…)</button>
+                @endif
                 @if ($b->id !== $active && in_array($b->id, auth()->user()->boutiquesBackOffice(), true))
                     <form method="POST" action="{{ route('boutique-active') }}" class="mt-1">
                         @csrf
@@ -70,6 +73,52 @@
                     <div class="flex gap-3 mt-2">
                         <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
                         <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Ouvrir la boutique</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    @if ($reglagesOuverts)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('reglagesOuverts', false)">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto flex flex-col gap-4">
+                <h2 class="font-display font-extrabold text-xl">Réglages de la boutique</h2>
+                <form wire:submit="enregistrerReglages" class="flex flex-col gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Nom</label>
+                        <input wire:model="reglages.nom" type="text" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        @error('reglages.nom') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Pays de la boutique</label>
+                        <x-choix-pays model="reglages.pays" :liste-pays="$listePays" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Devise</label>
+                        <select wire:model="reglages.devise" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong] bg-white">
+                            @foreach ($devises as $code)
+                                <option value="{{ $code }}">{{ $code }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-[--color-muted] mt-1">Affichée sur la caisse et les tickets. Les montants déjà enregistrés ne sont pas convertis.</p>
+                        @error('reglages.devise') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Téléphone (imprimé sur le ticket)</label>
+                        <input wire:model="reglages.telephone" type="tel" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Adresse (imprimée sur le ticket)</label>
+                        <input wire:model="reglages.adresse" type="text" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">E-mail</label>
+                        <input wire:model="reglages.email" type="email" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        @error('reglages.email') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="flex gap-3 mt-2">
+                        <button type="button" wire:click="$set('reglagesOuverts', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
+                        <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
                     </div>
                 </form>
             </div>

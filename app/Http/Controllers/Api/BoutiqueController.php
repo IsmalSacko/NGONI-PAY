@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ReglagesBoutique;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,14 @@ class BoutiqueController extends Controller
         $boutique = $service->ajouterBoutique($request->user(), $data);
 
         return response()->json($boutique, 201);
+    }
+
+    /** Réglages de la boutique active (nom, pays, devise, coordonnées). */
+    public function update(Request $request, ReglagesBoutique $reglages): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+
+        return response()->json(['data' => $reglages->mettreAJour($boutique, $request->all())]);
     }
 
     /** Boutique ouverte par défaut à la connexion. */

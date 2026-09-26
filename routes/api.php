@@ -41,6 +41,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     // créer une (elle en devient propriétaire) ; les limites viennent du plan.
     Route::get('boutiques', [BoutiqueController::class, 'index']);
     Route::post('boutiques', [BoutiqueController::class, 'store']);
+    Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;

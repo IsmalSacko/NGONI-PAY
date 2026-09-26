@@ -197,4 +197,44 @@ class EquipeEtRolesTest extends TestCase
             'moyen_paiement' => 'especes',
         ])->assertUnprocessable()->assertJsonValidationErrors('client_id');
     }
+
+    public function test_l_admin_regle_pays_et_devise_de_sa_boutique(): void
+    {
+        // Boutique au Mali, commerçant joignable en France : la devise se choisit.
+        $this->api($this->admin)->putJson('/api/boutique', [
+            'nom' => 'Pharmacie Les Castors', 'pays' => 'FR', 'telephone' => '06 05 75 84 94', 'adresse' => 'Paris',
+        ])->assertOk()->assertJsonPath('data.devise', 'EUR')->assertJsonPath('data.telephone', '+33605758494');
+
+        $this->api($this->admin)->putJson('/api/boutique', ['nom' => 'Pharmacie Les Castors', 'pays' => 'ML', 'devise' => 'EUR'])
+            ->assertOk()->assertJsonPath('data.devise', 'EUR')->assertJsonPath('data.pays', 'ML');
+
+        $this->api($this->admin)->putJson('/api/boutique', ['nom' => 'X', 'pays' => 'ML', 'devise' => 'ABC'])
+            ->assertUnprocessable()->assertJsonValidationErrors('devise');
+
+        $this->api($this->gerant)->putJson('/api/boutique', ['nom' => 'Pirate', 'pays' => 'ML'])->assertForbidden();
+        $this->api($this->caissier)->putJson('/api/boutique', ['nom' => 'Pirate', 'pays' => 'ML'])->assertForbidden();
+
+        // /moi rend la nouvelle devise à l'application.
+        $this->api($this->admin)->getJson('/api/moi')->assertJsonPath('user.boutique.devise', 'EUR');
+    }
+
+    public function test_les_reglages_depuis_le_back_office(): void
+    {
+        $this->actingAs($this->admin);
+        $this->dansLaBoutique();
+
+        Livewire::test(BoutiquesIndex::class)
+            ->call('ouvrirReglages')
+            ->assertSet('reglages.devise', 'XOF')
+            ->set('reglages.devise', 'EUR')
+            ->set('reglages.adresse', 'Bamako')
+            ->call('enregistrerReglages')
+            ->assertRedirect(route('boutiques.index'));
+
+        $this->assertSame('EUR', $this->boutique->fresh()->devise);
+        $this->assertSame('Bamako', $this->boutique->fresh()->adresse);
+
+        $this->actingAs($this->gerant);
+        Livewire::test(BoutiquesIndex::class)->call('ouvrirReglages')->assertForbidden();
+    }
 }

@@ -8,9 +8,12 @@ use App\Enums\Country;
 use App\Models\Boutique;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ReglagesBoutique;
+use App\Support\Money\Currencies;
 use App\Support\Tenancy\BoutiqueActive;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -34,6 +37,12 @@ class Index extends Component
 
     public ?string $alerte = null;
 
+    /** Réglages de la boutique active (admin). */
+    public bool $reglagesOuverts = false;
+
+    /** @var array{nom: string, pays: string, devise: string, telephone: string, email: string, adresse: string} */
+    public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => ''];
+
     public function mount(): void
     {
         $this->pays = Boutique::find(Auth::user()->boutique_id)?->pays ?? Country::default()->value;
@@ -44,6 +53,39 @@ class Index extends Component
         $this->resetValidation();
         $this->reset(['nom', 'telephone', 'adresse', 'alerte']);
         $this->modaleOuverte = true;
+    }
+
+    public function ouvrirReglages(): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $b = Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+
+        $this->resetValidation();
+        $this->reglages = [
+            'nom' => $b->nom, 'pays' => (string) $b->pays, 'devise' => (string) $b->devise,
+            'telephone' => (string) $b->telephone, 'email' => (string) $b->email, 'adresse' => (string) $b->adresse,
+        ];
+        $this->reglagesOuverts = true;
+    }
+
+    public function enregistrerReglages(ReglagesBoutique $service): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $b = Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+
+        try {
+            $b = $service->mettreAJour($b, array_map(fn ($v) => $v === '' ? null : $v, $this->reglages));
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError('reglages.'.$champ, $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->reglagesOuverts = false;
+        session()->flash('info', "Réglages de « {$b->nom} » enregistrés ({$b->devise}).");
+        $this->redirectRoute('boutiques.index', navigate: false);
     }
 
     public function creer(BoutiqueRegistrationService $service): void
@@ -88,6 +130,8 @@ class Index extends Component
             'listePays' => Country::cases(),
             'maxBoutiques' => $abonnements->planDe($user->abonnement()->first())?->max_boutiques,
             'possedees' => $user->boutiquesPossedees()->count(),
+            'peutRegler' => $user->can('boutique.update'),
+            'devises' => Currencies::codes(),
         ]);
     }
 }
