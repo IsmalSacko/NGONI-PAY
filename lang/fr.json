@@ -6,5 +6,7 @@
     "Pagination Navigation": "Navigation de la pagination",
     "Go to page :page": "Aller à la page :page",
     "« Previous": "« Précédent",
-    "Next »": "Suivant »"
+    "Next »": "Suivant »",
+    "(and :count more error)": "(et :count autre erreur)",
+    "(and :count more errors)": "(et :count autres erreurs)"
 }
