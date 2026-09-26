@@ -441,3 +441,14 @@ it('annonce l’aperçu avant que la demande ne soit déposée', function () {
         ->and($versPro['credited_days'])->toBeLessThan(20)
         ->and($versPro['credited_days'])->toBeGreaterThan(0);
 });
+
+it('publie le numéro WhatsApp de l’exploitant avec le catalogue', function () {
+    $this->getJson('/api/subscription-plans')
+        ->assertOk()
+        ->assertJsonPath('support.whatsapp', '+33605758494');
+
+    config(['subscriptions.support_whatsapp' => '+22370000000']);
+
+    $this->getJson('/api/subscription-plans')
+        ->assertJsonPath('support.whatsapp', '+22370000000');
+});

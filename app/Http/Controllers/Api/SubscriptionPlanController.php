@@ -25,6 +25,12 @@ class SubscriptionPlanController extends Controller
             ->ordered()
             ->get();
 
-        return SubscriptionPlanResource::collection($plans);
+        return SubscriptionPlanResource::collection($plans)->additional([
+            // Contact direct de l'exploitant : l'application le propose à côté
+            // de la demande en ligne, pour qui préfère s'abonner en lui écrivant.
+            'support' => [
+                'whatsapp' => config('subscriptions.support_whatsapp'),
+            ],
+        ]);
     }
 }
