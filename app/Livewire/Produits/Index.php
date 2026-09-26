@@ -98,6 +98,11 @@ class Index extends Component
         ]);
 
         $data['categorie_produit_id'] = $data['categorie_produit_id'] ?: null;
+        // Champs facultatifs vides : NULL, jamais '' — le code-barres est unique
+        // par boutique, deux articles sans code entraient en conflit (erreur 500).
+        foreach (['code_barre', 'code', 'format'] as $champ) {
+            $data[$champ] = trim((string) ($data[$champ] ?? '')) === '' ? null : trim((string) $data[$champ]);
+        }
         $data['prix_vente'] = Montant::parse($data['prix_vente']);
         $data['prix_achat'] = Montant::parse($data['prix_achat'] ?? null);
 

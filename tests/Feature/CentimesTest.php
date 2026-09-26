@@ -156,4 +156,18 @@ class CentimesTest extends TestCase
         $reponse = $this->withToken($caissier->createToken('t')->plainTextToken)->getJson('/api/produits')->assertOk();
         $this->assertArrayNotHasKey('prix_achat', $reponse->json('0'));
     }
+
+    public function test_deux_articles_sans_code_barre_au_back_office(): void
+    {
+        $this->dansLaBoutique();
+        $this->actingAs($this->admin);
+        foreach (['Sucre', 'Farine'] as $nom) {
+            Livewire::test(ProduitsIndex::class)
+                ->call('nouveauProduit')
+                ->set('nom', $nom)->set('prix_vente', '1000')->set('code_barre', '')->set('code', '')
+                ->set('taux_tva', '0')->set('stock', '5')->set('seuil_alerte', '1')
+                ->call('enregistrer')->assertHasNoErrors();
+        }
+        $this->assertSame(2, Produit::whereNull('code_barre')->count());
+    }
 }
