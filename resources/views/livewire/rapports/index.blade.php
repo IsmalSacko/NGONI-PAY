@@ -33,7 +33,7 @@
             ['Chiffre d’affaires', $m($r['ventes']['total']).' '.$devise],
             ['Tickets', $r['ventes']['nombre'].' · '.$r['ventes']['articles'].' articles'],
             ['Panier moyen', $m($r['ventes']['panier_moyen']).' '.$devise],
-            ['Marge brute', $r['marge']['taux'] === null ? '—' : $m($r['marge']['marge']).' '.$devise.' ('.$r['marge']['taux'].' %)'],
+            ['Marge brute', $r['marge']['taux'] === null ? 'Prix d’achat à renseigner' : $m($r['marge']['marge']).' '.$devise.' ('.$r['marge']['taux'].' %)'],
             ['Remises accordées', $m($r['ventes']['remises']).' '.$devise],
             ['TVA collectée', $m($r['ventes']['tva']).' '.$devise],
             ['Ventes annulées', $r['annulees']['nombre'].' · '.$m($r['annulees']['total']).' '.$devise],
@@ -45,8 +45,16 @@
             </div>
         @endforeach
     </div>
-    @if ($r['marge']['taux'] !== null && $r['marge']['chiffre_couvert'] < $r['ventes']['total'])
-        <p class="text-xs text-[--color-muted] -mt-2">Marge calculée sur les articles dont le prix d’achat est renseigné ({{ $m($r['marge']['chiffre_couvert']) }} {{ $devise }} de ventes), avant remise.</p>
+    @if ($r['marge']['taux'] === null && $r['ventes']['nombre'] > 0)
+        <p class="text-sm -mt-2 rounded-xl bg-[--color-warn-bg] text-[--color-warn-fg] px-4 py-3">
+            Pour voir votre marge, renseignez le <strong>prix d’achat</strong> de vos articles
+            (<a href="{{ route('produits.index') }}" class="underline">Produits</a>, ou fiche article dans l’application).
+        </p>
+    @elseif ($r['marge']['taux'] !== null && ($r['marge']['couverture'] < 100 || $r['marge']['estimee']))
+        <p class="text-xs text-[--color-muted] -mt-2">
+            Marge calculée sur {{ $r['marge']['couverture'] }} % des ventes (articles dont le prix d’achat est connu), avant remise.
+            @if ($r['marge']['estimee']) Certaines ventes antérieures au prix d’achat utilisent le prix d’achat actuel (estimation). @endif
+        </p>
     @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

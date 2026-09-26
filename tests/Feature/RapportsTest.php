@@ -127,4 +127,30 @@ class RapportsTest extends TestCase
         $this->assertStringContainsString('Riz;;;;94;', $this->get('/exports/stocks')->assertOk()->streamedContent());
         $this->assertStringContainsString('Fatou;;7000;XOF', $this->get('/exports/credits')->assertOk()->streamedContent());
     }
+
+    public function test_la_marge_est_estimee_ou_expliquee(): void
+    {
+        $this->dans();
+        $savon = Produit::create(['nom' => 'Savon', 'prix_vente' => 1000, 'taux_tva' => 0, 'stock' => 10]); // sans prix d'achat
+        $this->api($this->admin)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['produit_id' => $savon->id, 'quantite' => 2], ['libelle' => 'Livraison', 'prix_unitaire' => 500, 'quantite' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertCreated();
+
+        $this->api($this->admin)->getJson('/api/rapports')->assertJsonPath('marge.taux', null);
+
+        // Prix d'achat renseigné après la vente : la marge est estimée.
+        $savon->update(['prix_achat' => 600]);
+        $this->api($this->admin)->getJson('/api/rapports')
+            ->assertJsonPath('marge.marge', 800)
+            ->assertJsonPath('marge.taux', 40)
+            ->assertJsonPath('marge.couverture', 80)
+            ->assertJsonPath('marge.estimee', true);
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin);
+        $this->dans();
+        $this->get('/rapports')->assertOk()->assertSee('Marge calculée sur 80 %', false)->assertSee('estimation');
+    }
 }

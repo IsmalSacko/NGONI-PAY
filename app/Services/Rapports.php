@@ -31,13 +31,20 @@ class Rapports
 
         $annulees = Vente::where('statut', Vente::STATUT_ANNULEE)->whereBetween('created_at', [$debut, $fin]);
 
+        // Coût : prix d'achat mémorisé à la vente, sinon prix d'achat actuel de
+        // l'article (estimation). Les montants libres n'ont pas de coût.
         $marge = LigneVente::query()
-            ->whereHas('vente', fn ($q) => $q->valides()->whereBetween('created_at', [$debut, $fin]))
-            ->whereNotNull('prix_achat')
-            ->selectRaw('COALESCE(SUM(total_ligne), 0) as chiffre, COALESCE(SUM(prix_achat * quantite), 0) as cout')
+            ->from('lignes_vente as lv')
+            ->leftJoin('produits as p', 'p.id', '=', 'lv.produit_id')
+            ->whereIn('lv.vente_id', $valides()->select('ventes.id'))
+            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(lv.prix_achat, p.prix_achat) IS NOT NULL THEN lv.total_ligne END), 0) as chiffre')
+            ->selectRaw('COALESCE(SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite), 0) as cout')
+            ->selectRaw('COALESCE(SUM(CASE WHEN lv.prix_achat IS NULL AND p.prix_achat IS NOT NULL THEN lv.total_ligne END), 0) as estime')
+            ->selectRaw('COALESCE(SUM(lv.total_ligne), 0) as brut')
             ->first();
         $chiffreCouvert = (int) $marge->chiffre;
         $cout = (int) $marge->cout;
+        $brut = (int) $marge->brut;
 
         return [
             'du' => $debut->toDateString(),
@@ -79,6 +86,9 @@ class Rapports
                 'cout' => $cout,
                 'marge' => $chiffreCouvert - $cout,
                 'taux' => $chiffreCouvert > 0 ? round(($chiffreCouvert - $cout) * 100 / $chiffreCouvert, 1) : null,
+                // Part des ventes (avant remise) dont le coût est connu, et part estimée.
+                'couverture' => $brut > 0 ? (int) round($chiffreCouvert * 100 / $brut) : null,
+                'estimee' => (int) $marge->estime > 0,
             ],
             'credit' => [
                 'accorde' => (int) $valides()->where('moyen_paiement', MoyenPaiement::CreditClient)->sum('total'),
