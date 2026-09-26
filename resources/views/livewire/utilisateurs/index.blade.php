@@ -1,5 +1,5 @@
 @php($libelles = ['admin' => 'Admin', 'gerant' => 'Gérant', 'caissier' => 'Caissier'])
-<div class="flex flex-col gap-5">
+<div class="flex flex-col gap-5" wire:poll.visible.30s>
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Équipe</h1>

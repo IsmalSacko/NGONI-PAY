@@ -195,4 +195,21 @@ class MultiBoutiqueTest extends TestCase
         $etrangere = (string) Str::uuid();
         $this->actingAs($this->awa)->post('/boutique-active', ['boutique' => $etrangere])->assertForbidden();
     }
+
+    public function test_une_categorie_creee_dans_l_app_apparait_dans_le_back_office(): void
+    {
+        $admin = \App\Services\BoutiqueRegistrationService::class;
+        ['user' => $user, 'boutique' => $boutique] = app($admin)->register([
+            'nom' => 'Pharmacie', 'pays' => 'ML', 'telephone' => '76001122',
+            'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Ismael',
+        ]);
+
+        $this->withToken($user->createToken('app')->plainTextToken)->withHeader('X-Boutique', $boutique->id)
+            ->postJson('/api/categories', ['nom' => 'Vêtement'])->assertCreated();
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+        app(\App\Support\Tenancy\TenantContext::class)->forget();
+        $this->actingAs($user)->get('/categories')->assertOk()->assertSee('Vêtement');
+    }
 }

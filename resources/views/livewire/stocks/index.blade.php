@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-5">
+<div class="flex flex-col gap-5" wire:poll.visible.30s>
     <div class="flex flex-col gap-1">
         <h1 class="font-display font-extrabold text-2xl md:text-3xl">Stocks &amp; inventaire</h1>
         <span class="text-[--color-muted] text-sm">Ajustez le stock à la suite d'un inventaire ou d'un réassort.</span>
