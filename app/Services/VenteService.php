@@ -18,10 +18,14 @@ use Illuminate\Validation\ValidationException;
 /**
  * Encaissement d'une vente à la caisse tactile.
  *
- * Les prix et taux de TVA ne sont JAMAIS pris depuis le client : ils sont
- * relus depuis le catalogue au moment de l'encaissement, pour qu'une
- * tablette compromise ou désynchronisée ne puisse pas imposer son propre
- * prix. Seules les quantités viennent du client.
+ * Pour un article du catalogue, les prix et taux de TVA ne sont JAMAIS pris
+ * depuis le client : ils sont relus depuis le catalogue au moment de
+ * l'encaissement, pour qu'une tablette compromise ou désynchronisée ne puisse
+ * pas imposer son propre prix. Seules les quantités viennent du client.
+ *
+ * Une ligne libre (libellé + prix saisi, sans produit) sert aux prestations,
+ * acomptes et articles hors catalogue : son prix vient par nature du client,
+ * elle ne touche ni au stock ni au journal des mouvements.
  *
  * `reference_locale` (UUID généré par la tablette) rend l'appel idempotent :
  * une vente hors ligne rejouée au retour du réseau ne se double pas.
@@ -37,7 +41,7 @@ class VenteService
      * @param  array{
      *     reference_locale: ?string,
      *     client_id: ?string,
-     *     lignes: list<array{produit_id: string, quantite: int}>,
+     *     lignes: list<array{produit_id?: ?string, libelle?: ?string, prix_unitaire?: ?int, taux_tva?: ?float, quantite: int}>,
      *     remise: int,
      *     moyen_paiement: string,
      *     montant_recu: ?int,
@@ -66,7 +70,7 @@ class VenteService
             // boutique, sans bloquer les autres boutiques.
             Boutique::whereKey($boutiqueId)->lockForUpdate()->first();
 
-            $produits = Produit::whereIn('id', array_column($data['lignes'], 'produit_id'))
+            $produits = Produit::whereIn('id', array_filter(array_column($data['lignes'], 'produit_id')))
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
@@ -75,6 +79,23 @@ class VenteService
             $sousTotal = 0;
 
             foreach ($data['lignes'] as $ligne) {
+                if (empty($ligne['produit_id'])) {
+                    $totalLigne = (int) $ligne['prix_unitaire'] * $ligne['quantite'];
+                    $sousTotal += $totalLigne;
+
+                    $lignes[] = [
+                        'produit' => null,
+                        'nom' => trim((string) $ligne['libelle']),
+                        'quantite' => $ligne['quantite'],
+                        'prix_unitaire' => (int) $ligne['prix_unitaire'],
+                        // Une prestation est souvent hors TVA : 0 par défaut.
+                        'taux_tva' => (float) ($ligne['taux_tva'] ?? 0),
+                        'total_ligne' => $totalLigne,
+                    ];
+
+                    continue;
+                }
+
                 $produit = $produits->get($ligne['produit_id']);
 
                 if ($produit === null) {
@@ -90,6 +111,7 @@ class VenteService
 
                 $lignes[] = [
                     'produit' => $produit,
+                    'nom' => $produit->nom,
                     'quantite' => $ligne['quantite'],
                     'prix_unitaire' => $produit->prix_vente,
                     'taux_tva' => $produit->taux_tva,
@@ -140,13 +162,18 @@ class VenteService
 
             foreach ($lignes as $l) {
                 $vente->lignes()->create([
-                    'produit_id' => $l['produit']->id,
-                    'nom_produit' => $l['produit']->nom,
+                    'produit_id' => $l['produit']?->id,
+                    'nom_produit' => $l['nom'],
                     'prix_unitaire' => $l['prix_unitaire'],
                     'taux_tva' => $l['taux_tva'],
                     'quantite' => $l['quantite'],
                     'total_ligne' => $l['total_ligne'],
                 ]);
+
+                // Ligne libre : ni stock ni mouvement à écrire.
+                if ($l['produit'] === null) {
+                    continue;
+                }
 
                 $produit = $l['produit'];
                 $produit->stock -= $l['quantite'];

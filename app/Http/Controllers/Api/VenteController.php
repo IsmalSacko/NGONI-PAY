@@ -38,7 +38,13 @@ class VenteController extends Controller
             'reference_locale' => ['nullable', 'uuid'],
             'client_id' => ['nullable', 'uuid', 'exists:clients,id'],
             'lignes' => ['required', 'array', 'min:1'],
-            'lignes.*.produit_id' => ['required', 'uuid'],
+            // Ligne du catalogue : produit_id (le prix est relu côté serveur).
+            // Ligne libre : libellé + prix saisi, sans produit ni stock —
+            // prestation, acompte, article hors catalogue.
+            'lignes.*.produit_id' => ['nullable', 'uuid', 'required_without:lignes.*.libelle'],
+            'lignes.*.libelle' => ['nullable', 'string', 'max:120', 'required_without:lignes.*.produit_id'],
+            'lignes.*.prix_unitaire' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_with:lignes.*.libelle'],
+            'lignes.*.taux_tva' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'lignes.*.quantite' => ['required', 'integer', 'min:1'],
             'remise' => ['nullable', 'integer', 'min:0'],
             'moyen_paiement' => ['required', Rule::enum(MoyenPaiement::class)],

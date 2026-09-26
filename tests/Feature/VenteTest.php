@@ -133,4 +133,76 @@ class VenteTest extends TestCase
             'moyen_paiement' => 'bitcoin',
         ])->assertUnprocessable()->assertJsonValidationErrors('moyen_paiement');
     }
+
+    public function test_une_vente_libre_encaisse_un_montant_sans_toucher_au_stock(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withToken($token)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['libelle' => 'Repassage costume', 'prix_unitaire' => 2500, 'quantite' => 2]],
+            'moyen_paiement' => 'especes',
+            'montant_recu' => 5000,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('total', 5000);
+        $response->assertJsonPath('tva', 0);
+        $response->assertJsonPath('lignes.0.nom_produit', 'Repassage costume');
+        $response->assertJsonPath('lignes.0.produit_id', null);
+
+        $this->assertDatabaseCount('mouvements_stock', 0);
+    }
+
+    public function test_une_vente_peut_melanger_catalogue_et_ligne_libre(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+
+        $produit = Produit::create(['nom' => 'Savon', 'prix_vente' => 250, 'taux_tva' => 18.00, 'stock' => 10]);
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withToken($token)->postJson('/api/ventes', [
+            'lignes' => [
+                ['produit_id' => $produit->id, 'quantite' => 2],
+                ['libelle' => 'Livraison', 'prix_unitaire' => 1000, 'quantite' => 1, 'taux_tva' => 18],
+            ],
+            'moyen_paiement' => 'orange_money',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('total', 1500);
+        $this->assertSame(8, $produit->fresh()->stock);
+        $this->assertDatabaseCount('mouvements_stock', 1);
+    }
+
+    public function test_un_prix_envoye_pour_un_article_du_catalogue_est_ignore(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+
+        $produit = Produit::create(['nom' => 'Riz', 'prix_vente' => 4750, 'taux_tva' => 18.00, 'stock' => 5]);
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $produit->id, 'quantite' => 1, 'prix_unitaire' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertCreated()->assertJsonPath('total', 4750);
+    }
+
+    public function test_une_ligne_libre_exige_un_libelle_et_un_prix(): void
+    {
+        ['user' => $admin] = $this->boutiqueAvecAdmin();
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/ventes', [
+            'lignes' => [['libelle' => 'Acompte', 'quantite' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertStatus(422)->assertJsonValidationErrors('lignes.0.prix_unitaire');
+
+        $this->withToken($token)->postJson('/api/ventes', [
+            'lignes' => [['quantite' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertStatus(422)->assertJsonValidationErrors(['lignes.0.produit_id', 'lignes.0.libelle']);
+    }
 }
