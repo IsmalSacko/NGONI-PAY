@@ -9,7 +9,6 @@ use App\Models\LigneVente;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Rapport d'activité de la boutique active sur une période (bornes incluses) :
@@ -24,12 +23,15 @@ class Rapports
     {
         $debut = $du->copy()->startOfDay();
         $fin = $au->copy()->endOfDay();
-        $valides = fn () => Vente::valides()->whereBetween('ventes.created_at', [$debut, $fin]);
+        // Par journée d'affaires : une vente faite après une clôture compte
+        // pour la journée suivante, comme sur le ticket Z.
+        $dans = fn ($q) => $q->whereBetween('ventes.jour_affaire', [$debut->toDateString(), $fin->toDateString()]);
+        $valides = fn () => $dans(Vente::valides());
 
         $total = (int) $valides()->sum('total');
         $nombre = $valides()->count();
 
-        $annulees = Vente::where('statut', Vente::STATUT_ANNULEE)->whereBetween('created_at', [$debut, $fin]);
+        $annulees = $dans(Vente::where('statut', Vente::STATUT_ANNULEE));
 
         // Coût : prix d'achat mémorisé à la vente, sinon prix d'achat actuel de
         // l'article (estimation). Les montants libres n'ont pas de coût.
@@ -55,12 +57,12 @@ class Rapports
                 'remises' => (int) $valides()->sum('remise'),
                 'tva' => (int) $valides()->sum('tva'),
                 'panier_moyen' => $nombre > 0 ? (int) round($total / $nombre) : 0,
-                'articles' => (int) LigneVente::whereHas('vente', fn ($q) => $q->valides()->whereBetween('created_at', [$debut, $fin]))->sum('quantite'),
+                'articles' => (int) LigneVente::whereHas('vente', fn ($q) => $dans($q->valides()))->sum('quantite'),
             ],
             'annulees' => ['nombre' => (clone $annulees)->count(), 'total' => (int) (clone $annulees)->sum('total')],
             'par_jour' => $valides()
-                ->selectRaw('DATE(created_at) as jour, COUNT(*) as nombre, SUM(total) as total')
-                ->groupByRaw('DATE(created_at)')->orderBy('jour')->get()
+                ->selectRaw('jour_affaire as jour, COUNT(*) as nombre, SUM(total) as total')
+                ->groupBy('jour_affaire')->orderBy('jour_affaire')->get()
                 ->map(fn ($r) => ['date' => (string) $r->jour, 'nombre' => (int) $r->nombre, 'total' => (int) $r->total]),
             'par_moyen' => $valides()
                 ->selectRaw('moyen_paiement, COUNT(*) as nombre, SUM(total) as total')
@@ -77,7 +79,7 @@ class Rapports
                 ->groupBy('users.name')->orderByDesc('total')->get()
                 ->map(fn ($r) => ['nom' => (string) $r->nom, 'nombre' => (int) $r->nombre, 'total' => (int) $r->total]),
             'top_produits' => LigneVente::query()
-                ->whereHas('vente', fn ($q) => $q->valides()->whereBetween('created_at', [$debut, $fin]))
+                ->whereHas('vente', fn ($q) => $dans($q->valides()))
                 ->selectRaw('nom_produit as nom, SUM(quantite) as quantite, SUM(total_ligne) as total')
                 ->groupBy('nom_produit')->orderByDesc('total')->limit(10)->get()
                 ->map(fn ($r) => ['nom' => (string) $r->nom, 'quantite' => (int) $r->quantite, 'total' => (int) $r->total]),

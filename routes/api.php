@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\ClotureController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\NotificationController;
@@ -64,6 +65,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
     Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');
+    Route::get('journee', [ClotureController::class, 'journee']);
+    Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
+    Route::post('clotures', [ClotureController::class, 'store'])->middleware('permission:rapports.view');
 
     Route::get('categories', [CategorieProduitController::class, 'index'])->middleware('permission:categories.view');
     Route::post('categories', [CategorieProduitController::class, 'store'])->middleware(['permission:categories.create', 'abonnement']);

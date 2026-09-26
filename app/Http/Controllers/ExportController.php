@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Boutique;
 use App\Models\Client;
+use App\Models\Cloture;
 use App\Models\Produit;
 use App\Models\Vente;
 use App\Services\Rapports;
@@ -89,7 +90,12 @@ class ExportController extends Controller
     {
         [$du, $au] = $this->periode($request);
 
-        return view('rapports.imprimer', ['r' => $rapports->periode($du, $au), 'boutique' => $this->boutique()]);
+        return view('rapports.imprimer', [
+            'r' => $rapports->periode($du, $au),
+            'boutique' => $this->boutique(),
+            // Journée clôturée : le rapport est son ticket Z.
+            'z' => $du->isSameDay($au) ? Cloture::whereDate('jour_affaire', $du)->first() : null,
+        ]);
     }
 
     /** @return array{0: Carbon, 1: Carbon} */

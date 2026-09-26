@@ -14,6 +14,7 @@ use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -143,6 +144,9 @@ class VenteService
             unset($l);
 
             $numero = (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->max('numero') + 1;
+            // Journée d'affaires et numéro du jour (repart à 1 après la clôture).
+            $jour = app(Journee::class)->courante()->toDateString();
+            $numeroJour = (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->whereDate('jour_affaire', $jour)->max('numero_jour') + 1;
             $session = $this->sessions->courante($caissier);
 
             $vente = Vente::create([
@@ -151,6 +155,8 @@ class VenteService
                 'session_caisse_id' => $session?->id,
                 'reference_locale' => $data['reference_locale'] ?? null,
                 'numero' => $numero,
+                'jour_affaire' => $jour,
+                'numero_jour' => $numeroJour,
                 'sous_total' => $sousTotal,
                 'remise' => $remise,
                 'tva' => $tva,
@@ -215,9 +221,11 @@ class VenteService
 
             // Des chiffres déjà arrêtés ne doivent jamais bouger après coup :
             // - une journée passée (chiffre d'affaires, rapports) ;
-            if (! $vente->created_at->isSameDay(now())) {
+            $journee = app(Journee::class);
+            $jourVente = $vente->jour_affaire ?? $vente->created_at->toDateString();
+            if ($journee->estCloturee($jourVente) || ! Carbon::parse($jourVente)->isSameDay($journee->courante())) {
                 throw ValidationException::withMessages(['vente' => [
-                    'Seules les ventes du jour s’annulent : les chiffres des jours précédents sont arrêtés.',
+                    'Seules les ventes de la journée en cours s’annulent : les journées clôturées ou passées sont arrêtées.',
                 ]]);
             }
 

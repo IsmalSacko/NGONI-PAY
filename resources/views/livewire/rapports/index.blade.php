@@ -17,8 +17,25 @@
         </div>
     </div>
 
+    @if ($statut)
+        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $statut }}</p>
+    @endif
+    @error('journee') <div class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 font-semibold">{{ $message }}</div> @enderror
+
+    <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-col gap-1">
+            <span class="text-sm font-semibold text-[--color-muted]">Journée en cours</span>
+            <span class="font-display font-extrabold text-xl">{{ $journee->translatedFormat('l d/m/Y') }} · {{ $ticketsJour }} ticket{{ $ticketsJour > 1 ? 's' : '' }}</span>
+            <span class="text-xs text-[--color-muted]">
+                La clôture fige les chiffres de la journée (ticket Z) ; les tickets repartent à 1 et les ventes suivantes comptent pour le lendemain.
+            </span>
+        </div>
+        <button wire:click="cloturer" wire:confirm="Clôturer la journée du {{ $journee->format('d/m/Y') }} ? Ses chiffres seront figés et ses ventes ne pourront plus être annulées."
+                class="h-11 px-5 rounded-xl bg-accent text-white font-bold">Clôturer la journée</button>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2">
-        @foreach (['jour' => 'Aujourd’hui (clôture)', 'hier' => 'Hier', '7j' => '7 jours', 'mois' => 'Ce mois', 'mois_dernier' => 'Mois dernier'] as $code => $libelle)
+        @foreach (['jour' => 'Aujourd’hui', 'hier' => 'Hier', '7j' => '7 jours', 'mois' => 'Ce mois', 'mois_dernier' => 'Mois dernier'] as $code => $libelle)
             <button wire:click="periode('{{ $code }}')" class="h-10 px-4 rounded-full text-sm font-bold bg-white border border-[--color-border-strong] hover:border-accent">{{ $libelle }}</button>
         @endforeach
         <span class="flex items-center gap-2 text-sm">
@@ -90,5 +107,24 @@
                 <p class="text-sm text-[--color-muted]">Aucune vente sur la période.</p>
             @endforelse
         </section>
+    </div>
+
+    <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-3">
+        <h2 class="font-display font-extrabold text-lg">Clôtures (tickets Z)</h2>
+        @forelse ($clotures as $z)
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-[--color-border] pt-3 text-sm">
+                <button wire:click="$set('du', '{{ $z->jour_affaire->toDateString() }}'); $set('au', '{{ $z->jour_affaire->toDateString() }}')" class="text-left">
+                    <strong>Z n° {{ $z->numero }}</strong> · {{ $z->jour_affaire->format('d/m/Y') }}
+                    <span class="text-[--color-muted]">· clôturée le {{ $z->created_at->format('d/m/Y à H:i') }} par {{ $z->auteur?->name }}</span>
+                </button>
+                <span class="flex items-center gap-3">
+                    <strong>{{ $m($z->totaux['ventes']['total'] ?? 0) }} {{ $devise }}</strong>
+                    <span class="text-[--color-muted]">{{ $z->totaux['ventes']['nombre'] ?? 0 }} tickets</span>
+                    <a href="{{ route('rapports.imprimer', ['du' => $z->jour_affaire->toDateString(), 'au' => $z->jour_affaire->toDateString()]) }}" target="_blank" class="underline">Imprimer</a>
+                </span>
+            </div>
+        @empty
+            <p class="text-sm text-[--color-muted]">Aucune journée clôturée pour l’instant.</p>
+        @endforelse
     </div>
 </div>

@@ -19,11 +19,21 @@ use Illuminate\Support\Str;
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
+    'jour_affaire', 'numero_jour',
 ])]
 class Vente extends Model
 {
     /** @use HasFactory<VenteFactory> */
     use BelongsToBoutique, HasFactory, HasUuids;
+
+    protected static function booted(): void
+    {
+        // Filet : une vente créée hors du service de caisse compte pour le
+        // jour de sa création.
+        static::creating(function (Vente $vente): void {
+            $vente->jour_affaire ??= ($vente->created_at ?? now())->toDateString();
+        });
+    }
 
     /** Numéro lisible, envoyé à l'application avec chaque vente. */
     protected $appends = ['numero_facture'];
@@ -38,6 +48,7 @@ class Vente extends Model
             'vendue_hors_ligne' => 'boolean',
             'synchronisee_le' => 'datetime',
             'annulee_le' => 'datetime',
+            'jour_affaire' => 'date:Y-m-d',
         ];
     }
 

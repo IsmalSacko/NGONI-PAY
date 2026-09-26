@@ -6,6 +6,9 @@ namespace App\Livewire\Rapports;
 
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Boutique;
+use App\Models\Cloture;
+use App\Models\Vente;
+use App\Services\Journee;
 use App\Services\Rapports;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
@@ -27,10 +30,25 @@ class Index extends Component
     #[Url]
     public string $au = '';
 
+    public string $statut = '';
+
     public function mount(): void
     {
         $this->du = $this->du ?: today()->toDateString();
         $this->au = $this->au ?: today()->toDateString();
+    }
+
+    /**
+     * Clôture la journée en cours (ticket Z) : ses chiffres sont figés, la
+     * numérotation des tickets repart à 1 et les ventes suivantes comptent
+     * pour le lendemain.
+     */
+    public function cloturer(Journee $journee): void
+    {
+        abort_unless(auth()->user()->can('rapports.view'), 403);
+        $z = $journee->cloturer(auth()->user());
+        $this->du = $this->au = $z->jour_affaire->toDateString();
+        $this->statut = ('Journée du '.$z->jour_affaire->format('d/m/Y').' clôturée : Z n° '.$z->numero.'. Les tickets repartent à 1.');
     }
 
     public function periode(string $choix): void
@@ -60,6 +78,9 @@ class Index extends Component
         return view('livewire.rapports.index', [
             'r' => $rapports->periode($du, $au),
             'boutique' => Boutique::find($this->boutiqueActiveId()),
+            'journee' => $jour = app(Journee::class)->courante(),
+            'ticketsJour' => (int) Vente::whereDate('jour_affaire', $jour)->max('numero_jour'),
+            'clotures' => Cloture::with('auteur:id,name')->latest('numero')->limit(15)->get(),
         ]);
     }
 }

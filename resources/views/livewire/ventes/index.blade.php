@@ -29,7 +29,7 @@
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="fermer">
             <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto flex flex-col gap-3">
                 <div class="flex justify-between items-baseline">
-                    <h2 class="font-display font-extrabold text-xl">Ticket n° {{ $detail->numeroFormate() }}</h2>
+                    <h2 class="font-display font-extrabold text-xl">Ticket n° {{ $detail->numeroFormate() }}@if ($detail->numero_jour) <span class="text-[--color-muted] text-base">· n° {{ $detail->numero_jour }} du jour</span>@endif</h2>
                     <span class="text-xs text-[--color-muted]">{{ $detail->created_at->format('d/m/Y H:i') }}</span>
                 </div>
                 <div class="text-sm text-[--color-muted]">

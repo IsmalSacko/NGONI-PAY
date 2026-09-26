@@ -75,7 +75,7 @@ class RapportsTest extends TestCase
         $annulee = $this->vendre($this->caissier);                        // 10 000 puis annulée
         $this->api($this->admin)->postJson("/api/ventes/{$annulee}/annuler", ['motif' => 'Erreur'])->assertOk();
         $hier = $this->vendre($this->admin);                              // hier : hors période
-        Vente::withoutGlobalScopes()->whereKey($hier)->update(['created_at' => now()->subDay()]);
+        Vente::withoutGlobalScopes()->whereKey($hier)->update(['created_at' => now()->subDay(), 'jour_affaire' => now()->subDay()->toDateString()]);
         $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 3000, 'moyen_paiement' => 'wave'])->assertCreated();
     }
 

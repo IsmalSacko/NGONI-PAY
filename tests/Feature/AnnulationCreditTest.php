@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Ventes\Index;
 use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\Produit;
 use App\Models\User;
+use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -130,13 +133,13 @@ class AnnulationCreditTest extends TestCase
         $this->actingAs($this->admin);
         $this->dans();
 
-        \Livewire\Livewire::test(\App\Livewire\Ventes\Index::class)
+        Livewire::test(Index::class)
             ->call('voir', $vente)->call('annuler')->assertHasErrors('motif')
             ->set('motif', 'Erreur de caisse')->call('annuler')->assertHasNoErrors()
             ->assertSee('Vente annulée')->assertSee('Erreur de caisse');
         $this->assertSame(8, $this->riz->fresh()->stock);
 
-        \Livewire\Livewire::test(\App\Livewire\Clients\Index::class)
+        Livewire::test(\App\Livewire\Clients\Index::class)
             ->assertSee('10 000')
             ->call('ouvrirReglement', $fatou->id)->assertSet('reglementMontant', '10000')
             ->set('reglementMontant', '99999')->call('enregistrerReglement')->assertHasErrors('reglementMontant')
@@ -148,9 +151,9 @@ class AnnulationCreditTest extends TestCase
     {
         // Journée passée.
         $hier = $this->vendre($this->admin)->json('id');
-        \App\Models\Vente::withoutGlobalScopes()->whereKey($hier)->update(['created_at' => now()->subDay()]);
+        Vente::withoutGlobalScopes()->whereKey($hier)->update(['created_at' => now()->subDay(), 'jour_affaire' => now()->subDay()->toDateString()]);
         $this->api($this->admin)->postJson("/api/ventes/{$hier}/annuler", ['motif' => 'x'])
-            ->assertUnprocessable()->assertJsonPath('errors.vente.0', 'Seules les ventes du jour s’annulent : les chiffres des jours précédents sont arrêtés.');
+            ->assertUnprocessable()->assertJsonPath('errors.vente.0', 'Seules les ventes de la journée en cours s’annulent : les journées clôturées ou passées sont arrêtées.');
 
         // Séance fermée.
         $this->api($this->caissier)->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
@@ -168,6 +171,6 @@ class AnnulationCreditTest extends TestCase
 
         // Aucun de ces refus n'a touché au stock ni aux chiffres.
         $this->assertSame(4, $this->riz->fresh()->stock);
-        $this->assertSame(0, \App\Models\Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
+        $this->assertSame(0, Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
     }
 }
