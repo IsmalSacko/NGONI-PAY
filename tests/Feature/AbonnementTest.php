@@ -270,4 +270,29 @@ class AbonnementTest extends TestCase
 
         $this->assertNull(User::where('name', 'De trop')->first());
     }
+
+    public function test_un_compte_sans_boutique_en_cree_une_et_son_essai_demarre(): void
+    {
+        $sansBoutique = User::create(['name' => 'Inscrit', 'phone' => '+22370000055', 'password' => 'password123']);
+
+        $this->api($sansBoutique)->getJson('/api/moi')->assertOk()->assertJsonPath('user.boutique', null);
+        $id = $this->api($sansBoutique)->postJson('/api/boutiques', ['nom' => 'Ma boutique', 'pays' => 'ML'])->assertCreated()->json('id');
+        $this->api($sansBoutique)->putJson("/api/boutiques/{$id}/par-defaut")->assertOk();
+
+        $this->assertSame('essai', $sansBoutique->fresh()->abonnement->plan);
+        $this->assertTrue($sansBoutique->fresh()->abonnement->estEnCours());
+        $this->api($sansBoutique)->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.est_proprietaire', true);
+    }
+
+    public function test_un_proprietaire_dont_les_boutiques_sont_fermees_peut_en_rouvrir_une(): void
+    {
+        $this->expirer();
+        $this->boutique->delete();
+
+        $this->api()->postJson('/api/boutiques', ['nom' => 'Réouverture'])->assertCreated();
+
+        // Pas de nouvel essai : l'abonnement reste expiré, la boutique en lecture seule.
+        $this->assertFalse($this->awa->abonnement()->first()->estEnCours());
+        $this->assertSame(1, Abonnement::count());
+    }
 }

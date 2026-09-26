@@ -39,6 +39,7 @@ class SessionCaisseService
         }
 
         $totalEspeces = (int) $session->ventes()
+            ->valides()
             ->where('moyen_paiement', MoyenPaiement::Especes)
             ->sum('total');
 

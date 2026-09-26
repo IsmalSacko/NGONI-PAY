@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['nom', 'telephone', 'points_fidelite'])]
+#[Fillable(['nom', 'telephone', 'email', 'notes', 'points_fidelite'])]
 class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */

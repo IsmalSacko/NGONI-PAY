@@ -14,7 +14,7 @@ class DashboardController extends Controller
 {
     public function index(): JsonResponse
     {
-        $aujourdhui = Vente::whereDate('created_at', today());
+        $aujourdhui = Vente::valides()->whereDate('created_at', today());
 
         return response()->json([
             'ventes_jour' => [

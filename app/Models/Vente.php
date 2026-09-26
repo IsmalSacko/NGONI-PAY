@@ -65,6 +65,22 @@ class Vente extends Model
         return $this->hasMany(LigneVente::class);
     }
 
+    public const STATUT_VALIDEE = 'validee';
+
+    /** Annulée (reprise de l'historique Ngoni Pay) : gardée, jamais comptée. */
+    public const STATUT_ANNULEE = 'annulee';
+
+    public function estAnnulee(): bool
+    {
+        return $this->statut === self::STATUT_ANNULEE;
+    }
+
+    /** Ventes qui comptent dans les chiffres (recettes, écarts de caisse). */
+    public function scopeValides($query)
+    {
+        return $query->where($this->getTable().'.statut', self::STATUT_VALIDEE);
+    }
+
     public function numeroFormate(): string
     {
         return str_pad((string) $this->numero, 6, '0', STR_PAD_LEFT);

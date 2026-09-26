@@ -77,6 +77,13 @@ class AbonnementService
             return true;
         }
 
+        // Plus aucune boutique active (toutes fermées) : il doit pouvoir en
+        // rouvrir une pour atteindre sa page d'abonnement. L'essai n'est pas
+        // relancé ; sans abonnement en cours, la boutique reste en lecture seule.
+        if ($proprietaire->boutiquesPossedees()->count() === 0) {
+            return true;
+        }
+
         if (! $abonnement->estEnCours()) {
             return false;
         }

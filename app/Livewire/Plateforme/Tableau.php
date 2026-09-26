@@ -31,8 +31,8 @@ class Tableau extends Component
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),
             'demandes' => DemandeAbonnement::enAttente()->count(),
-            'ventesJour' => Vente::withoutBoutiqueScope()->whereDate('created_at', today())->count(),
-            'montantJour' => (int) Vente::withoutBoutiqueScope()->whereDate('created_at', today())->sum('total'),
+            'ventesJour' => Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today())->count(),
+            'montantJour' => (int) Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today())->sum('total'),
         ]);
     }
 }

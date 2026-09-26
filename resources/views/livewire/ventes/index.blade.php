@@ -10,7 +10,7 @@
         </div>
         @forelse ($ventes as $vente)
             <div class="grid grid-cols-[100px_1fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
-                <span class="font-mono">{{ $vente->numeroFormate() }}</span>
+                <span class="font-mono">{{ $vente->numeroFormate() }}@if ($vente->estAnnulee()) <span class="ml-1 rounded bg-danger-bg px-1.5 text-xs font-bold text-danger-fg">annulée</span>@endif</span>
                 <span>{{ $vente->caissier->name }}</span>
                 <span>{{ $vente->client->nom ?? '—' }}</span>
                 <span>{{ $vente->moyen_paiement->label() }}</span>

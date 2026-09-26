@@ -19,7 +19,7 @@ class Dashboard extends Component
     public function render()
     {
         $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
-        $ventesJour = Vente::whereDate('created_at', today())->get();
+        $ventesJour = Vente::valides()->whereDate('created_at', today())->get();
 
         $total = (int) $ventesJour->sum('total');
         $tickets = $ventesJour->count();
@@ -42,7 +42,7 @@ class Dashboard extends Component
             ])->sortByDesc('total')->values();
 
         $topProduits = LigneVente::query()
-            ->whereHas('vente', fn ($q) => $q->whereDate('created_at', today()))
+            ->whereHas('vente', fn ($q) => $q->valides()->whereDate('created_at', today()))
             ->selectRaw('nom_produit, sum(quantite) as quantite, sum(total_ligne) as total')
             ->groupBy('nom_produit')
             ->orderByDesc('total')

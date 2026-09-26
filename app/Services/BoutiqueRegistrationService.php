@@ -129,7 +129,7 @@ class BoutiqueRegistrationService
         }
     }
 
-    private function provisionnerRoles(Boutique $boutique): void
+    public function provisionnerRoles(Boutique $boutique): void
     {
         // Une boutique peut être la toute première du catalogue : les
         // permissions elles-mêmes (globales, sans colonne d'équipe) doivent

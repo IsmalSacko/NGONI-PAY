@@ -44,6 +44,21 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        // Base de Ngoni Pay, lue une seule fois par `ecaisse:importer-ngonipay`
+        // pour reprendre ses comptes à la bascule. Lecture seule.
+        'ngonipay' => [
+            'driver' => env('NGONIPAY_DB_CONNECTION', 'mysql'),
+            'host' => env('NGONIPAY_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('NGONIPAY_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('NGONIPAY_DB_DATABASE', 'ngonipay'),
+            'username' => env('NGONIPAY_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('NGONIPAY_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
