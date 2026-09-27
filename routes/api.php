@@ -55,6 +55,8 @@ Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->control
     Route::get('utilisateurs', 'utilisateurs');
     Route::post('utilisateurs/{user}/basculer', 'basculer');
     Route::post('utilisateurs/{user}/mot-de-passe', 'motDePasse');
+    Route::get('utilisateurs/{user}/suppression', 'apercuSuppression');
+    Route::delete('utilisateurs/{user}', 'supprimerCompte');
     Route::get('annonces', 'annonces');
     Route::post('annonces', 'envoyerAnnonce');
 });

@@ -16,6 +16,7 @@ use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
 use App\Services\DiffusionAnnonces;
+use App\Services\SuppressionCompte;
 use App\Support\WhatsApp;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -208,6 +209,21 @@ class PlateformeController extends Controller
     public function motDePasse(User $user, Request $request, ComptesPlateforme $comptes): JsonResponse
     {
         return response()->json($comptes->motDePasseProvisoire($user, $request->user()));
+    }
+
+    /** Ce que la suppression du compte emporterait (rien n'est touché). */
+    public function apercuSuppression(User $user, SuppressionCompte $suppression): JsonResponse
+    {
+        return response()->json($suppression->apercu($user));
+    }
+
+    /** Suppression définitive du compte et de ses boutiques : il faut taper SUPPRIMER. */
+    public function supprimerCompte(User $user, Request $request, SuppressionCompte $suppression): JsonResponse
+    {
+        $request->validate(['confirmation' => ['required', 'in:SUPPRIMER']], ['confirmation.in' => 'Tapez SUPPRIMER pour confirmer.']);
+        $resultat = $suppression->supprimer($user, $request->user());
+
+        return response()->json([...$resultat, 'message' => "Compte de {$user->name} supprimé, avec {$resultat['boutiques']} boutique(s) et {$resultat['comptes']} compte(s)."]);
     }
 
     public function annonces(): JsonResponse

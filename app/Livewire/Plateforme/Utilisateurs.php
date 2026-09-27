@@ -6,6 +6,7 @@ namespace App\Livewire\Plateforme;
 
 use App\Models\User;
 use App\Services\ComptesPlateforme;
+use App\Services\SuppressionCompte;
 use Illuminate\Validation\ValidationException;
 use App\Support\WhatsApp;
 use Illuminate\Support\Facades\Auth;
@@ -33,6 +34,15 @@ class Utilisateurs extends Component
     public ?string $pour = null;
 
     public ?string $lienWhatsApp = null;
+
+    /** Compte dont la suppression est en cours de confirmation, et son aperçu. */
+    public ?string $aSupprimer = null;
+
+    public array $apercu = [];
+
+    public string $confirmation = '';
+
+    public ?string $info = null;
 
     public ?string $alerte = null;
 
@@ -67,6 +77,36 @@ class Utilisateurs extends Component
         $this->motDePasseProvisoire = $provisoire['mot_de_passe'];
         $this->pour = "{$user->name} · {$user->phone}";
         $this->lienWhatsApp = $provisoire['whatsapp'];
+    }
+
+    /** Ouvre la confirmation : ce qui partira, avant d'effacer quoi que ce soit. */
+    public function preparerSuppression(string $userId, SuppressionCompte $suppression): void
+    {
+        $this->reset(['alerte', 'info', 'confirmation']);
+        $this->aSupprimer = $userId;
+        $this->apercu = $suppression->apercu(User::findOrFail($userId));
+    }
+
+    public function annulerSuppression(): void
+    {
+        $this->reset(['aSupprimer', 'apercu', 'confirmation']);
+    }
+
+    public function supprimer(SuppressionCompte $suppression): void
+    {
+        $this->validate(['confirmation' => ['required', 'in:SUPPRIMER']], ['confirmation.in' => 'Tapez SUPPRIMER pour confirmer.', 'confirmation.required' => 'Tapez SUPPRIMER pour confirmer.']);
+        $user = User::findOrFail($this->aSupprimer);
+
+        try {
+            $r = $suppression->supprimer($user, Auth::user());
+        } catch (ValidationException $e) {
+            $this->alerte = collect($e->errors())->flatten()->first();
+
+            return;
+        }
+
+        $this->info = "Compte de {$user->name} supprimé, avec {$r['boutiques']} boutique(s) et {$r['comptes']} compte(s). Sauvegarde : {$r['sauvegarde']}";
+        $this->annulerSuppression();
     }
 
     public function fermerMotDePasse(): void
