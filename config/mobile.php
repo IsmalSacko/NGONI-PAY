@@ -20,4 +20,10 @@ return [
     // Texte des nouveautés (facultatif), et copie par e-mail (non par défaut).
     'nouveautes' => env('MOBILE_NOUVEAUTES'),
     'annonce_par_email' => (bool) env('MOBILE_ANNONCE_PAR_EMAIL', false),
+
+    // Annonce sans intervention : la CI lit la version en production sur le
+    // Play Store et l'envoie à /api/publication-play avec ce jeton. L'annonce
+    // part après ce délai (le temps que le Play Store la diffuse partout).
+    'jeton_publication' => env('MOBILE_JETON_PUBLICATION'),
+    'delai_annonce_heures' => (int) env('MOBILE_DELAI_ANNONCE_HEURES', 3),
 ];

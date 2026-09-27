@@ -40,7 +40,7 @@ class VitrineController extends Controller
             ])->values(),
             'storeUrl' => (string) config('mobile.store_url'),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
-            'version' => (string) config('mobile.latest_version'),
+            'version' => \App\Support\VersionApplication::derniere(),
         ]);
     }
 }

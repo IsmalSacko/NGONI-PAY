@@ -62,7 +62,7 @@ class Annonces extends Component
         $this->quand = $type === 'campagne' ? 'programmer' : 'maintenant';
 
         if ($type === 'mise_a_jour') {
-            $this->version = (string) config('mobile.latest_version');
+            $this->version = \App\Support\VersionApplication::derniere();
             $this->lien = (string) config('mobile.store_url');
             $this->titre = 'Nouvelle version de l’application';
             $this->message = 'Mettez à jour Ngoni Caisse depuis le Play Store pour profiter des nouveautés.';

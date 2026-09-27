@@ -66,12 +66,8 @@ class AnnoncerMiseAJour extends Command
         return self::SUCCESS;
     }
 
-    /** Plus haute version déjà annoncée (l'ordre des versions, pas celui des dates). */
     private function derniereVersionAnnoncee(): ?string
     {
-        return Annonce::where('type', 'mise_a_jour')
-            ->whereNotNull('version')
-            ->pluck('version')
-            ->reduce(fn (?string $max, string $v) => $max === null || version_compare($v, $max, '>') ? $v : $max);
+        return \App\Support\VersionApplication::derniereAnnoncee();
     }
 }

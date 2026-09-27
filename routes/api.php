@@ -26,10 +26,13 @@ Route::get('pays', [PaysController::class, 'index']);
 // ce qui annonce aux applications Ngoni Pay 1.x qu'elles doivent se mettre à
 // jour (et devenir e-caisse) après la bascule.
 Route::get('app-version', fn () => response()->json([
-    'latest_version' => config('mobile.latest_version'),
+    'latest_version' => \App\Support\VersionApplication::derniere(),
     'store_url' => config('mobile.store_url'),
     'minimum_version' => config('mobile.minimum_version'),
 ]));
+// Version publiée sur le Play Store, signalée par la CI (jeton secret) : annonce automatique.
+Route::post('publication-play', \App\Http\Controllers\Api\PublicationPlayController::class)->middleware('throttle:10,1');
+
 // Catalogue public des plans : l'écran d'abonnement s'affiche même abonnement expiré.
 Route::get('plans', [AbonnementController::class, 'plans']);
 Route::post('inscription', [AuthController::class, 'register']);
