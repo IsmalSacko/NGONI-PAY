@@ -34,7 +34,7 @@ class SuppressionCompte
     ];
 
     /** Ordre d'effacement explicite : les tables qui en référencent d'autres d'abord. */
-    private const ORDRE_EFFACEMENT = [
+    public const ORDRE_EFFACEMENT = [
         'ventes', 'mouvements_stock', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur',
         'achats', 'fournisseurs', 'clotures', 'clients', 'produits', 'categories_produits',
     ];
