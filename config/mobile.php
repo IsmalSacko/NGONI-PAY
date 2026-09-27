@@ -12,4 +12,12 @@ return [
     // En deçà, la mise à jour est obligatoire : les applications Ngoni Pay 1.x
     // parlent à une API qui n'existe plus.
     'minimum_version' => env('MOBILE_MINIMUM_VERSION', '2.0.0'),
+
+    // Annonce automatique d'une nouvelle version (ecaisse:annoncer-mise-a-jour) :
+    // dès que MOBILE_LATEST_VERSION dépasse la dernière version annoncée, tous
+    // les comptes reçoivent une notification (application + push). À changer
+    // seulement quand la version est visible sur le Play Store.
+    // Texte des nouveautés (facultatif), et copie par e-mail (non par défaut).
+    'nouveautes' => env('MOBILE_NOUVEAUTES'),
+    'annonce_par_email' => (bool) env('MOBILE_ANNONCE_PAR_EMAIL', false),
 ];

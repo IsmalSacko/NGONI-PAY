@@ -16,3 +16,7 @@ Artisan::command('ecaisse:diffuser-annonces', function () {
 })->purpose('Diffuse les annonces programmées arrivées à échéance');
 
 \Illuminate\Support\Facades\Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlapping();
+
+// Nouvelle version de l'application (MOBILE_LATEST_VERSION changée) : annoncée
+// d'elle-même à tous les comptes, une seule fois par version.
+\Illuminate\Support\Facades\Schedule::command('ecaisse:annoncer-mise-a-jour')->everyFiveMinutes()->withoutOverlapping();
