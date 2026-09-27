@@ -192,4 +192,35 @@ class SuppressionCompteTest extends TestCase
 
         $this->assertNull(User::find($this->awa->id));
     }
+
+    public function test_un_compte_dont_la_boutique_a_ete_effacee_a_la_main_se_supprime_avec_ses_restes(): void
+    {
+        // Comme en production : la boutique a disparu sans ses données (clés étrangères
+        // contournées). Les restes passent sur un identifiant qui n'existe pas ; le
+        // contrôle différé des clés n'a jamais lieu, le test étant annulé à la fin.
+        $fantome = (string) Str::uuid();
+        DB::statement('PRAGMA defer_foreign_keys = ON');
+        foreach (['users', 'ventes', 'produits', 'clients', 'categories_produits', 'mouvements_stock', 'sessions_caisse', 'roles', 'model_has_roles'] as $table) {
+            DB::table($table)->where('boutique_id', $this->boutiqueAwa->id)->update(['boutique_id' => $fantome]);
+        }
+        DB::table('boutiques')->where('id', $this->boutiqueAwa->id)->delete();
+        $this->boutiqueAwa->id = $fantome;
+        $this->assertSame(1, DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->count(), 'restes orphelins');
+
+        $apercu = app(SuppressionCompte::class)->apercu($this->awa->fresh());
+        $this->assertNull($apercu['blocage'], 'sa vente est dans sa propre boutique fantôme');
+        $this->assertSame(['Boutique déjà supprimée (données restantes)'], $apercu['boutiques']);
+        $this->assertSame(1, $apercu['ventes']);
+
+        app(SuppressionCompte::class)->supprimer($this->awa->fresh(), $this->exploitant);
+
+        $this->assertNull(User::find($this->awa->id));
+        $this->assertNull(User::find($this->moussa->id));
+        foreach (['ventes', 'produits', 'clients', 'categories_produits', 'mouvements_stock', 'sessions_caisse'] as $table) {
+            $this->assertSame(0, DB::table($table)->where('boutique_id', $this->boutiqueAwa->id)->count(), "$table nettoyée");
+        }
+        // Fanta travaillait aussi chez Ibrahim : conservée, rattachée à lui.
+        $this->assertSame($this->boutiqueIbrahim->id, User::find($this->fanta->id)->boutique_id);
+        $this->assertSame(1, DB::table('ventes')->where('boutique_id', $this->boutiqueIbrahim->id)->count());
+    }
 }

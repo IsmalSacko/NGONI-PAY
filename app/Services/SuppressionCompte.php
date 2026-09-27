@@ -33,6 +33,12 @@ class SuppressionCompte
         'reglements_credit', 'fournisseurs', 'achats', 'paiements_fournisseur', 'clotures',
     ];
 
+    /** Ordre d'effacement explicite : les tables qui en référencent d'autres d'abord. */
+    private const ORDRE_EFFACEMENT = [
+        'ventes', 'mouvements_stock', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur',
+        'achats', 'fournisseurs', 'clotures', 'clients', 'produits', 'categories_produits',
+    ];
+
     /** Tables rattachées à un compte (effacées avec lui par la base). */
     private const PAR_COMPTE = ['abonnements', 'demandes_abonnement', 'notifications_app', 'appareils', 'password_reset_codes', 'annonce_cibles'];
 
@@ -46,7 +52,10 @@ class SuppressionCompte
         $plan = $this->plan($compte);
 
         return [
-            'boutiques' => Boutique::withoutGlobalScopes()->whereIn('id', $plan['boutiques'])->orderBy('nom')->pluck('nom')->all(),
+            'boutiques' => [
+                ...Boutique::withoutGlobalScopes()->whereIn('id', $plan['boutiques'])->orderBy('nom')->pluck('nom')->all(),
+                ...array_fill(0, count($plan['fantomes']), 'Boutique déjà supprimée (données restantes)'),
+            ],
             'comptes_supprimes' => User::whereIn('id', $plan['supprimes'])->orderBy('name')->get()->map(fn (User $u) => "{$u->name} · {$u->phone}")->all(),
             'comptes_conserves' => User::whereIn('id', array_keys($plan['conserves']))->orderBy('name')->get()->map(fn (User $u) => "{$u->name} · {$u->phone}")->all(),
             'articles' => DB::table('produits')->whereIn('boutique_id', $plan['boutiques'])->count(),
@@ -88,9 +97,13 @@ class SuppressionCompte
             // D'abord ce qui pointe vers un compte sans cascade (ventes, stock,
             // séances) : MySQL n'efface pas les tables filles d'une boutique dans
             // un ordre garanti, et un compte effacé avant ses ventes bloquerait tout.
-            DB::table('ventes')->whereIn('boutique_id', $plan['boutiques'])->delete();
-            DB::table('mouvements_stock')->whereIn('boutique_id', $plan['boutiques'])->delete();
-            DB::table('sessions_caisse')->whereIn('boutique_id', $plan['boutiques'])->delete();
+            // Tout le contenu, table par table, dans l'ordre des dépendances : une
+            // boutique fantôme n'a plus de ligne pour déclencher la cascade.
+            foreach (self::ORDRE_EFFACEMENT as $table) {
+                DB::table($table)->whereIn('boutique_id', $plan['boutiques'])->delete();
+            }
+            DB::table('users')->whereIn('boutique_id', $plan['fantomes'])->whereNotIn('id', $plan['supprimes'])
+                ->update(['boutique_id' => null]);
 
             // Les boutiques, et avec elles tout leur contenu (cascade de la base).
             DB::table('boutiques')->whereIn('id', $plan['boutiques'])->delete();
@@ -119,7 +132,16 @@ class SuppressionCompte
      */
     private function plan(User $compte): array
     {
-        $boutiques = Boutique::withoutGlobalScopes()->where('proprietaire_id', $compte->id)->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $possedees = Boutique::withoutGlobalScopes()->where('proprietaire_id', $compte->id)->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        // Boutiques « fantômes » : effacées de la base sans leurs données (import,
+        // suppression à la main). Leurs restes appartiennent au compte qui y est
+        // encore rattaché : ils partent avec lui.
+        $rattachees = array_values(array_filter(array_unique([(string) $compte->boutique_id, ...$compte->boutiqueIds()])));
+        $existantes = DB::table('boutiques')->whereIn('id', $rattachees)->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $fantomes = array_values(array_diff($rattachees, $existantes));
+
+        $boutiques = array_values(array_unique([...$possedees, ...$fantomes]));
 
         $membres = collect(DB::table(config('permission.table_names.model_has_roles'))
             ->where('model_type', $compte->getMorphClass())->whereIn('boutique_id', $boutiques)->pluck('model_id'))
@@ -137,7 +159,7 @@ class SuppressionCompte
             }
         }
 
-        return ['boutiques' => $boutiques, 'supprimes' => $supprimes, 'conserves' => array_filter($conserves)];
+        return ['boutiques' => $boutiques, 'fantomes' => $fantomes, 'supprimes' => $supprimes, 'conserves' => array_filter($conserves)];
     }
 
     /** Activité d'un compte à effacer dans la boutique d'un autre : on ne l'efface pas. */
