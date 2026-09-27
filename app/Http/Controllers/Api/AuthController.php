@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Boutique;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\ReinitialisationMotDePasse;
 use App\Support\Auth\Identification;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -57,6 +58,8 @@ class AuthController extends Controller
         $user = Identification::connecter($data['telephone'], $data['pays'] ?? null, $data['password']);
 
         if ($user === null) {
+            Identification::tracerRefus($data['telephone'], $data['pays'] ?? null, $data['password']);
+
             throw ValidationException::withMessages([
                 'telephone' => ['Identifiants incorrects.'],
             ]);
@@ -80,11 +83,11 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
-        $boutiqueId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+        $boutiqueId = app(TenantContext::class)->boutiqueId();
 
         // `boutique` : la boutique active de la requête (en-tête X-Boutique),
         // pas forcément celle par défaut du compte.
-        $user->setRelation('boutique', \App\Models\Boutique::find($boutiqueId));
+        $user->setRelation('boutique', Boutique::find($boutiqueId));
 
         return response()->json([
             'user' => $user,

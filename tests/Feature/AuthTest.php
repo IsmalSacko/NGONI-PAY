@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -115,5 +116,29 @@ class AuthTest extends TestCase
             ->assertOk()
             ->assertJsonMissing(['nom' => 'Produit A'])
             ->assertJsonCount(2); // ses deux articles de départ, rien de la boutique A
+    }
+
+    public function test_une_connexion_refusee_est_tracee_avec_sa_cause_jamais_le_mot_de_passe(): void
+    {
+        app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Épicerie Test', 'pays' => 'ML', 'telephone' => '76000000',
+            'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Aminata',
+        ]);
+        $traces = [];
+        Log::listen(function ($m) use (&$traces) {
+            $traces[] = $m->message.' '.json_encode($m->context);
+        });
+
+        $this->postJson('/api/connexion', ['telephone' => '76000000', 'pays' => 'FR', 'password' => 'password123'])->assertUnprocessable();
+        $this->postJson('/api/connexion', ['telephone' => '76000000', 'pays' => 'ML', 'password' => 'password123 '])->assertUnprocessable();
+        $this->postJson('/api/connexion', ['telephone' => '76000000', 'pays' => 'ML', 'password' => 'secret-faux'])->assertUnprocessable();
+
+        $this->assertStringContainsString('aucun compte pour ce numéro dans ce pays', $traces[0]);
+        $this->assertStringContainsString('espaces autour du mot de passe', $traces[1]);
+        $this->assertStringContainsString('mot de passe différent', $traces[2]);
+        foreach ($traces as $trace) {
+            $this->assertStringNotContainsString('password123', $trace);
+            $this->assertStringNotContainsString('secret-faux', $trace);
+        }
     }
 }
