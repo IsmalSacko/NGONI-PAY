@@ -23,7 +23,10 @@ class DiffusionAnnonces
     /** @return Builder<User> */
     public function destinataires(Annonce $annonce): Builder
     {
-        $requete = User::query()->where('is_active', true)->where('est_admin_plateforme', false);
+        // L'exploitant n'est écarté que s'il n'a pas de boutique : s'il tient
+        // aussi une boutique avec l'application, il est un commerçant comme les autres.
+        $requete = User::query()->where('is_active', true)
+            ->where(fn (Builder $q) => $q->where('est_admin_plateforme', false)->orWhereNotNull('boutique_id'));
 
         $abonnes = fn (callable $filtre) => $requete->whereIn('id', Abonnement::query()->tap($filtre)->select('user_id'));
         $enCours = fn ($q) => $q->where('est_actif', true)->where(fn ($d) => $d->whereNull('fin')->orWhereDate('fin', '>=', today()));

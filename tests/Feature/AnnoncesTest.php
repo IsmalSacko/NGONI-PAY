@@ -71,6 +71,18 @@ class AnnoncesTest extends TestCase
         $this->withToken($jeton)->getJson('/api/notifications')->assertJsonPath('non_lues', 0);
     }
 
+    public function test_l_exploitant_qui_tient_une_boutique_recoit_les_annonces(): void
+    {
+        // Sans boutique : écarté (il n'utilise que la console).
+        $sansBoutique = app(\App\Services\DiffusionAnnonces::class)->destinataires(new \App\Models\Annonce(['audience' => 'tous']))->pluck('id');
+        $this->assertNotContains($this->exploitant->id, $sansBoutique);
+
+        // Avec une boutique : commerçant comme les autres.
+        $this->exploitant->forceFill(['boutique_id' => \App\Models\Boutique::value('id')])->save();
+        $avecBoutique = app(\App\Services\DiffusionAnnonces::class)->destinataires(new \App\Models\Annonce(['audience' => 'tous']))->pluck('id');
+        $this->assertContains($this->exploitant->id, $avecBoutique);
+    }
+
     public function test_cibler_les_expires_ou_des_comptes_choisis(): void
     {
         $diffusion = app(DiffusionAnnonces::class);
