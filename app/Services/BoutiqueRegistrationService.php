@@ -87,6 +87,11 @@ class BoutiqueRegistrationService
         } catch (\Throwable $e) {
             Log::error('Mail d’inscription non envoyé', ['user' => $user->id, 'boutique' => $boutique->id, 'error' => $e->getMessage()]);
         }
+        app(AlertesExploitant::class)->envoyer(
+            $nouveauCompte ? 'Nouvelle inscription' : 'Nouvelle boutique',
+            "{$user->name} · {$boutique->nom} · {$user->phone}",
+            '/console/comptes',
+        );
     }
 
     /**

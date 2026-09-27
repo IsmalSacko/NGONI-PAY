@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Plateforme;
 
 use App\Models\User;
+use App\Services\ComptesPlateforme;
+use Illuminate\Validation\ValidationException;
 use App\Support\WhatsApp;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -39,52 +41,32 @@ class Utilisateurs extends Component
         $this->resetPage();
     }
 
-    public function basculer(string $userId): void
+    public function basculer(string $userId, ComptesPlateforme $comptes): void
     {
         $this->alerte = null;
-        $user = User::findOrFail($userId);
-
-        if ($user->id === Auth::id()) {
-            $this->alerte = 'Vous ne pouvez pas désactiver votre propre compte.';
-
-            return;
-        }
-
-        $user->update(['is_active' => ! $user->is_active]);
-
-        if (! $user->is_active) {
-            $user->tokens()->delete();
+        try {
+            $comptes->basculer(User::findOrFail($userId), Auth::user());
+        } catch (ValidationException $e) {
+            $this->alerte = collect($e->errors())->flatten()->first();
         }
     }
 
-    public function motDePasse(string $userId): void
+    public function motDePasse(string $userId, ComptesPlateforme $comptes): void
     {
         $this->alerte = null;
         $user = User::findOrFail($userId);
 
-        if ($user->est_admin_plateforme && $user->id !== Auth::id()) {
-            $this->alerte = 'Compte protégé : réinitialisation impossible depuis la console.';
+        try {
+            $provisoire = $comptes->motDePasseProvisoire($user, Auth::user());
+        } catch (ValidationException $e) {
+            $this->alerte = collect($e->errors())->flatten()->first();
 
             return;
         }
 
-        // Lisible et facile à dicter : ni 0/O ni 1/l.
-        $alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-        $motDePasse = '';
-        for ($i = 0; $i < 10; $i++) {
-            $motDePasse .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-
-        $user->forceFill(['password' => $motDePasse])->save();
-        $user->tokens()->delete();
-
-        $message = "Bonjour {$user->name}, votre mot de passe Ngoni Caisse provisoire est : {$motDePasse}\n"
-            .'Connectez-vous puis changez-le.';
-        $lien = WhatsApp::link($user->phone);
-
-        $this->motDePasseProvisoire = $motDePasse;
+        $this->motDePasseProvisoire = $provisoire['mot_de_passe'];
         $this->pour = "{$user->name} · {$user->phone}";
-        $this->lienWhatsApp = $lien === null ? null : $lien.'?text='.rawurlencode($message);
+        $this->lienWhatsApp = $provisoire['whatsapp'];
     }
 
     public function fermerMotDePasse(): void

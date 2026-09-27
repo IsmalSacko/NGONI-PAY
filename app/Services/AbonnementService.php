@@ -181,6 +181,10 @@ class AbonnementService
             Log::error('Mail de demande d’abonnement non envoyé', ['demande' => $demande->id, 'error' => $e->getMessage()]);
         }
 
+        $alerte = ($boutique->nom ?? 'Une boutique').' demande '.$plan->nom.' ('.mb_strtolower($cycle->libelle()).') · '
+            .number_format($tarif->montant, 0, ',', ' ').' '.$tarif->devise;
+        app(AlertesExploitant::class)->envoyer('Demande d’abonnement', $alerte, '/console/demandes');
+
         return $demande;
     }
 
@@ -188,6 +192,12 @@ class AbonnementService
     {
         $this->exigerEnAttente($demande);
         $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now()]);
+
+        app(AlertesExploitant::class)->envoyer(
+            'Demande annulée',
+            ($demande->boutique?->nom ?? 'Une boutique').' a annulé sa demande '.ucfirst($demande->plan).'.',
+            '/console/demandes',
+        );
     }
 
     /** L'exploitant a constaté le paiement : le plan s'active pour la durée payée. */

@@ -41,6 +41,24 @@ Route::post('connexion', [AuthController::class, 'login']);
 Route::post('mot-de-passe-oublie', [AuthController::class, 'motDePasseOublie'])->middleware('throttle:reinit-demande');
 Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiserMotDePasse'])->middleware('throttle:reinit-code');
 
+// Console de l'exploitant dans l'application : hors du contexte d'une
+// boutique (pas de « tenant »), elle voit tous les comptes.
+Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->controller(\App\Http\Controllers\Api\PlateformeController::class)->group(function (): void {
+    Route::get('tableau', 'tableau');
+    Route::get('demandes', 'demandes');
+    Route::get('demandes/{demande}/preuve', 'preuve')->name('api.plateforme.preuve');
+    Route::post('demandes/{demande}/approuver', 'approuver');
+    Route::post('demandes/{demande}/refuser', 'refuser');
+    Route::get('comptes', 'comptes');
+    Route::post('comptes/{user}/accorder', 'accorder');
+    Route::post('comptes/{user}/revoquer', 'revoquer');
+    Route::get('utilisateurs', 'utilisateurs');
+    Route::post('utilisateurs/{user}/basculer', 'basculer');
+    Route::post('utilisateurs/{user}/mot-de-passe', 'motDePasse');
+    Route::get('annonces', 'annonces');
+    Route::post('annonces', 'envoyerAnnonce');
+});
+
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
