@@ -121,7 +121,7 @@
 <main>
     {{-- Accroche --}}
     <section class="relative overflow-hidden">
-        <div class="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-jaune-doux blur-3xl opacity-80" aria-hidden="true"></div>
+        <div class="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-accent-soft blur-3xl opacity-70" aria-hidden="true"></div>
         <div class="relative max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
             <div>
                 <span class="inline-flex items-center gap-2 rounded-full bg-white border border-border px-3 py-1 text-xs font-bold text-accent-dark">
@@ -150,7 +150,7 @@
 
             {{-- Téléphone dessiné en HTML : l'écran de caisse, sans image à charger. --}}
             <div class="relative mx-auto w-[290px] md:w-[320px]" aria-label="Aperçu de l'écran de caisse de Ngoni Caisse" role="img">
-                <div class="absolute -inset-6 rounded-[56px] bg-jaune/40 rotate-3" aria-hidden="true"></div>
+                <div class="absolute -inset-6 rounded-[56px] bg-accent/8 rotate-3" aria-hidden="true"></div>
                 <div class="relative rounded-[44px] bg-ink p-3 shadow-2xl">
                     <div class="rounded-[34px] bg-paper overflow-hidden">
                         <div class="h-7 flex items-center justify-center bg-accent"><span class="w-20 h-4 rounded-full bg-ink"></span></div>
