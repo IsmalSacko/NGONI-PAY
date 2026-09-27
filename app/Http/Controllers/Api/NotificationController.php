@@ -29,6 +29,14 @@ class NotificationController extends Controller
         return response()->json(['message' => 'ok']);
     }
 
+    /** Balayée dans l'application : supprimée (seulement les siennes). */
+    public function supprimer(Request $request, int $notification): JsonResponse
+    {
+        NotificationApp::where('user_id', $request->user()->id)->whereKey($notification)->delete();
+
+        return response()->json(['message' => 'ok']);
+    }
+
     public function toutLu(Request $request): JsonResponse
     {
         NotificationApp::where('user_id', $request->user()->id)->whereNull('lue_le')->update(['lue_le' => now()]);

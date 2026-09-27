@@ -69,6 +69,13 @@ class AnnoncesTest extends TestCase
         $id = $this->withToken($jeton)->getJson('/api/notifications')->json('data.0.id');
         $this->withToken($jeton)->postJson("/api/notifications/{$id}/lue")->assertOk();
         $this->withToken($jeton)->getJson('/api/notifications')->assertJsonPath('non_lues', 0);
+
+        // Balayée : supprimée, et seulement la sienne.
+        $autre = \App\Models\NotificationApp::where('user_id', '!=', $this->moussa->id)->value('id');
+        $this->withToken($jeton)->deleteJson("/api/notifications/{$autre}")->assertOk();
+        $this->assertNotNull(\App\Models\NotificationApp::find($autre), 'celle d’un autre compte reste');
+        $this->withToken($jeton)->deleteJson("/api/notifications/{$id}")->assertOk();
+        $this->assertNull(\App\Models\NotificationApp::find($id));
     }
 
     public function test_l_exploitant_qui_tient_une_boutique_recoit_les_annonces(): void
