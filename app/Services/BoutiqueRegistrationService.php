@@ -68,6 +68,9 @@ class BoutiqueRegistrationService
             // tard ne le relance pas.
             app(AbonnementService::class)->demarrerEssai($user);
 
+            // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
+            app(CatalogueDeDepart::class)->installer($boutique);
+
             return ['boutique' => $boutique->fresh(), 'user' => $user->fresh()];
         });
 

@@ -240,6 +240,7 @@ class AbonnementTest extends TestCase
     {
         $this->expirer();
         $this->actingAs($this->awa);
+        $avant = Produit::withoutBoutiqueScope()->count(); // les articles de départ
 
         Livewire::test(ProduitsIndex::class)
             ->call('nouveauProduit')
@@ -247,7 +248,7 @@ class AbonnementTest extends TestCase
             ->call('enregistrer')
             ->assertDispatched('abonnement-expire');
 
-        $this->assertSame(0, Produit::withoutBoutiqueScope()->count());
+        $this->assertSame($avant, Produit::withoutBoutiqueScope()->count(), 'aucun article créé');
         $this->get('/tableau-de-bord')->assertOk()->assertSee('Essai gratuit terminé');
     }
 

@@ -144,7 +144,7 @@ class CentimesTest extends TestCase
         $riz = Produit::where('nom', 'Riz long')->firstOrFail();
         $this->assertSame(20000, $riz->prix_achat);
 
-        $this->api()->getJson('/api/produits')->assertJsonPath('0.prix_achat', 20000);
+        $this->assertSame(20000, collect($this->api()->getJson('/api/produits')->json())->firstWhere('nom', 'Riz long')['prix_achat']);
 
         $this->dansLaBoutique();
         $caissier = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Caissier', 'phone' => '+22370000002', 'password' => 'password123']);
@@ -154,7 +154,9 @@ class CentimesTest extends TestCase
         app(TenantContext::class)->forget();
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
         $reponse = $this->withToken($caissier->createToken('t')->plainTextToken)->getJson('/api/produits')->assertOk();
-        $this->assertArrayNotHasKey('prix_achat', $reponse->json('0'));
+        foreach ($reponse->json() as $article) {
+            $this->assertArrayNotHasKey('prix_achat', $article);
+        }
     }
 
     public function test_deux_articles_sans_code_barre_au_back_office(): void
@@ -168,6 +170,6 @@ class CentimesTest extends TestCase
                 ->set('taux_tva', '0')->set('stock', '5')->set('seuil_alerte', '1')
                 ->call('enregistrer')->assertHasNoErrors();
         }
-        $this->assertSame(2, Produit::whereNull('code_barre')->count());
+        $this->assertSame(2, Produit::whereIn('nom', ['Sucre', 'Farine'])->whereNull('code_barre')->count());
     }
 }

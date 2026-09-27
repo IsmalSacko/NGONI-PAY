@@ -113,6 +113,7 @@ class AuthTest extends TestCase
         $this->withToken($tokenB)
             ->getJson('/api/produits')
             ->assertOk()
-            ->assertJsonCount(0);
+            ->assertJsonMissing(['nom' => 'Produit A'])
+            ->assertJsonCount(2); // ses deux articles de départ, rien de la boutique A
     }
 }
