@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Politique de confidentialité - conttron</title>
+    <link rel="canonical" href="{{ url('/privacy') }}">
+    <x-tete-commune :indexer="true" />
     <style>
         :root {
             color-scheme: light;

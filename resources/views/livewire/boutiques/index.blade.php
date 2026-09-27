@@ -12,7 +12,7 @@
     </div>
 
     @if (session('info'))
-        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ session('info') }}</p>
+        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ session('info') }}</p>
     @endif
     @if ($alerte)
         <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">
@@ -30,7 +30,7 @@
                 <div class="flex items-start justify-between gap-2">
                     <h2 class="font-display font-extrabold text-lg">{{ $b->nom }}</h2>
                     @if ($b->id === $active)
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-[#0B4F39]">Active</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">Active</span>
                     @endif
                 </div>
                 <span class="text-sm text-[--color-muted]">{{ \App\Enums\Country::tryFrom((string) $b->pays)?->label() }} · devise <strong>{{ $b->devise }}</strong></span>
@@ -121,7 +121,7 @@
                         </select>
                         @error('reglages.devise') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
-                    <div class="rounded-xl bg-[#F7F5F0] p-3 text-sm flex flex-col gap-2">
+                    <div class="rounded-xl bg-fond-tableau p-3 text-sm flex flex-col gap-2">
                         <span class="font-semibold">Si la devise change (actuellement {{ $deviseInitiale }})</span>
                         <label class="flex items-start gap-2">
                             <input type="checkbox" wire:model="reglages.convertir" class="mt-1">

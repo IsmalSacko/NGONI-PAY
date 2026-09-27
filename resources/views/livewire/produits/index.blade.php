@@ -18,14 +18,18 @@
            class="w-full md:w-96 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-3 px-5 py-3 bg-fond-tableau border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span>Catégorie</span><span class="text-right">Vente</span><span class="text-right">TVA</span><span class="text-right">Stock</span><span></span>
         </div>
         @foreach ($produits as $produit)
             {{-- Téléphone : nom et prix, puis stock et actions. --}}
-            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-separateur items-center text-sm">
                 <div class="flex items-center gap-3">
-                    @if ($produit->photo_url)<img src="{{ $produit->photo_url }}" alt="" class="w-10 h-10 rounded-lg object-cover border border-[--color-border]">@endif
+                    @if ($produit->photo_url)
+                        <img src="{{ $produit->photo_url }}" alt="" loading="lazy" class="w-11 h-11 rounded-lg object-contain bg-white border border-border shrink-0">
+                    @else
+                        <span class="w-11 h-11 rounded-lg bg-puce text-accent text-xs font-extrabold flex items-center justify-center shrink-0">{{ mb_strtoupper($produit->code ?: mb_substr($produit->nom, 0, 2)) }}</span>
+                    @endif
                 <div class="flex flex-col">
                     <span class="font-bold">{{ $produit->nom }}</span>
                     <span class="text-xs text-[--color-muted]">{{ $produit->format }}</span>
@@ -77,16 +81,35 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3">
-                        @if ($photo && str_starts_with((string) $photo->getMimeType(), 'image/'))
-                            <img src="{{ $photo->temporaryUrl() }}" alt="" class="w-14 h-14 rounded-lg object-cover border border-[--color-border]">
-                        @elseif ($produitId && ($p = \App\Models\Produit::find($produitId))?->photo_url)
-                            <img src="{{ $p->photo_url }}" alt="" class="w-14 h-14 rounded-lg object-cover border border-[--color-border]">
-                        @endif
-                        <label class="text-sm font-bold text-accent cursor-pointer">
-                            Photo de l’article <span class="font-normal text-[--color-muted]">(facultatif, montrée dans la caisse)</span>
-                            <input type="file" wire:model="photo" accept="image/png,image/jpeg,image/webp" class="hidden">
+                    {{-- Photo : montrée sur la tuile de la caisse. Sur téléphone, le
+                         sélecteur propose aussi l'appareil photo. --}}
+                    @php($photoActuelle = $produitId && ! $retirerPhoto ? \App\Models\Produit::find($produitId)?->photo_url : null)
+                    <div class="rounded-xl border-2 border-dashed border-border-strong p-3 flex items-center gap-4">
+                        <label class="relative w-24 h-24 shrink-0 rounded-xl bg-fond-tableau border border-border overflow-hidden flex items-center justify-center cursor-pointer">
+                            @if ($photo && str_starts_with((string) $photo->getMimeType(), 'image/'))
+                                <img src="{{ $photo->temporaryUrl() }}" alt="Nouvelle photo" class="w-full h-full object-contain bg-white">
+                            @elseif ($photoActuelle)
+                                <img src="{{ $photoActuelle }}" alt="Photo actuelle" class="w-full h-full object-contain bg-white">
+                            @else
+                                <x-icone nom="photo" class="w-8 h-8 text-muted" />
+                            @endif
+                            <span wire:loading.flex wire:target="photo" class="absolute inset-0 bg-white/85 items-center justify-center text-xs font-bold text-accent">Envoi…</span>
+                            <input type="file" wire:model="photo" accept="image/*" class="sr-only" aria-label="Photo de l’article">
                         </label>
+                        <div class="flex flex-col gap-2 min-w-0">
+                            <span class="font-bold text-sm">Photo de l’article</span>
+                            <span class="text-xs text-muted">Facultative, affichée dans la caisse. JPG, PNG ou WebP, 3 Mo maximum.</span>
+                            <div class="flex flex-wrap gap-2">
+                                <label class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-accent text-white text-xs font-bold cursor-pointer">
+                                    <x-icone nom="photo" class="w-4 h-4" />
+                                    {{ $photo || $photoActuelle ? 'Changer la photo' : 'Ajouter une photo' }}
+                                    <input type="file" wire:model="photo" accept="image/*" class="sr-only">
+                                </label>
+                                @if ($photo || $photoActuelle)
+                                    <button type="button" wire:click="retirerLaPhoto" class="h-9 px-3 rounded-lg border border-border-strong text-xs font-bold text-danger-fg">Retirer</button>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                     @error('photo') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
                     @php($devise = \App\Support\Money\Montant::deviseActive())
@@ -134,7 +157,7 @@
 
                     <div class="flex gap-3 mt-2">
                         <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
-                        <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
+                        <button type="submit" wire:loading.attr="disabled" wire:target="photo,enregistrer" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold disabled:opacity-60">Enregistrer</button>
                     </div>
                 </form>
             </div>

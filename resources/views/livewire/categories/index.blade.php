@@ -10,7 +10,7 @@
     <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
         <section class="bg-white border border-[--color-border] rounded-2xl overflow-x-auto">
             @forelse ($categories as $categorie)
-                <div class="flex items-center gap-3 px-5 py-3 border-b border-[#EEEAE1]">
+                <div class="flex items-center gap-3 px-5 py-3 border-b border-separateur">
                     <span class="w-4 h-4 rounded-full shrink-0" style="background: {{ $categorie->couleur ?: '#0B6E4F' }}"></span>
                     <span class="font-bold flex-grow">{{ $categorie->nom }}</span>
                     <span class="text-sm text-[--color-muted]">{{ $categorie->produits_count }} article(s)</span>

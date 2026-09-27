@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\Country;
+use App\Mail\InscriptionMail;
 use App\Models\Boutique;
 use App\Models\User;
 use App\Support\Authorization\Permissions;
@@ -13,6 +14,8 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -31,7 +34,7 @@ class BoutiqueRegistrationService
      */
     public function register(array $data): array
     {
-        return DB::transaction(function () use ($data): array {
+        $resultat = DB::transaction(function () use ($data): array {
             $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
 
             $boutique = Boutique::create([
@@ -67,6 +70,23 @@ class BoutiqueRegistrationService
 
             return ['boutique' => $boutique->fresh(), 'user' => $user->fresh()];
         });
+
+        $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);
+
+        return $resultat;
+    }
+
+    /**
+     * Mail à l'exploitant, une fois l'inscription enregistrée. Un mail perdu ne
+     * doit jamais faire échouer l'inscription : le compte est visible dans la console.
+     */
+    private function prevenirExploitant(User $user, Boutique $boutique, bool $nouveauCompte): void
+    {
+        try {
+            Mail::to(config('ecaisse.notification_email'))->send(new InscriptionMail($user, $boutique, $nouveauCompte));
+        } catch (\Throwable $e) {
+            Log::error('Mail d’inscription non envoyé', ['user' => $user->id, 'boutique' => $boutique->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -101,7 +121,7 @@ class BoutiqueRegistrationService
         $tenantPrecedent = $this->tenant->boutiqueId();
 
         try {
-            return DB::transaction(function () use ($proprietaire, $data): Boutique {
+            $boutique = DB::transaction(function () use ($proprietaire, $data): Boutique {
                 $pays = Country::tryFrom(strtoupper((string) ($data['pays'] ?? ''))) ?? Country::default();
 
                 $boutique = Boutique::create([
@@ -134,6 +154,10 @@ class BoutiqueRegistrationService
             app(PermissionRegistrar::class)->setPermissionsTeamId($equipePrecedente);
             $proprietaire->unsetRelation('roles')->unsetRelation('permissions');
         }
+
+        $this->prevenirExploitant($proprietaire, $boutique, nouveauCompte: false);
+
+        return $boutique;
     }
 
     public function provisionnerRoles(Boutique $boutique): void

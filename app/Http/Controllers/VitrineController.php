@@ -11,13 +11,15 @@ use Illuminate\View\View;
 
 /**
  * Site vitrine de Ngoni Caisse, à la racine du domaine. Un compte connecté
- * va directement à son espace (console ou back-office).
+ * va directement à son espace (console ou back-office), sauf en aperçu.
  */
 class VitrineController extends Controller
 {
     public function __invoke(): View|RedirectResponse
     {
-        if ($user = auth()->user()) {
+        // Un compte connecté va à son espace, sauf s'il demande l'aperçu
+        // (lien « Voir le site » de la console).
+        if (($user = auth()->user()) && ! request()->boolean('apercu')) {
             return redirect($user->est_admin_plateforme ? '/plateforme' : '/tableau-de-bord');
         }
 

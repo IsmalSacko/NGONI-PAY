@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Ngoni Caisse' }}</title>
+    <x-tete-commune />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -26,39 +27,44 @@
     @endphp
 
     {{-- Téléphone : barre du haut et menu déroulant. --}}
-    <header class="md:hidden sticky top-0 z-40 bg-ink text-white">
-        <div class="h-14 px-4 flex items-center gap-3">
-            <span class="w-9 h-9 rounded-xl bg-accent flex items-center justify-center font-display font-extrabold">N</span>
-            <span class="flex-grow truncate font-semibold text-sm">{{ $boutiqueActive?->nom }}</span>
-            <button type="button" @click="menu = !menu" :aria-expanded="menu" class="h-10 px-3 rounded-lg bg-[#263039] text-sm font-bold">
+    <header class="md:hidden sticky top-0 z-40 bg-accent text-white">
+        <div class="h-16 px-4 flex items-center gap-3">
+            <x-logo taille="w-10 h-10" />
+            <span class="flex-grow min-w-0 flex flex-col leading-tight">
+                <span class="truncate font-extrabold">{{ $boutiqueActive?->nom }}</span>
+                <span class="truncate text-xs text-rail">{{ auth()->user()->name }}</span>
+            </span>
+            <button type="button" @click="menu = !menu" :aria-expanded="menu" aria-controls="menu-telephone"
+                    class="h-10 px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold">
                 <span x-text="menu ? 'Fermer' : 'Menu'">Menu</span>
             </button>
         </div>
-        <nav x-show="menu" x-cloak x-transition.opacity @click.outside="menu = false" class="px-4 pb-4 flex flex-col gap-1" aria-label="Navigation principale">
+        <nav id="menu-telephone" x-show="menu" x-cloak x-transition.opacity @click.outside="menu = false"
+             class="px-4 pb-4 grid grid-cols-2 gap-1.5 max-h-[75vh] overflow-y-auto" aria-label="Navigation principale">
             @foreach ($liens as $lien)
                 @can($lien['permission'])
                     <a href="{{ route($lien['route']) }}"
-                       class="h-11 px-3 rounded-lg flex items-center font-semibold no-underline {{ request()->routeIs($lien['route']) ? 'bg-[#263039] text-white' : 'text-[#B9BEC6]' }}">
+                       class="h-12 px-3 rounded-xl flex items-center font-bold no-underline {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'bg-nuit-clair text-white' }}">
                         {{ $lien['label'] }}
                     </a>
                 @endcan
             @endforeach
-            <form method="POST" action="{{ route('deconnexion') }}">
+            <form method="POST" action="{{ route('deconnexion') }}" class="col-span-2">
                 @csrf
-                <button type="submit" class="h-11 px-3 w-full text-left rounded-lg font-semibold text-[#B9BEC6]">Quitter</button>
+                <button type="submit" class="h-12 px-3 w-full text-left rounded-xl font-bold text-rail">Quitter</button>
             </form>
         </nav>
     </header>
 
     <div class="flex min-h-screen">
-        {{-- Ordinateur et tablette : colonne de navigation. --}}
-        <nav aria-label="Navigation principale" class="hidden md:flex w-20 shrink-0 bg-ink flex-col items-center py-4 gap-2">
-            <span class="w-11 h-11 rounded-2xl bg-accent text-white flex items-center justify-center font-display font-extrabold text-xl mb-3">N</span>
+        {{-- Ordinateur et tablette : colonne de navigation, onglet actif en jaune. --}}
+        <nav aria-label="Navigation principale" class="hidden md:flex w-24 shrink-0 bg-accent flex-col items-center py-4 gap-1.5 sticky top-0 h-screen overflow-y-auto">
+            <x-logo taille="w-12 h-12" class="mb-4" />
 
             @foreach ($liens as $lien)
                 @can($lien['permission'])
                     <a href="{{ route($lien['route']) }}"
-                       class="w-17 h-16 rounded-xl flex flex-col items-center justify-center gap-1 text-[11px] font-semibold no-underline {{ request()->routeIs($lien['route']) ? 'bg-[#263039] text-white' : 'text-[#B9BEC6] hover:text-white' }}">
+                       class="w-20 h-14 rounded-2xl flex items-center justify-center text-center px-1 text-[12px] font-bold leading-tight no-underline {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                         {{ $lien['label'] }}
                     </a>
                 @endcan
@@ -68,7 +74,7 @@
 
             <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
-                <button type="submit" class="w-17 h-16 rounded-xl flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-[#B9BEC6] hover:text-white">
+                <button type="submit" class="w-20 h-12 rounded-2xl text-[12px] font-bold text-rail hover:text-white hover:bg-nuit-clair">
                     Quitter
                 </button>
             </form>
@@ -76,7 +82,7 @@
 
         <main class="flex-grow min-w-0 p-4 md:p-8">
             {{-- Boutique de travail : un compte peut en gérer plusieurs. --}}
-            <div class="flex justify-end mb-4">
+            <div class="flex items-center justify-end gap-3 mb-4">
                 @if ($mesBoutiques->count() > 1)
                     <form method="POST" action="{{ route('boutique-active') }}" class="flex items-center gap-2 text-sm w-full md:w-auto">
                         @csrf
@@ -89,7 +95,7 @@
                         </select>
                     </form>
                 @else
-                    <span class="hidden md:inline text-sm font-semibold text-[--color-muted]">{{ $mesBoutiques->first()?->nom }}</span>
+                    <span class="hidden md:inline-flex items-center gap-2 rounded-xl bg-white border border-border px-3 h-10 text-sm font-bold text-accent">{{ $mesBoutiques->first()?->nom }} <span class="font-semibold text-muted">· {{ auth()->user()->name }}</span></span>
                 @endif
             </div>
             @php

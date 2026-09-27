@@ -11,7 +11,7 @@
             <div class="bg-white border border-border rounded-2xl p-5" wire:key="plan-{{ $id }}">
                 <div class="flex flex-wrap items-center gap-3 mb-4">
                     <input wire:model="plans.{{ $id }}.nom" class="h-11 px-3 rounded-lg border border-border-strong font-bold min-w-0 flex-1 md:flex-none">
-                    <code class="text-xs bg-[#F1EDE4] rounded px-2 py-1">{{ $plan['code'] }}</code>
+                    <code class="text-xs bg-puce rounded px-2 py-1">{{ $plan['code'] }}</code>
                     @unless ($plan['essai'])
                         <label class="flex items-center gap-2 text-sm ml-auto"><input type="checkbox" wire:model="plans.{{ $id }}.est_actif"> Proposé dans l’application</label>
                     @endunless

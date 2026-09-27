@@ -29,7 +29,22 @@ class SessionCaisseController extends Controller
     {
         $session = $this->sessions->courante($request->user());
 
+        // L'application pré-remplit le comptage de fin de séance avec ce montant.
+        $session?->setAttribute('total_especes', $this->sessions->totalEspeces($session))
+            ->setAttribute('fond_attendu', $this->sessions->fondAttendu($session));
+
         return response()->json($session);
+    }
+
+    /** Fond proposé à l'ouverture : celui laissé à la dernière fermeture. */
+    public function suggestionOuverture(): JsonResponse
+    {
+        $derniere = $this->sessions->derniereFermeture();
+
+        return response()->json([
+            'fond_suggere' => $derniere?->fond_final,
+            'fermee_le' => $derniere?->fermee_le?->toIso8601String(),
+        ]);
     }
 
     public function ouvrir(Request $request): JsonResponse

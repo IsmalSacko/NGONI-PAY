@@ -51,7 +51,7 @@
                         </ul>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="rounded-full bg-[#F1EDE4] px-2.5 py-0.5 text-xs font-bold">{{ $abonnement->estEssai() ? 'essai' : $abonnement->plan }}</span>
+                        <span class="rounded-full bg-puce px-2.5 py-0.5 text-xs font-bold">{{ $abonnement->estEssai() ? 'essai' : $abonnement->plan }}</span>
                         @if ($abonnement->est_manuel)<span class="text-xs text-muted">manuel</span>@endif
                         <x-statut-abonnement :abonnement="$abonnement" />
                         <button wire:click="gerer('{{ $abonnement->user_id }}')" class="h-9 px-3 rounded-lg border border-border-strong text-xs font-bold">Gérer</button>

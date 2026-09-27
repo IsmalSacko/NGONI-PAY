@@ -4,17 +4,29 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+    /* Mêmes polices et couleurs que l'application : titres Poppins, texte
+       Nunito Sans ; bleu nuit pour la structure, jaune pour ce qui est choisi. */
+    --font-sans: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 
-    --color-ink: #15191e;
-    --color-paper: #f3f0e8;
-    --color-accent: #0b6e4f;
-    --color-accent-dark: #08553d;
-    --color-accent-soft: #e3f1ea;
-    --color-border: #e3ded3;
-    --color-border-strong: #d9d3c6;
-    --color-muted: #5b616b;
+    --color-ink: #111b30;
+    --color-paper: #eef2f8;
+    --color-accent: #0f2a5c;
+    --color-accent-dark: #0a1e45;
+    --color-accent-soft: #e4ebf7;
+    --color-nuit-clair: #1c3b78;
+    --color-jaune: #ffcc1f;
+    --color-jaune-doux: #fff4cc;
+    --color-succes: #16a34a;
+    --color-succes-doux: #e3f6ea;
+    --color-whatsapp: #25d366;
+    --color-border: #e3e8f0;
+    --color-border-strong: #d7deea;
+    --color-separateur: #e6ebf2;
+    --color-fond-tableau: #f5f7fb;
+    --color-puce: #e8edf5;
+    --color-rail: #c9d3e6;
+    --color-muted: #5a6478;
     --color-warn-bg: #fdf1dc;
     --color-warn-fg: #7a3e06;
     --color-danger-bg: #fde7e4;

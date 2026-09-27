@@ -24,6 +24,10 @@ Route::get('telecharger', fn () => view('telecharger', [
     'storeUrl' => config('mobile.store_url'),
 ]))->name('telecharger');
 
+// Référencement automatique : plan du site et consignes aux robots.
+Route::get('sitemap.xml', [\App\Http\Controllers\SeoController::class, 'sitemap'])->name('sitemap');
+Route::get('robots.txt', [\App\Http\Controllers\SeoController::class, 'robots'])->name('robots');
+
 // Logo et photos d'articles, sans session (tickets, application).
 Route::get('images/logos/{boutique}', [\App\Http\Controllers\ImageController::class, 'logo'])->name('image.logo');
 Route::get('images/produits/{produit}', [\App\Http\Controllers\ImageController::class, 'photo'])->name('image.produit');

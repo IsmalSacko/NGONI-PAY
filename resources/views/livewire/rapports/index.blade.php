@@ -18,7 +18,7 @@
     </div>
 
     @if ($statut)
-        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $statut }}</p>
+        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $statut }}</p>
     @endif
     @error('journee') <div class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 font-semibold">{{ $message }}</div> @enderror
 
@@ -78,7 +78,7 @@
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Par moyen de paiement</h2>
             @forelse ($r['par_moyen'] as $l)
-                <div class="flex justify-between text-sm py-2 border-b border-[#EEEAE1]"><span>{{ $l['libelle'] }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
+                <div class="flex justify-between text-sm py-2 border-b border-separateur"><span>{{ $l['libelle'] }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucune vente sur la période.</p>
             @endforelse
@@ -86,7 +86,7 @@
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Par caissier</h2>
             @forelse ($r['par_caissier'] as $l)
-                <div class="flex justify-between text-sm py-2 border-b border-[#EEEAE1]"><span>{{ $l['nom'] }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
+                <div class="flex justify-between text-sm py-2 border-b border-separateur"><span>{{ $l['nom'] }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucune vente sur la période.</p>
             @endforelse
@@ -94,7 +94,7 @@
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Meilleurs articles</h2>
             @forelse ($r['top_produits'] as $l)
-                <div class="flex justify-between text-sm py-2 border-b border-[#EEEAE1]"><span>{{ $l['nom'] }} <span class="text-[--color-muted]">× {{ $l['quantite'] }}</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
+                <div class="flex justify-between text-sm py-2 border-b border-separateur"><span>{{ $l['nom'] }} <span class="text-[--color-muted]">× {{ $l['quantite'] }}</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucune vente sur la période.</p>
             @endforelse
@@ -102,7 +102,7 @@
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Jour par jour</h2>
             @forelse ($r['par_jour'] as $l)
-                <div class="flex justify-between text-sm py-2 border-b border-[#EEEAE1]"><span>{{ \Illuminate\Support\Carbon::parse($l['date'])->translatedFormat('D d/m') }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
+                <div class="flex justify-between text-sm py-2 border-b border-separateur"><span>{{ \Illuminate\Support\Carbon::parse($l['date'])->translatedFormat('D d/m') }} <span class="text-[--color-muted]">({{ $l['nombre'] }})</span></span><span class="font-bold">{{ $m($l['total']) }}</span></div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucune vente sur la période.</p>
             @endforelse

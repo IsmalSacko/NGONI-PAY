@@ -49,7 +49,7 @@
                         <span class="font-semibold">{{ $moyen['label'] }}</span>
                         <span class="font-bold">{{ $moyen['pct'] }} % <span class="text-[--color-muted] font-normal">· {{ \App\Support\Money\Montant::format($moyen['total']) }}</span></span>
                     </div>
-                    <div class="h-2 rounded-full bg-[#F1EDE4]"><div class="h-2 rounded-full bg-accent" style="width: {{ $moyen['pct'] }}%"></div></div>
+                    <div class="h-2 rounded-full bg-puce"><div class="h-2 rounded-full bg-accent" style="width: {{ $moyen['pct'] }}%"></div></div>
                 </div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucune vente aujourd'hui.</p>
@@ -64,7 +64,7 @@
                 <span>Article</span><span class="text-right">Qté</span><span class="text-right">CA</span>
             </div>
             @forelse ($topProduits as $p)
-                <div class="grid grid-cols-[1fr_70px_110px] gap-3 text-sm py-2 border-b border-[#EEEAE1] items-center">
+                <div class="grid grid-cols-[1fr_70px_110px] gap-3 text-sm py-2 border-b border-separateur items-center">
                     <span class="font-semibold">{{ $p->nom_produit }}</span>
                     <span class="text-right">{{ $p->quantite }}</span>
                     <span class="text-right font-bold">{{ \App\Support\Money\Montant::format($p->total) }}</span>
@@ -80,7 +80,7 @@
                 <a href="{{ route('stocks.index') }}" class="text-sm font-bold">Tout voir</a>
             </div>
             @forelse ($alertes as $produit)
-                <div class="flex items-center gap-3 py-2 border-b border-[#EEEAE1]">
+                <div class="flex items-center gap-3 py-2 border-b border-separateur">
                     <span class="text-xs font-bold rounded px-2 py-1 min-w-[70px] text-center {{ $produit->estEnRupture() ? 'bg-danger-bg text-danger-fg' : 'bg-warn-bg text-warn-fg' }}">
                         {{ $produit->estEnRupture() ? 'Rupture' : 'Stock bas' }}
                     </span>

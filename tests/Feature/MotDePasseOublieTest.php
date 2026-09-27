@@ -125,7 +125,8 @@ class MotDePasseOublieTest extends TestCase
 
         $this->assertEquals($inconnu, $sansEmail);
         $this->assertSame('+33605758494', $inconnu['support_whatsapp']);
-        Mail::assertNothingSent();
+        // Aucun code envoyé (l'inscription ci-dessus prévient seulement l'exploitant).
+        Mail::assertNotSent(\App\Mail\CodeReinitialisationMail::class);
     }
 
     public function test_les_demandes_en_rafale_sont_limitees(): void

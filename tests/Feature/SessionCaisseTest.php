@@ -82,6 +82,40 @@ class SessionCaisseTest extends TestCase
         $this->assertDatabaseHas('ventes', ['moyen_paiement' => 'especes', 'session_caisse_id' => $sessionId]);
     }
 
+    public function test_l_application_recoit_le_montant_attendu_et_le_fond_a_reprendre(): void
+    {
+        $token = $this->admin->createToken('test')->plainTextToken;
+
+        // Aucune séance fermée encore : rien à proposer.
+        $this->withToken($token)->getJson('/api/sessions-caisse/suggestion-ouverture')
+            ->assertOk()->assertJsonPath('fond_suggere', null);
+
+        $sessionId = $this->withToken($token)->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->json('id');
+        $produit = Produit::create(['nom' => 'Riz', 'prix_vente' => 4750, 'taux_tva' => 0, 'stock' => 10]);
+        foreach (['especes', 'orange_money'] as $moyen) {
+            app(VenteService::class)->encaisser([
+                'reference_locale' => (string) Str::uuid(),
+                'lignes' => [['produit_id' => $produit->id, 'quantite' => 1]],
+                'moyen_paiement' => $moyen,
+                'montant_recu' => $moyen === 'especes' ? 4750 : null,
+                'vendue_hors_ligne' => false,
+            ], $this->admin);
+        }
+
+        // Pendant la séance : le tiroir devrait contenir 10 000 + 4 750 (Orange Money exclu).
+        $this->withToken($token)->getJson('/api/sessions-caisse/courante')
+            ->assertOk()
+            ->assertJsonPath('total_especes', 4750)
+            ->assertJsonPath('fond_attendu', 14750);
+
+        $this->withToken($token)->putJson("/api/sessions-caisse/{$sessionId}/fermer", ['fond_final' => 14750])
+            ->assertOk()->assertJsonPath('ecart', 0);
+
+        // À la réouverture : on propose de reprendre ce qui est resté dans le tiroir.
+        $this->withToken($token)->getJson('/api/sessions-caisse/suggestion-ouverture')
+            ->assertOk()->assertJsonPath('fond_suggere', 14750);
+    }
+
     public function test_fermer_une_session_deja_fermee_est_refuse(): void
     {
         $session = app(SessionCaisseService::class)->ouvrir($this->admin, 5000);

@@ -30,7 +30,7 @@
 
     <section class="bg-white border border-border rounded-2xl overflow-x-auto">
         @foreach ($users as $user)
-            <div class="grid min-w-[820px] grid-cols-[2.4fr_1.3fr_1fr_0.8fr_220px] gap-3 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm" wire:key="u-{{ $user->id }}">
+            <div class="grid min-w-[820px] grid-cols-[2.4fr_1.3fr_1fr_0.8fr_220px] gap-3 px-5 py-3 border-b border-separateur items-center text-sm" wire:key="u-{{ $user->id }}">
                 @php
                     $activite = collect([$user->derniere_app ? \Illuminate\Support\Carbon::parse($user->derniere_app) : null,
                         $user->derniere_web ? \Illuminate\Support\Carbon::createFromTimestamp((int) $user->derniere_web) : null])->filter()->max();
@@ -51,7 +51,7 @@
                     @if ($user->is_active)
                         <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">Actif</span>
                     @else
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-[#F1EDE4] text-muted">Désactivé</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-puce text-muted">Désactivé</span>
                     @endif
                 </span>
                 <div class="flex gap-2 justify-end">

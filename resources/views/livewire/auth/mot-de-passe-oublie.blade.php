@@ -36,14 +36,14 @@
             <button type="button" wire:click="$set('etape', 'demande')" class="text-sm text-accent font-semibold">Renvoyer un code</button>
         </form>
     @else
-        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold mb-4">Mot de passe changé. Connectez-vous avec le nouveau, dans l’application comme ici.</p>
+        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold mb-4">Mot de passe changé. Connectez-vous avec le nouveau, dans l’application comme ici.</p>
         <a href="{{ route('connexion') }}" class="h-12 rounded-xl bg-accent text-white font-bold flex items-center justify-center">Se connecter</a>
     @endif
 
     @if ($etape !== 'termine' && $lienWhatsApp)
         <div class="mt-6 pt-5 border-t border-[--color-border] text-sm">
             <p class="text-[--color-muted] mb-2">Pas d’adresse e-mail, ou pas de code reçu ? Écrivez-nous : nous vous donnons un mot de passe provisoire.</p>
-            <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="inline-flex items-center h-10 px-4 rounded-lg bg-[#25D366] text-white font-bold">WhatsApp {{ $support }}</a>
+            <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="inline-flex items-center h-10 px-4 rounded-lg bg-whatsapp text-white font-bold">WhatsApp {{ $support }}</a>
         </div>
     @endif
 

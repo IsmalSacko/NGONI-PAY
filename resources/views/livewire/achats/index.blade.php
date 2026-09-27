@@ -10,14 +10,14 @@
         @endcan
     </div>
 
-    @if ($info)<p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $info }}</p>@endif
+    @if ($info)<p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>@endif
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Fournisseurs</h2>
             @forelse ($fournisseurs as $f)
                 @php($doit = max(0, (int) $f->achats_total - (int) $f->paiements_total))
-                <div class="flex flex-wrap items-center gap-2 justify-between py-2 border-b border-[#EEEAE1] text-sm" wire:key="f-{{ $f->id }}">
+                <div class="flex flex-wrap items-center gap-2 justify-between py-2 border-b border-separateur text-sm" wire:key="f-{{ $f->id }}">
                     <span><span class="font-semibold">{{ $f->nom }}</span> <span class="text-[--color-muted]">{{ $f->telephone }}</span></span>
                     <span class="flex items-center gap-2">
                         <span class="font-bold {{ $doit > 0 ? 'text-danger-fg' : 'text-[--color-muted]' }}">{{ $doit > 0 ? 'Vous devez '.$m($doit) : 'Rien à payer' }}</span>
@@ -35,7 +35,7 @@
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Dernières réceptions</h2>
             @forelse ($achats as $a)
-                <div class="py-2 border-b border-[#EEEAE1] text-sm" wire:key="a-{{ $a->id }}">
+                <div class="py-2 border-b border-separateur text-sm" wire:key="a-{{ $a->id }}">
                     <div class="flex justify-between"><span class="font-semibold">{{ $a->created_at->format('d/m/Y H:i') }} · {{ $a->fournisseur?->nom ?? 'Sans fournisseur' }} @if ($a->reference) · {{ $a->reference }} @endif</span><span class="font-bold">{{ $m($a->total) }}</span></div>
                     <div class="text-xs text-[--color-muted]">{{ $a->lignes->map(fn ($l) => $l->nom_produit.' × '.$l->quantite)->join(', ') }}</div>
                 </div>
@@ -63,7 +63,7 @@
                     </label>
                 </div>
                 @if ($fournisseurOuvert)
-                    <div class="flex flex-wrap gap-2 items-end rounded-xl bg-[#F7F5F0] p-3">
+                    <div class="flex flex-wrap gap-2 items-end rounded-xl bg-fond-tableau p-3">
                         <input wire:model="nomFournisseur" type="text" placeholder="Nom du fournisseur" class="h-10 px-3 rounded-lg border border-[--color-border-strong] flex-1 min-w-0">
                         <input wire:model="telFournisseur" type="tel" placeholder="Téléphone" class="h-10 px-3 rounded-lg border border-[--color-border-strong] w-40">
                         <button type="button" wire:click="creerFournisseur" class="h-10 px-4 rounded-lg bg-ink text-white font-bold">Créer</button>

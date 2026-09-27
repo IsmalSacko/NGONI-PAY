@@ -20,14 +20,14 @@
     </details>
 
     @if ($info)
-        <p class="rounded-xl bg-accent-soft text-[#0B4F39] px-4 py-3 text-sm font-semibold">{{ $info }}</p>
+        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>
     @endif
     @if ($motDePasseProvisoire)
         <div class="rounded-xl border-2 border-accent bg-white px-4 py-3 text-sm flex flex-col gap-2">
             <span>Mot de passe provisoire, affiché une seule fois :</span>
             <code class="text-lg font-bold tracking-wider">{{ $motDePasseProvisoire }}</code>
             @if ($lienWhatsApp)
-                <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="self-start h-10 px-4 rounded-lg bg-[#25D366] text-white font-bold inline-flex items-center">Envoyer par WhatsApp</a>
+                <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="self-start h-10 px-4 rounded-lg bg-whatsapp text-white font-bold inline-flex items-center">Envoyer par WhatsApp</a>
             @endif
         </div>
     @endif
@@ -36,13 +36,13 @@
     @endif
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="hidden md:grid grid-cols-[2fr_1.3fr_1fr_1fr_200px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+        <div class="hidden md:grid grid-cols-[2fr_1.3fr_1fr_1fr_200px] gap-3 px-5 py-3 bg-fond-tableau border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Nom</span><span>Téléphone</span><span>Rôle</span><span>Statut</span><span></span>
         </div>
         @foreach ($membres as $membre)
             @php($role = $membre->roles->first()?->name)
             @php($modifiable = $peutGerer && $membre->id !== auth()->id() && $membre->id !== $proprietaireId)
-            <div class="flex flex-col gap-2 md:grid md:grid-cols-[2fr_1.3fr_1fr_1fr_200px] md:gap-3 px-5 py-4 md:py-3 border-b border-[#EEEAE1] md:items-center text-sm" wire:key="membre-{{ $membre->id }}">
+            <div class="flex flex-col gap-2 md:grid md:grid-cols-[2fr_1.3fr_1fr_1fr_200px] md:gap-3 px-5 py-4 md:py-3 border-b border-separateur md:items-center text-sm" wire:key="membre-{{ $membre->id }}">
                 <span class="font-bold">
                     {{ $membre->name }}
                     @if ($membre->id === $proprietaireId)
@@ -63,9 +63,9 @@
                 </span>
                 <span>
                     @if ($membre->is_active)
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-[#0B4F39]">Actif</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">Actif</span>
                     @else
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-[#F1EDE4] text-[--color-muted]">Désactivé</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-puce text-[--color-muted]">Désactivé</span>
                     @endif
                 </span>
                 @if ($modifiable)

@@ -56,7 +56,8 @@ class AnnoncesTest extends TestCase
             ->assertSet('info', fn ($i) => str_contains($i, '2 notification(s), 0 push, 1 e-mail(s)'));
 
         Mail::assertSent(AnnonceMail::class, fn (AnnonceMail $m) => $m->hasTo('awa@example.com'));
-        Mail::assertSentCount(1);
+        // Une seule annonce envoyée (les inscriptions de la mise en place écrivent aussi à l'exploitant).
+        Mail::assertSent(AnnonceMail::class, 1);
 
         // L'application de Moussa voit la notification, non lue.
         $this->app['auth']->forgetGuards();

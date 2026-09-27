@@ -13,25 +13,29 @@
     <meta property="og:title" content="{{ $titre }}">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:url" content="{{ url('/telecharger') }}">
-    <meta property="og:image" content="{{ asset('images/e-caisse.png') }}">
+    <meta property="og:image" content="{{ asset('images/og-ngoni-caisse.jpg') }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Ngoni Caisse">
-    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="{{ url('/telecharger') }}">
+    <x-tete-commune :indexer="true" />
     <style>
         body { margin: 0; min-height: 100vh; display: grid; place-items: center;
-               font-family: "Segoe UI", Arial, sans-serif; background: #f3f7f5; color: #1f2937; }
+               font-family: "Segoe UI", Arial, sans-serif; background: #eef2f8; color: #1f2937; }
         main { max-width: 420px; margin: 24px 16px; text-align: center; background: #fff;
                border-radius: 20px; padding: 36px 28px; box-shadow: 0 10px 24px rgba(0,0,0,.08); }
         img { width: 96px; height: 96px; border-radius: 22px; }
         h1 { margin: 16px 0 4px; font-size: 26px; }
-        .version { color: #0B6E4F; font-size: 16px; font-weight: 600; }
+        .version { color: #0F2A5C; font-size: 16px; font-weight: 600; }
         p { color: #4b5563; line-height: 1.5; }
         a.bouton { display: inline-block; margin-top: 12px; padding: 14px 26px; border-radius: 12px;
-                   background: #0B6E4F; color: #fff; font-weight: 700; text-decoration: none; }
+                   background: #0F2A5C; color: #fff; font-weight: 700; text-decoration: none; }
     </style>
 </head>
 <body>
 <main>
-    <img src="{{ asset('images/e-caisse.png') }}" alt="Ngoni Caisse">
+    <img src="{{ asset('icone-512.png') }}" alt="Ngoni Caisse">
     <h1>Ngoni Caisse @if ($version)<span class="version">{{ $version }}</span>@endif</h1>
     <p>{{ $description }}</p>
     <a class="bouton" href="{{ $storeUrl }}" rel="noopener">Télécharger sur Google Play</a>

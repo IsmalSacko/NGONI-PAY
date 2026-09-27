@@ -38,12 +38,7 @@ class SessionCaisseService
             throw ValidationException::withMessages(['session' => ['Cette séance est déjà fermée.']]);
         }
 
-        $totalEspeces = (int) $session->ventes()
-            ->valides()
-            ->where('moyen_paiement', MoyenPaiement::Especes)
-            ->sum('total');
-
-        $fondAttendu = $session->fond_initial + $totalEspeces;
+        $fondAttendu = $this->fondAttendu($session);
 
         $session->update([
             'fond_final' => $fondFinal,
@@ -54,6 +49,31 @@ class SessionCaisseService
         ]);
 
         return $session->fresh();
+    }
+
+    /** Ventes en espèces encaissées pendant la séance (annulées exclues). */
+    public function totalEspeces(SessionCaisse $session): int
+    {
+        return (int) $session->ventes()
+            ->valides()
+            ->where('moyen_paiement', MoyenPaiement::Especes)
+            ->sum('total');
+    }
+
+    /** Ce que le tiroir devrait contenir : le fond d'ouverture plus les espèces encaissées. */
+    public function fondAttendu(SessionCaisse $session): int
+    {
+        return $session->fond_initial + $this->totalEspeces($session);
+    }
+
+    /**
+     * Fond proposé à l'ouverture : l'argent laissé dans le tiroir à la
+     * dernière fermeture de la boutique (quel que soit le caissier : le
+     * tiroir, lui, reste le même).
+     */
+    public function derniereFermeture(): ?SessionCaisse
+    {
+        return SessionCaisse::where('statut', 'fermee')->whereNotNull('fond_final')->latest('fermee_le')->first();
     }
 
     public function courante(User $caissier): ?SessionCaisse

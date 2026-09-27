@@ -30,8 +30,8 @@
                         Abonnement actuel : <x-statut-abonnement :abonnement="$demande->proprietaire?->abonnement" />
                         @if ($demande->moyen) · moyen annoncé : {{ $demande->moyen }} @endif
                     </p>
-                    @if ($demande->note)<p class="mt-2 rounded-lg bg-[#F7F5F0] px-3 py-2">{{ $demande->note }}</p>@endif
-                    @if ($demande->preuve_note)<p class="mt-2 rounded-lg bg-[#F7F5F0] px-3 py-2"><span class="font-bold">SMS / preuve :</span> {{ $demande->preuve_note }}</p>@endif
+                    @if ($demande->note)<p class="mt-2 rounded-lg bg-fond-tableau px-3 py-2">{{ $demande->note }}</p>@endif
+                    @if ($demande->preuve_note)<p class="mt-2 rounded-lg bg-fond-tableau px-3 py-2"><span class="font-bold">SMS / preuve :</span> {{ $demande->preuve_note }}</p>@endif
                     @if ($demande->preuve_chemin)
                         <a href="{{ route('plateforme.preuve', $demande) }}" target="_blank" class="mt-2 inline-block font-bold text-accent underline">Voir la preuve de paiement</a>
                     @endif

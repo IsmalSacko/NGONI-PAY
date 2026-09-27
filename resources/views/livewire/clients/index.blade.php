@@ -13,11 +13,11 @@
            class="w-full md:w-96 h-12 px-4 rounded-xl border border-[--color-border-strong] focus:outline-none focus:ring-2 focus:ring-accent">
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 px-5 py-3 bg-fond-tableau border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Nom</span><span>Téléphone</span><span class="text-right">Doit</span><span></span>
         </div>
         @forelse ($clients as $client)
-            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-separateur items-center text-sm">
                 <span class="font-bold">{{ $client->nom }}</span>
                 <span class="text-right md:text-left">{{ $client->telephone ?: '—' }}</span>
                 @php($doit = max(0, (int) $client->credit_total - (int) $client->reglements_total))

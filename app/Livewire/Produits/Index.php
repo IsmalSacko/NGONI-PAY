@@ -44,6 +44,9 @@ class Index extends Component
     /** Photo choisie pour l'article (fichier temporaire Livewire). */
     public $photo = null;
 
+    /** Photo actuelle à supprimer à l'enregistrement. */
+    public bool $retirerPhoto = false;
+
     public string $taux_tva = '18';
 
     public string $stock = '0';
@@ -53,7 +56,7 @@ class Index extends Component
     public function nouveauProduit(): void
     {
         $this->resetValidation();
-        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock', 'photo']);
+        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock', 'photo', 'retirerPhoto']);
         $this->taux_tva = '18';
         $this->seuil_alerte = '10';
         $this->modaleOuverte = true;
@@ -62,6 +65,7 @@ class Index extends Component
     public function modifier(string $produitId): void
     {
         $this->resetValidation();
+        $this->reset(['photo', 'retirerPhoto']);
         $produit = Produit::findOrFail($produitId);
 
         $this->produitId = $produit->id;
@@ -129,12 +133,27 @@ class Index extends Component
             $produit = Produit::create($data);
         }
 
+        $images = app(\App\Services\Images::class);
         if ($this->photo) {
-            $produit->forceFill(['photo' => app(\App\Services\Images::class)->enregistrer($this->photo, 'produits', $produit->id, $produit->photo)])->save();
-            $this->reset('photo');
+            $produit->forceFill(['photo' => $images->enregistrer($this->photo, 'produits', $produit->id, $produit->photo)])->save();
+        } elseif ($this->retirerPhoto && $produit->photo) {
+            $images->supprimer($produit->photo);
+            $produit->forceFill(['photo' => null])->save();
         }
+        $this->reset(['photo', 'retirerPhoto']);
 
         $this->modaleOuverte = false;
+    }
+
+    /** « Retirer » : annule la photo choisie, ou marque l'actuelle à supprimer. */
+    public function retirerLaPhoto(): void
+    {
+        if ($this->photo) {
+            $this->reset('photo');
+
+            return;
+        }
+        $this->retirerPhoto = true;
     }
 
     public function supprimer(string $produitId): void

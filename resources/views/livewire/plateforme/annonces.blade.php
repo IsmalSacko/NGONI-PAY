@@ -57,7 +57,7 @@
             </div>
 
             @if ($audience === 'selection')
-                <div class="rounded-xl bg-[#F7F5F0] p-3 flex flex-col gap-2">
+                <div class="rounded-xl bg-fond-tableau p-3 flex flex-col gap-2">
                     <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Nom ou téléphone (2 lettres min.)" class="h-10 px-3 rounded-lg border border-border-strong">
                     @foreach ($comptes as $c)
                         <label class="flex items-center gap-2 text-sm" wire:key="c-{{ $c->id }}">
@@ -108,7 +108,7 @@
 
     <section class="bg-white border border-border rounded-2xl overflow-hidden">
         @forelse ($annonces as $a)
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 border-b border-[#EEEAE1] text-sm" wire:key="a-{{ $a->id }}">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 border-b border-separateur text-sm" wire:key="a-{{ $a->id }}">
                 <div class="flex flex-col min-w-0 flex-1">
                     <span class="font-bold truncate">{{ $a->titre }}</span>
                     <span class="text-muted text-xs">
@@ -123,7 +123,7 @@
                     @elseif ($a->statut === 'envoyee')
                         <span class="rounded px-2 py-1 bg-accent-soft text-accent-dark font-bold">envoyée {{ $a->derniere_diffusion?->format('d/m/Y H:i') }}</span>
                     @else
-                        <span class="rounded px-2 py-1 bg-[#F1EDE4] text-muted font-bold">arrêtée</span>
+                        <span class="rounded px-2 py-1 bg-puce text-muted font-bold">arrêtée</span>
                     @endif
                 </span>
                 <span class="text-xs text-muted">{{ $a->nb_notifies }} notif. · {{ $a->nb_emails }} e-mails @if ($a->nb_echecs) · {{ $a->nb_echecs }} échecs @endif</span>

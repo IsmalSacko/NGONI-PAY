@@ -42,6 +42,33 @@
         ['Et sur iPhone ?', "L’application est disponible sur Android. Le back-office fonctionne dans n’importe quel navigateur, iPhone compris."],
     ];
 @endphp
+@php
+    $url = route('vitrine');
+    // Données structurées tirées du contenu même de la page : une question
+    // ajoutée à la FAQ apparaît aussi dans les résultats Google, sans rien d'autre à faire.
+    $faq = [
+        '@context' => 'https://schema.org',
+        '@type' => 'FAQPage',
+        'mainEntity' => collect($questions)->map(fn ($q) => [
+            '@type' => 'Question',
+            'name' => $q[0],
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => $q[1]],
+        ])->values()->all(),
+    ];
+    $organisation = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'Organization',
+        'name' => 'Ngoni Caisse',
+        'url' => $url,
+        'logo' => asset('icone-512.png'),
+        'contactPoint' => $whatsapp ? ['@type' => 'ContactPoint', 'telephone' => $whatsapp, 'contactType' => 'customer support', 'availableLanguage' => 'French'] : null,
+    ]);
+    $texteDePartage = 'Ngoni Caisse, la caisse moderne pour les commerçants : ventes, stocks et tickets depuis le téléphone, même hors ligne.';
+    $partage = [
+        'facebook' => 'https://www.facebook.com/sharer/sharer.php?u='.rawurlencode($url),
+        'whatsapp' => 'https://wa.me/?text='.rawurlencode($texteDePartage.' '.$url),
+    ];
+@endphp
 <!doctype html>
 <html lang="fr" class="scroll-smooth">
 <head>
@@ -51,9 +78,7 @@
     <meta name="description" content="{{ $description }}">
     <link rel="canonical" href="{{ route('vitrine') }}">
     <meta name="robots" content="index, follow">
-    <meta name="theme-color" content="#0B6E4F">
-    <link rel="icon" href="{{ asset('images/e-caisse.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('images/e-caisse.png') }}">
+    <x-tete-commune :indexer="true" />
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Ngoni Caisse">
     <meta property="og:locale" content="fr_FR">
@@ -63,8 +88,14 @@
     <meta property="og:image" content="{{ $apercu }}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ngoni Caisse, la caisse moderne pour les commerçants en Afrique">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $titre }}">
+    <meta name="twitter:description" content="{{ $description }}">
+    <meta name="twitter:image" content="{{ $apercu }}">
     <script type="application/ld+json">@json($donnees, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)</script>
+    <script type="application/ld+json">@json($faq, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)</script>
+    <script type="application/ld+json">@json($organisation, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)</script>
     @vite(['resources/css/app.css'])
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
@@ -72,14 +103,14 @@
 {{-- Navigation --}}
 <header class="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-border/70">
     <div class="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center gap-6">
-        <a href="{{ route('vitrine') }}" class="flex items-center gap-2 font-display font-extrabold text-lg">
-            <span class="w-9 h-9 rounded-xl bg-accent text-white flex items-center justify-center">N</span>
-            Ngoni Caisse
+        <a href="{{ route('vitrine') }}" aria-label="Ngoni Caisse, accueil">
+            <x-logo taille="w-10 h-10" :nom="true" couleur-nom="text-accent" />
         </a>
         <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-muted">
             <a href="#fonctions" class="hover:text-ink">Fonctions</a>
             <a href="#tarifs" class="hover:text-ink">Tarifs</a>
             <a href="#questions" class="hover:text-ink">Questions</a>
+            <a href="#partager" class="hover:text-ink">Partager</a>
         </nav>
         <div class="flex-grow"></div>
         <a href="{{ route('connexion') }}" class="hidden sm:inline-flex h-10 px-4 items-center rounded-xl font-bold text-sm hover:bg-white">Se connecter</a>
@@ -90,14 +121,14 @@
 <main>
     {{-- Accroche --}}
     <section class="relative overflow-hidden">
-        <div class="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-accent-soft blur-3xl opacity-70" aria-hidden="true"></div>
+        <div class="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full bg-jaune-doux blur-3xl opacity-80" aria-hidden="true"></div>
         <div class="relative max-w-6xl mx-auto px-4 md:px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
             <div>
                 <span class="inline-flex items-center gap-2 rounded-full bg-white border border-border px-3 py-1 text-xs font-bold text-accent-dark">
                     <span class="w-2 h-2 rounded-full bg-accent"></span> Nouveau : Ngoni Pay devient Ngoni Caisse
                 </span>
                 <h1 class="mt-5 font-display font-extrabold text-4xl md:text-6xl leading-[1.05] tracking-tight">
-                    La caisse de votre commerce, <span class="text-accent">dans votre téléphone.</span>
+                    La caisse de votre commerce, <span class="text-accent bg-[linear-gradient(transparent_62%,var(--color-jaune)_62%)]">dans votre téléphone.</span>
                 </h1>
                 <p class="mt-5 text-lg text-muted max-w-xl">
                     Encaissez en quelques secondes, imprimez vos tickets, suivez vos stocks, vos marges et votre équipe —
@@ -119,17 +150,17 @@
 
             {{-- Téléphone dessiné en HTML : l'écran de caisse, sans image à charger. --}}
             <div class="relative mx-auto w-[290px] md:w-[320px]" aria-label="Aperçu de l'écran de caisse de Ngoni Caisse" role="img">
-                <div class="absolute -inset-6 rounded-[56px] bg-accent/10 rotate-3" aria-hidden="true"></div>
+                <div class="absolute -inset-6 rounded-[56px] bg-jaune/40 rotate-3" aria-hidden="true"></div>
                 <div class="relative rounded-[44px] bg-ink p-3 shadow-2xl">
                     <div class="rounded-[34px] bg-paper overflow-hidden">
-                        <div class="h-7 flex items-center justify-center"><span class="w-20 h-4 rounded-full bg-ink"></span></div>
+                        <div class="h-7 flex items-center justify-center bg-accent"><span class="w-20 h-4 rounded-full bg-ink"></span></div>
                         <div class="px-4 pb-3">
-                            <div class="text-[11px] font-semibold text-muted">PHARMACIE LES CASTORS · Awa</div>
+                            <div class="-mx-4 px-4 pb-2 bg-accent text-[11px] font-extrabold text-white flex items-center gap-2"><x-logo taille="w-5 h-5" /> PHARMACIE LES CASTORS</div>
                             <div class="mt-2 h-8 rounded-lg bg-white border border-border text-[11px] text-muted flex items-center px-3">Scanner ou rechercher…</div>
                             <div class="mt-2 flex gap-1.5 text-[10px] font-bold">
-                                <span class="rounded-full bg-ink text-white px-2.5 py-1">Tous</span>
-                                <span class="rounded-full bg-white border border-border px-2.5 py-1">Aliments</span>
-                                <span class="rounded-full bg-white border border-border px-2.5 py-1">Boissons</span>
+                                <span class="rounded-lg bg-jaune text-accent px-2.5 py-1">Tous</span>
+                                <span class="rounded-lg bg-puce text-accent px-2.5 py-1">Aliments</span>
+                                <span class="rounded-lg bg-puce text-accent px-2.5 py-1">Boissons</span>
                             </div>
                             <div class="mt-3 grid grid-cols-2 gap-2">
                                 @foreach ([['Riz parfumé', '4 750', 'RI'], ['Huile 1 L', '1 500', 'HU'], ['Sucre 1 kg', '900', 'SU'], ['Lait en poudre', '2 800', 'LA']] as [$nom, $p, $c])
@@ -142,8 +173,8 @@
                             </div>
                             <div class="mt-3 rounded-xl bg-white border border-border p-3">
                                 <div class="flex justify-between text-[11px] text-muted"><span>3 articles</span><span>Espèces</span></div>
-                                <div class="flex justify-between items-baseline mt-1"><span class="text-[11px] font-semibold">Total à payer</span><span class="font-display font-extrabold text-lg">9 150 F</span></div>
-                                <div class="mt-2 h-9 rounded-lg bg-accent text-white text-[12px] font-bold flex items-center justify-center">Encaisser 9 150 F</div>
+                                <div class="flex justify-between items-baseline mt-1.5 rounded-lg bg-jaune text-accent px-2.5 py-1.5"><span class="text-[11px] font-extrabold">Total</span><span class="font-display font-extrabold text-lg">9 150 F</span></div>
+                                <div class="mt-2 h-9 rounded-lg bg-succes text-white text-[12px] font-bold flex items-center justify-center">Encaisser</div>
                             </div>
                         </div>
                         <div class="h-14 bg-white border-t border-border flex items-center justify-around text-[9px] text-muted relative">
@@ -191,9 +222,9 @@
     </section>
 
     {{-- Comment ça marche --}}
-    <section class="bg-ink text-white">
+    <section class="bg-accent text-white">
         <div class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
-            <p class="text-sm font-bold text-accent-soft uppercase tracking-wider">En 3 minutes</p>
+            <p class="text-sm font-bold text-jaune uppercase tracking-wider">En 3 minutes</p>
             <h2 class="mt-2 font-display font-extrabold text-3xl md:text-4xl">Votre caisse prête avant le prochain client.</h2>
             <ol class="mt-10 grid md:grid-cols-3 gap-6">
                 @foreach ([
@@ -202,7 +233,7 @@
                     ['Encaissez', 'Touchez, encaissez, imprimez ou envoyez le reçu. Votre journée se retrouve dans le pilotage.'],
                 ] as $i => [$etape, $texte])
                     <li class="rounded-2xl bg-white/5 border border-white/10 p-6">
-                        <span class="font-display font-extrabold text-4xl text-accent-soft">{{ $i + 1 }}</span>
+                        <span class="font-display font-extrabold text-4xl text-jaune">{{ $i + 1 }}</span>
                         <h3 class="mt-3 font-bold text-lg">{{ $etape }}</h3>
                         <p class="mt-2 text-sm text-white/70 leading-relaxed">{{ $texte }}</p>
                     </li>
@@ -223,7 +254,7 @@
                 @php($pro = $plan['code'] === 'pro')
                 <div class="relative rounded-3xl p-7 md:p-8 {{ $pro ? 'bg-accent text-white shadow-2xl' : 'bg-white border border-border' }}">
                     @if ($pro)
-                        <span class="absolute -top-3 right-6 rounded-full bg-ink text-white text-xs font-bold px-3 py-1">Le plus complet</span>
+                        <span class="absolute -top-3 right-6 rounded-full bg-jaune text-accent text-xs font-extrabold px-3 py-1">Le plus complet</span>
                     @endif
                     <h3 class="font-display font-extrabold text-2xl">{{ $plan['nom'] }}</h3>
                     <p class="mt-1 text-sm {{ $pro ? 'text-white/80' : 'text-muted' }}">{{ $plan['description'] }}</p>
@@ -280,27 +311,79 @@
             <div class="relative flex flex-wrap gap-3">
                 <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl bg-white text-accent-dark font-bold hover:bg-accent-soft">Télécharger l’application</a>
                 @if ($waMessage)
-                    <a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl border-2 border-white font-bold hover:bg-white/10">WhatsApp</a>
+                    <a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex h-12 px-6 items-center gap-2 rounded-xl bg-whatsapp text-white font-bold hover:brightness-95">
+                        <x-icone nom="whatsapp" class="w-5 h-5" /> Écrire sur WhatsApp
+                    </a>
                 @endif
+            </div>
+        </div>
+    </section>
+    {{-- Partager la page : Facebook, WhatsApp, copier le lien (et le partage du téléphone quand il existe). --}}
+    <section id="partager" class="max-w-6xl mx-auto px-4 md:px-6 pb-16 md:pb-24">
+        <div class="rounded-3xl bg-white border border-border px-6 py-8 md:px-10 flex flex-col md:flex-row md:items-center gap-6">
+            <div class="flex-grow">
+                <h2 class="font-display font-extrabold text-2xl">Un commerçant autour de vous en a besoin ?</h2>
+                <p class="mt-1 text-muted">Partagez Ngoni Caisse en un geste.</p>
+            </div>
+            <div class="flex flex-wrap gap-2.5">
+                <a href="{{ $partage['whatsapp'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-whatsapp text-white font-bold hover:brightness-95">
+                    <x-icone nom="whatsapp" /> WhatsApp
+                </a>
+                <a href="{{ $partage['facebook'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-[#1877F2] text-white font-bold hover:brightness-95">
+                    <x-icone nom="facebook" /> Facebook
+                </a>
+                <button type="button" data-copier="{{ $url }}" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl border-2 border-accent text-accent font-bold hover:bg-accent-soft">
+                    <x-icone nom="lien" /> <span data-libelle>Copier le lien</span>
+                </button>
+                <button type="button" data-partager data-titre="Ngoni Caisse" data-texte="{{ $texteDePartage }}" data-url="{{ $url }}" hidden
+                        class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-accent text-white font-bold">
+                    <x-icone nom="partager" /> Partager…
+                </button>
             </div>
         </div>
     </section>
 </main>
 
+@if ($waMessage)
+    <a href="{{ $waMessage }}" target="_blank" rel="noopener" aria-label="Nous écrire sur WhatsApp"
+       class="fixed z-50 right-4 bottom-4 md:right-6 md:bottom-6 w-14 h-14 rounded-full bg-whatsapp text-white shadow-xl flex items-center justify-center hover:scale-105 transition">
+        <x-icone nom="whatsapp" class="w-8 h-8" />
+    </a>
+@endif
+
 <footer class="border-t border-border">
     <div class="max-w-6xl mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between text-sm text-muted">
-        <div class="flex items-center gap-2 font-display font-extrabold text-ink">
-            <span class="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center">N</span> Ngoni Caisse
-        </div>
+        <x-logo taille="w-9 h-9" :nom="true" couleur-nom="text-accent" />
         <nav class="flex flex-wrap gap-x-6 gap-y-2">
             <a href="#fonctions" class="hover:text-ink">Fonctions</a>
             <a href="#tarifs" class="hover:text-ink">Tarifs</a>
             <a href="{{ route('connexion') }}" class="hover:text-ink">Back-office</a>
             <a href="{{ url('/privacy') }}" class="hover:text-ink">Confidentialité</a>
-            @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener" class="hover:text-ink">Contact</a>@endif
+            @if ($waMessage)<a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 hover:text-ink"><x-icone nom="whatsapp" class="w-4 h-4 text-whatsapp" /> Contact WhatsApp</a>@endif
         </nav>
         <span>© {{ now()->year }} Ngoni Caisse</span>
     </div>
 </footer>
+<script>
+    // Copier le lien (repli pour les navigateurs sans presse-papiers asynchrone).
+    document.querySelectorAll('[data-copier]').forEach((bouton) => bouton.addEventListener('click', async () => {
+        const lien = bouton.dataset.copier;
+        try {
+            await navigator.clipboard.writeText(lien);
+        } catch (e) {
+            const zone = Object.assign(document.createElement('textarea'), { value: lien });
+            document.body.append(zone); zone.select(); document.execCommand('copy'); zone.remove();
+        }
+        const libelle = bouton.querySelector('[data-libelle]');
+        libelle.textContent = 'Lien copié ✓';
+        setTimeout(() => (libelle.textContent = 'Copier le lien'), 2500);
+    }));
+    // Partage du téléphone (Android, iPhone) : proposé seulement là où il existe.
+    document.querySelectorAll('[data-partager]').forEach((bouton) => {
+        if (!navigator.share) return;
+        bouton.hidden = false;
+        bouton.addEventListener('click', () => navigator.share({ title: bouton.dataset.titre, text: bouton.dataset.texte, url: bouton.dataset.url }).catch(() => {}));
+    });
+</script>
 </body>
 </html>

@@ -33,12 +33,12 @@
     </div>
 
     <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-[#F7F5F0] border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+        <div class="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-3 px-5 py-3 bg-fond-tableau border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
             <span>Article</span><span class="text-right">Stock</span><span class="text-right">Seuil</span><span>Statut</span><span></span>
         </div>
         @forelse ($produits as $produit)
             {{-- Téléphone : une carte par article (nom, stock / seuil, statut, Ajuster). --}}
-            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_100px] gap-x-3 gap-y-1 px-5 py-3 border-b border-[#EEEAE1] items-center text-sm">
+            <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_100px] gap-x-3 gap-y-1 px-5 py-3 border-b border-separateur items-center text-sm">
                 <span class="font-bold">{{ $produit->nom }}</span>
                 <span class="text-right font-semibold"><span class="md:hidden text-[--color-muted] font-normal">Stock </span>{{ $produit->stock }}</span>
                 <span class="hidden md:block text-right text-[--color-muted]">{{ $produit->seuil_alerte }}</span>
@@ -48,7 +48,7 @@
                     @elseif ($produit->stockFaible())
                         <span class="text-xs font-bold rounded px-2 py-1 bg-warn-bg text-warn-fg">Stock bas</span>
                     @else
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-[#0B4F39]">En stock</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">En stock</span>
                     @endif
                 </span>
                 @can('stocks.update')
