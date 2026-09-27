@@ -128,7 +128,7 @@
                     <span class="w-2 h-2 rounded-full bg-accent"></span> Nouveau : Ngoni Pay devient Ngoni Caisse
                 </span>
                 <h1 class="mt-5 font-display font-extrabold text-4xl md:text-6xl leading-[1.05] tracking-tight">
-                    La caisse de votre commerce, <span class="text-accent bg-[linear-gradient(transparent_62%,var(--color-jaune)_62%)]">dans votre téléphone.</span>
+                    La caisse de votre commerce, <span class="text-accent">dans votre téléphone.</span>
                 </h1>
                 <p class="mt-5 text-lg text-muted max-w-xl">
                     Encaissez en quelques secondes, imprimez vos tickets, suivez vos stocks, vos marges et votre équipe —
@@ -301,7 +301,7 @@
     </section>
 
     {{-- Appel final --}}
-    <section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+    <section class="max-w-6xl mx-auto px-4 md:px-6 pt-16 md:pt-24 pb-8 md:pb-10">
         <div class="rounded-3xl bg-accent text-white px-6 py-12 md:px-14 md:py-16 grid md:grid-cols-[1fr_auto] gap-8 items-center overflow-hidden relative">
             <div class="absolute -right-20 -bottom-24 w-80 h-80 rounded-full bg-white/10" aria-hidden="true"></div>
             <div class="relative">
@@ -310,34 +310,29 @@
             </div>
             <div class="relative flex flex-wrap gap-3">
                 <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl bg-white text-accent-dark font-bold hover:bg-accent-soft">Télécharger l’application</a>
-                @if ($waMessage)
-                    <a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex h-12 px-6 items-center gap-2 rounded-xl bg-whatsapp text-white font-bold hover:brightness-95">
-                        <x-icone nom="whatsapp" class="w-5 h-5" /> Écrire sur WhatsApp
-                    </a>
-                @endif
             </div>
         </div>
     </section>
-    {{-- Partager la page : Facebook, WhatsApp, copier le lien (et le partage du téléphone quand il existe). --}}
+    {{-- Partager la page : sobre, l'icône de chaque réseau suffit à le reconnaître. --}}
     <section id="partager" class="max-w-6xl mx-auto px-4 md:px-6 pb-16 md:pb-24">
-        <div class="rounded-3xl bg-white border border-border px-6 py-8 md:px-10 flex flex-col md:flex-row md:items-center gap-6">
+        <div class="rounded-3xl bg-white border border-border px-6 py-6 md:px-10 flex flex-col lg:flex-row lg:items-center gap-5">
             <div class="flex-grow">
-                <h2 class="font-display font-extrabold text-2xl">Un commerçant autour de vous en a besoin ?</h2>
+                <h2 class="font-display font-bold text-xl md:text-2xl">Un commerçant autour de vous en a besoin&nbsp;?</h2>
                 <p class="mt-1 text-muted">Partagez Ngoni Caisse en un geste.</p>
             </div>
-            <div class="flex flex-wrap gap-2.5">
-                <a href="{{ $partage['whatsapp'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-whatsapp text-white font-bold hover:brightness-95">
-                    <x-icone nom="whatsapp" /> WhatsApp
+            <div class="flex flex-wrap sm:flex-nowrap gap-2">
+                @php($bouton = 'inline-flex items-center gap-2 h-11 px-4 rounded-xl border border-border-strong bg-white text-accent font-bold hover:bg-paper whitespace-nowrap')
+                <a href="{{ $partage['whatsapp'] }}" target="_blank" rel="noopener" class="{{ $bouton }}">
+                    <x-icone nom="whatsapp" class="w-5 h-5 text-whatsapp" /> WhatsApp
                 </a>
-                <a href="{{ $partage['facebook'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-[#1877F2] text-white font-bold hover:brightness-95">
-                    <x-icone nom="facebook" /> Facebook
+                <a href="{{ $partage['facebook'] }}" target="_blank" rel="noopener" class="{{ $bouton }}">
+                    <x-icone nom="facebook" class="w-5 h-5 text-[#1877F2]" /> Facebook
                 </a>
-                <button type="button" data-copier="{{ $url }}" class="inline-flex items-center gap-2 h-12 px-4 rounded-xl border-2 border-accent text-accent font-bold hover:bg-accent-soft">
-                    <x-icone nom="lien" /> <span data-libelle>Copier le lien</span>
+                <button type="button" data-copier="{{ $url }}" class="{{ $bouton }}">
+                    <x-icone nom="lien" class="w-5 h-5" /> <span data-libelle>Copier le lien</span>
                 </button>
-                <button type="button" data-partager data-titre="Ngoni Caisse" data-texte="{{ $texteDePartage }}" data-url="{{ $url }}" hidden
-                        class="inline-flex items-center gap-2 h-12 px-4 rounded-xl bg-accent text-white font-bold">
-                    <x-icone nom="partager" /> Partager…
+                <button type="button" data-partager data-titre="Ngoni Caisse" data-texte="{{ $texteDePartage }}" data-url="{{ $url }}" hidden class="{{ $bouton }}">
+                    <x-icone nom="partager" class="w-5 h-5" /> Partager…
                 </button>
             </div>
         </div>
