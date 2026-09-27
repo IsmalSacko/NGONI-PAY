@@ -94,7 +94,7 @@ class Comptes extends Component
     {
         $needle = '%'.mb_strtolower($this->recherche).'%';
 
-        $abonnements = Abonnement::query()
+        $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
             ]), 'proprietaire.boutiquesPossedees' => fn ($q) => $q

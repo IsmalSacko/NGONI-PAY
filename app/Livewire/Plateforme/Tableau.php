@@ -18,15 +18,15 @@ class Tableau extends Component
 {
     public function render()
     {
-        $actifs = Abonnement::where('est_actif', true)
+        $actifs = Abonnement::avecCompte()->where('est_actif', true)
             ->where(fn ($q) => $q->whereNull('fin')->orWhereDate('fin', '>=', today()))
             ->count();
-        $parPlan = Abonnement::select('plan', DB::raw('COUNT(*) as n'))->groupBy('plan')->pluck('n', 'plan');
+        $parPlan = Abonnement::avecCompte()->select('plan', DB::raw('COUNT(*) as n'))->groupBy('plan')->pluck('n', 'plan');
 
         return view('livewire.plateforme.tableau', [
-            'comptes' => Abonnement::count(),
+            'comptes' => Abonnement::avecCompte()->count(),
             'actifs' => $actifs,
-            'expires' => Abonnement::count() - $actifs,
+            'expires' => Abonnement::avecCompte()->count() - $actifs,
             'parPlan' => $parPlan,
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),

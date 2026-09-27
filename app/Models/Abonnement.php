@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -29,6 +30,17 @@ class Abonnement extends Model
             'est_actif' => 'boolean',
             'est_manuel' => 'boolean',
         ];
+    }
+
+    /**
+     * Abonnements dont le compte existe encore : la console n'affiche ni ne
+     * compte ceux d'un compte effacé de la base.
+     *
+     * @param  Builder<Abonnement>  $query
+     */
+    public function scopeAvecCompte(Builder $query): void
+    {
+        $query->whereHas('proprietaire');
     }
 
     /**

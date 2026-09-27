@@ -34,16 +34,16 @@ class PlateformeController extends Controller
 {
     public function tableau(): JsonResponse
     {
-        $actifs = Abonnement::where('est_actif', true)
+        $actifs = Abonnement::avecCompte()->where('est_actif', true)
             ->where(fn ($q) => $q->whereNull('fin')->orWhereDate('fin', '>=', today()))
             ->count();
         $ventesDuJour = Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today());
 
         return response()->json([
-            'comptes' => Abonnement::count(),
+            'comptes' => Abonnement::avecCompte()->count(),
             'actifs' => $actifs,
-            'expires' => Abonnement::count() - $actifs,
-            'par_plan' => Abonnement::select('plan', DB::raw('COUNT(*) as n'))->groupBy('plan')->pluck('n', 'plan'),
+            'expires' => Abonnement::avecCompte()->count() - $actifs,
+            'par_plan' => Abonnement::avecCompte()->select('plan', DB::raw('COUNT(*) as n'))->groupBy('plan')->pluck('n', 'plan'),
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),
             'inscriptions_7j' => User::where('created_at', '>=', now()->subDays(7))->whereNotNull('boutique_id')->count(),
@@ -115,7 +115,7 @@ class PlateformeController extends Controller
         $needle = '%'.mb_strtolower((string) $request->query('recherche', '')).'%';
         $filtre = (string) $request->query('filtre', '');
 
-        $abonnements = Abonnement::query()
+        $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
             ]), 'proprietaire.boutiquesPossedees'])

@@ -23,11 +23,12 @@ Artisan::command('ecaisse:diffuser-annonces', function () {
 
 // Restes de boutiques effacées sans leurs données : aperçu par défaut,
 // effacement (après sauvegarde) seulement avec --confirmer.
-Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde}', function () {
+Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde} {--comptes-seulement : Seulement les restes de comptes effacés, pas les boutiques}', function () {
     $nettoyage = app(\App\Services\NettoyageOrphelins::class);
     $apercu = $nettoyage->apercu();
-    if ($apercu === []) {
-        $this->info('Aucune boutique fantôme : rien à nettoyer.');
+    $comptes = $nettoyage->restesDeComptes();
+    if ($apercu === [] && $comptes === []) {
+        $this->info('Aucun reste de boutique ni de compte effacé : rien à nettoyer.');
 
         return;
     }
@@ -36,11 +37,17 @@ Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, apr
         $this->line("• {$b['boutique']} : {$detail}".($b['comptes'] ? ' — comptes rattachés : '.implode(', ', $b['comptes']) : ''));
     }
     $this->line(count($apercu).' boutique(s) fantôme(s).');
+    if ($comptes !== []) {
+        $this->line('Restes de comptes effacés : '.collect($comptes)->map(fn ($n, $t) => "{$n} {$t}")->implode(', '));
+    }
+    if ($garde = $nettoyage->historiqueGarde()) {
+        $this->line('Gardé (historique de boutiques existantes) : '.collect($garde)->map(fn ($n, $t) => "{$n} {$t}")->implode(', '));
+    }
     if (! $this->option('confirmer')) {
         $this->comment('Aperçu seulement. Pour effacer (après sauvegarde) : --confirmer');
 
         return;
     }
-    $r = $nettoyage->nettoyer();
+    $r = $nettoyage->nettoyer(avecBoutiques: ! $this->option('comptes-seulement'));
     $this->info("Nettoyé : {$r['boutiques']} boutique(s), {$r['lignes']} ligne(s). Sauvegarde : storage/app/{$r['sauvegarde']}");
 })->purpose('Nettoie les restes de boutiques effacées sans leurs données');

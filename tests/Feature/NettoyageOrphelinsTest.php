@@ -53,7 +53,14 @@ class NettoyageOrphelinsTest extends TestCase
         }
         DB::table('boutiques')->where('id', $perdue->id)->delete();
 
+        // Un compte effacé à la main a laissé son abonnement Pro (la ligne vide de la console).
+        $disparu = (string) Str::uuid();
+        DB::table('abonnements')->insert(['user_id' => $disparu, 'plan' => 'pro', 'est_actif' => true, 'est_manuel' => true, 'debut' => now(), 'fin' => now()->addMonth(), 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertSame(1, \App\Models\Abonnement::whereDoesntHave('proprietaire')->count());
+        $this->assertSame(2, \App\Models\Abonnement::avecCompte()->count(), 'la console ne le montre plus');
+
         $nettoyage = app(NettoyageOrphelins::class);
+        $this->assertSame(['abonnements' => 1], $nettoyage->restesDeComptes());
         $this->assertSame([$fantome], $nettoyage->fantomes());
         $apercu = $nettoyage->apercu()[0];
         $this->assertSame(1, $apercu['compte']['ventes']);
@@ -63,9 +70,17 @@ class NettoyageOrphelinsTest extends TestCase
         $this->artisan('ecaisse:nettoyer-orphelins')->expectsOutputToContain('Aperçu seulement')->assertSuccessful();
         $this->assertSame(1, DB::table('ventes')->where('boutique_id', $fantome)->count(), 'l’aperçu ne touche à rien');
 
+        // D'abord les seuls restes de comptes : les boutiques fantômes ne bougent pas.
+        $this->artisan('ecaisse:nettoyer-orphelins', ['--confirmer' => true, '--comptes-seulement' => true])->assertSuccessful();
+        $this->assertSame([], $nettoyage->restesDeComptes());
+        $this->assertSame([$fantome], $nettoyage->fantomes());
+        $this->assertSame(1, DB::table('ventes')->where('boutique_id', $fantome)->count());
+
         $this->artisan('ecaisse:nettoyer-orphelins', ['--confirmer' => true])->expectsOutputToContain('Sauvegarde')->assertSuccessful();
 
         $this->assertSame([], $nettoyage->fantomes());
+        $this->assertSame([], $nettoyage->restesDeComptes());
+        $this->assertSame(0, DB::table('abonnements')->where('user_id', $disparu)->count());
         foreach (['ventes', 'produits', 'clients', 'categories_produits', 'roles', 'model_has_roles'] as $t) {
             $this->assertSame(0, DB::table($t)->where('boutique_id', $fantome)->count(), "$t nettoyée");
         }
