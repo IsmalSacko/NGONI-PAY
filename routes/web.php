@@ -87,6 +87,9 @@ Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
     Route::get('utilisateurs', UtilisateursIndex::class)->name('utilisateurs.index')->middleware('permission:utilisateurs.view');
 });
 
+// Son propre compte (nom, téléphone, e-mail, mot de passe) : commerçant comme exploitant.
+Route::get('mon-compte', \App\Livewire\MonCompte::class)->middleware(['auth', 'tenant'])->name('mon-compte');
+
 // Console de l'exploitant : comptes, abonnements, demandes, plans, utilisateurs.
 Route::middleware(['auth', 'plateforme'])->prefix('plateforme')->name('plateforme.')->group(function (): void {
     Route::get('/', \App\Livewire\Plateforme\Tableau::class)->name('tableau');

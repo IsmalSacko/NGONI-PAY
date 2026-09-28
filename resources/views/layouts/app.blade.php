@@ -50,7 +50,9 @@
                     </a>
                 @endcan
             @endforeach
-            <form method="POST" action="{{ route('deconnexion') }}" class="col-span-2">
+            <a href="{{ route('mon-compte') }}"
+               class="h-12 px-3 rounded-xl flex items-center font-bold no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'bg-nuit-clair text-white' }}">Mon compte</a>
+            <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
                 <button type="submit" class="h-12 px-3 w-full text-left rounded-xl font-bold text-rail">Quitter</button>
             </form>
@@ -73,6 +75,8 @@
 
             <div class="flex-grow"></div>
 
+            <a href="{{ route('mon-compte') }}"
+               class="w-20 h-14 rounded-2xl flex items-center justify-center text-center px-1 text-[12px] font-bold leading-tight no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">Mon compte</a>
             <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
                 <button type="submit" class="w-20 h-12 rounded-2xl text-[12px] font-bold text-rail hover:text-white hover:bg-nuit-clair">
@@ -96,7 +100,7 @@
                         </select>
                     </form>
                 @else
-                    <span class="hidden md:inline-flex items-center gap-2 rounded-xl bg-white border border-border px-3 h-10 text-sm font-bold text-accent">{{ $mesBoutiques->first()?->nom }} <span class="font-semibold text-muted">· {{ auth()->user()->name }}</span></span>
+                    <a href="{{ route('mon-compte') }}" title="Mon compte" class="hidden md:inline-flex items-center gap-2 rounded-xl bg-white border border-border px-3 h-10 text-sm font-bold text-accent no-underline hover:border-accent">{{ $mesBoutiques->first()?->nom }} <span class="font-semibold text-muted">· {{ auth()->user()->name }}</span></a>
                 @endif
             </div>
             @php
