@@ -23,6 +23,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -74,6 +75,13 @@ class AbonnementTest extends TestCase
         ];
     }
 
+    private function produit(int $stock): Produit
+    {
+        app(TenantContext::class)->setBoutique($this->boutique->id);
+
+        return Produit::create(['nom' => 'Riz', 'prix_vente' => 500, 'taux_tva' => 0, 'stock' => $stock]);
+    }
+
     public function test_l_inscription_offre_un_essai_de_7_jours(): void
     {
         $abonnement = $this->awa->abonnement;
@@ -93,9 +101,9 @@ class AbonnementTest extends TestCase
     {
         $this->expirer();
 
-        $this->api()->postJson('/api/ventes', $this->vente())
-            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
         $this->api()->postJson('/api/produits', ['nom' => 'Riz', 'prix_vente' => 500])
+            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
+        $this->api()->postJson('/api/clients', ['nom' => 'Fatou'])
             ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
         $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 0])
             ->assertForbidden();
@@ -103,7 +111,59 @@ class AbonnementTest extends TestCase
         $this->api()->getJson('/api/produits')->assertOk();
         $this->api()->getJson('/api/ventes')->assertOk();
         $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.est_en_cours', false);
+    }
+
+    public function test_apres_l_essai_la_caisse_vend_le_catalogue_jusqu_a_epuisement(): void
+    {
+        $riz = $this->produit(stock: 2);
+        $this->expirer();
+
+        $vente = fn (int $quantite): array => [
+            'lignes' => [['produit_id' => $riz->id, 'quantite' => $quantite]],
+            'moyen_paiement' => 'especes',
+        ];
+
+        $this->api()->postJson('/api/ventes', $vente(2))->assertCreated();
+        $this->assertSame(0, $riz->fresh()->stock);
+
+        // Stock vide, et plus moyen de le remonter : c'est là que l'abonnement se décide.
+        $this->api()->postJson('/api/ventes', $vente(1))->assertUnprocessable();
+        $this->api()->postJson("/api/produits/{$riz->id}/ajuster-stock", ['stock' => 10, 'motif' => 'Arrivage'])
+            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
+    }
+
+    public function test_apres_l_essai_les_lignes_libres_sont_refusees(): void
+    {
+        $riz = $this->produit(stock: 5);
+        $this->expirer();
+
+        $this->api()->postJson('/api/ventes', $this->vente())
+            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
+            ->assertJsonFragment(['message' => 'Votre essai gratuit est terminé : la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.']);
+
+        // Mêlée au catalogue, la ligne libre fait refuser toute la vente.
+        $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $riz->id, 'quantite' => 1], ['libelle' => 'Livraison', 'prix_unitaire' => 500, 'quantite' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertForbidden();
+
         $this->assertSame(0, Vente::withoutBoutiqueScope()->count());
+        $this->assertSame(5, $riz->fresh()->stock);
+    }
+
+    public function test_apres_l_essai_une_dette_client_s_encaisse_encore(): void
+    {
+        $riz = $this->produit(stock: 5);
+        $fatou = $this->api()->postJson('/api/clients', ['nom' => 'Fatou'])->assertCreated()->json('id');
+        $this->api()->postJson('/api/ventes', [
+            'client_id' => $fatou,
+            'lignes' => [['produit_id' => $riz->id, 'quantite' => 2]],
+            'moyen_paiement' => 'credit_client',
+        ])->assertCreated();
+        $this->expirer();
+
+        $this->api()->postJson("/api/clients/{$fatou}/reglements", ['montant' => 500, 'moyen_paiement' => 'especes'])
+            ->assertCreated();
     }
 
     public function test_une_vente_deja_enregistree_se_rejoue_meme_apres_expiration(): void
@@ -200,7 +260,7 @@ class AbonnementTest extends TestCase
         $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
 
         // Une demande tranchée ne se retranche pas.
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         $service->approuver($demande->fresh(), $exploitant);
     }
 

@@ -116,7 +116,7 @@
                         {{ $abonnementCourant?->estEssai() ? 'Essai gratuit terminé' : 'Abonnement expiré' }}
                         @if ($abonnementCourant?->fin) le {{ $abonnementCourant->fin->format('d/m/Y') }} @endif
                     </p>
-                    <p class="mt-1">Vos données restent consultables, mais aucune modification n’est possible. Abonnez-vous depuis l’application Ngoni Caisse.</p>
+                    <p class="mt-1">La caisse fonctionne toujours pour les articles de votre catalogue, mais plus rien ne se modifie : articles, stocks, clients, équipe. Abonnez-vous depuis l’application Ngoni Caisse.</p>
                 </div>
             @endif
             @if (session('abonnement_expire'))
@@ -130,7 +130,7 @@
         // Action refusée faute d'abonnement : on le dit tout de suite, au clic.
         document.addEventListener('livewire:init', () => {
             Livewire.on('abonnement-expire', () => alert(
-                "Votre essai ou abonnement est terminé : vos données restent consultables, "
+                "Votre essai ou abonnement est terminé : la caisse fonctionne toujours, "
                 + "mais aucune modification n'est possible. Abonnez-vous depuis l'application Ngoni Caisse."
             ));
         });

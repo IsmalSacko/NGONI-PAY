@@ -82,9 +82,7 @@ class Index extends Component
 
     public function enregistrerReglement(): void
     {
-        if (! $this->abonnementActif()) {
-            return;
-        }
+        // Encaisser une dette reste possible sans abonnement, comme la caisse.
         Auth::user()->can('ventes.create') || abort(403);
         $this->resetValidation();
 

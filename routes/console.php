@@ -21,6 +21,25 @@ Artisan::command('ecaisse:diffuser-annonces', function () {
 // d'elle-même à tous les comptes, une seule fois par version.
 \Illuminate\Support\Facades\Schedule::command('ecaisse:annoncer-mise-a-jour')->everyFiveMinutes()->withoutOverlapping();
 
+// Fin d'essai dans deux jours : le propriétaire est prévenu (application,
+// push, e-mail), une fois par échéance. Neuf heures à Bamako (UTC).
+Artisan::command('ecaisse:rappeler-fin-essai {--simulation : Liste qui serait prévenu, sans rien envoyer}', function () {
+    $rappel = app(\App\Services\RappelFinEssai::class);
+    if ($this->option('simulation')) {
+        foreach ($rappel->aPrevenir()->get() as $a) {
+            $this->line("• {$a->proprietaire->name} — essai jusqu'au {$a->fin->format('d/m/Y')}");
+        }
+
+        return;
+    }
+    $n = $rappel->envoyerLesEcheances();
+    if ($n > 0) {
+        $this->info("{$n} propriétaire(s) prévenu(s) de la fin de leur essai.");
+    }
+})->purpose('Prévient les propriétaires deux jours avant la fin de leur essai');
+
+\Illuminate\Support\Facades\Schedule::command('ecaisse:rappeler-fin-essai')->dailyAt('09:00')->withoutOverlapping();
+
 // Restes de boutiques effacées sans leurs données : aperçu par défaut,
 // effacement (après sauvegarde) seulement avec --confirmer.
 Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde} {--comptes-seulement : Seulement les restes de comptes effacés, pas les boutiques}', function () {

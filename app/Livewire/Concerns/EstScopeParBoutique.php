@@ -41,8 +41,8 @@ trait EstScopeParBoutique
     }
 
     /**
-     * Sans abonnement en cours, le back-office reste consultable mais n'agit
-     * plus (comme l'API). Rend `false` et prévient l'utilisateur.
+     * Sans abonnement en cours, le back-office reste consultable mais ne
+     * modifie plus rien (comme l'API) ; seuls les encaissements continuent. Rend `false` et prévient l'utilisateur.
      */
     protected function abonnementActif(): bool
     {
@@ -52,7 +52,7 @@ trait EstScopeParBoutique
             return true;
         }
 
-        session()->flash('abonnement_expire', 'Votre essai ou abonnement est terminé : les données restent consultables, '
+        session()->flash('abonnement_expire', 'Votre essai ou abonnement est terminé : la caisse fonctionne toujours, '
             .'mais aucune modification n’est possible. Abonnez-vous depuis l’application.');
         $this->dispatch('abonnement-expire');
 

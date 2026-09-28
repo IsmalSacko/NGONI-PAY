@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Abonnement extends Model
 {
     protected $fillable = [
-        'user_id', 'plan', 'debut', 'fin', 'est_actif', 'est_manuel', 'accorde_par', 'note_admin',
+        'user_id', 'plan', 'debut', 'fin', 'est_actif', 'est_manuel', 'accorde_par', 'note_admin', 'rappel_fin_pour',
     ];
 
     protected function casts(): array
@@ -27,6 +27,7 @@ class Abonnement extends Model
         return [
             'debut' => 'date',
             'fin' => 'date',
+            'rappel_fin_pour' => 'date',
             'est_actif' => 'boolean',
             'est_manuel' => 'boolean',
         ];
