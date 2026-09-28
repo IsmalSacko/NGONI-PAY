@@ -24,8 +24,9 @@ class GestionAnnonces
 
     /**
      * Ce qu'un formulaire propose d'emblée pour un type : une mise à jour
-     * arrive avec la dernière version et le lien du Play Store, une campagne
-     * se programme.
+     * arrive avec la dernière version et le lien du Play Store, un message
+     * libre avec le lien du back-office des boutiques, une campagne se
+     * programme.
      *
      * @return array{type: string, titre: string, message: string, version: string, lien: string, quand: string}
      */
@@ -43,7 +44,7 @@ class GestionAnnonces
                 'quand' => 'maintenant',
             ],
             'campagne' => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => '', 'quand' => 'programmer'],
-            default => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => '', 'quand' => 'maintenant'],
+            default => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => route('tableau-de-bord'), 'quand' => 'maintenant'],
         };
     }
 
