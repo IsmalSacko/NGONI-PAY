@@ -226,7 +226,13 @@ class AbonnementService
                 'note_decision' => $note,
             ]);
 
-            return $abonnement;
+            // Un vrai paiement vient d'être constaté : les jours gagnés en
+            // parrainant s'ajoutent, et le parrain de ce compte est récompensé.
+            $parrainage = app(Parrainage::class);
+            $parrainage->appliquerJoursOfferts($abonnement);
+            $parrainage->recompenser($demande->user_id);
+
+            return $abonnement->fresh();
         });
     }
 

@@ -29,12 +29,20 @@ class BoutiqueRegistrationService
     public function __construct(private readonly TenantContext $tenant) {}
 
     /**
-     * @param  array{nom: string, pays: string, telephone: string, email: ?string, password: string, nom_utilisateur: string}  $data
+     * @param  array{nom: string, pays: string, telephone: string, email: ?string, password: string, nom_utilisateur: string, code_parrainage?: ?string}  $data
      * @return array{boutique: Boutique, user: User}
      */
     public function register(array $data): array
     {
-        $resultat = DB::transaction(function () use ($data): array {
+        // Code vérifié avant de rien créer : une faute de frappe se corrige
+        // sans laisser de compte à moitié inscrit.
+        $parrain = null;
+        if (filled($data['code_parrainage'] ?? null)) {
+            $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
+            $parrain = app(Parrainage::class)->parrainPour($data['code_parrainage'], PhoneNumber::normalize($data['telephone'], $pays));
+        }
+
+        $resultat = DB::transaction(function () use ($data, $parrain): array {
             $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
 
             $boutique = Boutique::create([
@@ -66,7 +74,11 @@ class BoutiqueRegistrationService
 
             // Essai offert au compte, une seule fois : une boutique ajoutée plus
             // tard ne le relance pas.
-            app(AbonnementService::class)->demarrerEssai($user);
+            $essai = app(AbonnementService::class)->demarrerEssai($user);
+
+            if ($parrain !== null) {
+                app(Parrainage::class)->lier($user, $parrain, $essai);
+            }
 
             // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
             app(CatalogueDeDepart::class)->installer($boutique);

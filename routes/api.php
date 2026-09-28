@@ -95,6 +95,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('abonnement/demandes', [AbonnementController::class, 'demandes'])->middleware('permission:abonnement.manage');
     Route::post('abonnement/demandes', [AbonnementController::class, 'demander'])->middleware('permission:abonnement.manage');
     Route::delete('abonnement/demandes/{demande}', [AbonnementController::class, 'annuler'])->middleware('permission:abonnement.manage');
+    // Code du propriétaire, ses filleuls et ce qu'ils lui ont rapporté.
+    Route::get('parrainage', fn (\Illuminate\Http\Request $request) => response()->json(['data' => app(\App\Services\Parrainage::class)->resume($request->user())]))
+        ->middleware('permission:abonnement.manage');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
     Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');

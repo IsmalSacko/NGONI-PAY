@@ -33,6 +33,8 @@
                         <p class="text-xs text-muted mt-1">
                             Inscrit le {{ $proprietaire?->created_at?->format('d/m/Y à H:i') }}
                             · {{ $proprietaire?->derniere_app ? 'actif dans l’app '.\Illuminate\Support\Carbon::parse($proprietaire->derniere_app)->locale('fr')->diffForHumans() : 'jamais connecté à l’app' }}
+                            @if ($proprietaire?->parrain) · parrainé par <span class="font-semibold">{{ $proprietaire->parrain->name }}</span> @endif
+                            @if ($abonnement->jours_offerts > 0) · {{ $abonnement->jours_offerts }} j offerts en attente @endif
                         </p>
                         <ul class="mt-2 flex flex-col gap-1 text-sm">
                             @forelse ($proprietaire?->boutiquesPossedees ?? [] as $b)

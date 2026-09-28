@@ -97,7 +97,7 @@ class Comptes extends Component
         $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-            ]), 'proprietaire.boutiquesPossedees' => fn ($q) => $q
+            ]), 'proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
                 ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
                 ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
                 ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])

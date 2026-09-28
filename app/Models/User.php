@@ -21,7 +21,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['boutique_id', 'name', 'phone', 'email', 'password', 'is_active'])]
 // Présence (vu_*) : pour la console, pas pour les réponses de l'application.
-#[Hidden(['password', 'remember_token', 'vu_le', 'vu_plateforme', 'vu_modele', 'vu_version', 'vu_boutique_id'])]
+#[Hidden(['password', 'remember_token', 'vu_le', 'vu_plateforme', 'vu_modele', 'vu_version', 'vu_boutique_id', 'parraine_par', 'parrainage_recompense_le'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -40,7 +40,18 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'est_admin_plateforme' => 'boolean',
             'vu_le' => 'datetime',
+            'parrainage_recompense_le' => 'datetime',
         ];
+    }
+
+    /**
+     * Qui a parrainé ce compte (code saisi à l'inscription).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function parrain(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parraine_par');
     }
 
     /**

@@ -27,6 +27,7 @@ class AuthController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'password' => ['required', 'string', 'min:8'],
             'nom_utilisateur' => ['required', 'string', 'max:255'],
+            'code_parrainage' => ['nullable', 'string', 'max:20'],
         ]);
 
         $result = $this->registration->register([
@@ -36,6 +37,7 @@ class AuthController extends Controller
             'email' => $data['email'] ?? null,
             'password' => $data['password'],
             'nom_utilisateur' => $data['nom_utilisateur'],
+            'code_parrainage' => $data['code_parrainage'] ?? null,
         ]);
 
         $token = $result['user']->createToken('e-caisse')->plainTextToken;
