@@ -19,7 +19,8 @@ class Dashboard extends Component
     public function render()
     {
         $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
-        $ventesJour = Vente::valides()->whereDate('created_at', today())->get();
+        // Journée d'affaires en cours, comme le rapport et le ticket Z.
+        $ventesJour = Vente::valides()->where('jour_affaire', app(\App\Services\Journee::class)->courante()->toDateString())->get();
 
         $total = (int) $ventesJour->sum('total');
         $tickets = $ventesJour->count();

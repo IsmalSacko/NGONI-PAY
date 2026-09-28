@@ -9,6 +9,7 @@ use App\Models\LigneVente;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Rapport d'activité de la boutique active sur une période (bornes incluses) :
@@ -78,10 +79,14 @@ class Rapports
                 ->selectRaw('users.name as nom, COUNT(*) as nombre, SUM(ventes.total) as total')
                 ->groupBy('users.name')->orderByDesc('total')->get()
                 ->map(fn ($r) => ['nom' => (string) $r->nom, 'nombre' => (int) $r->nombre, 'total' => (int) $r->total]),
-            'top_produits' => LigneVente::query()
-                ->whereHas('vente', fn ($q) => $dans($q->valides()))
-                ->selectRaw('nom_produit as nom, SUM(quantite) as quantite, SUM(total_ligne) as total')
-                ->groupBy('nom_produit')->orderByDesc('total')->limit(10)->get()
+            // Par article, sous son nom actuel : un article renommé en cours de
+            // période ne se coupe pas en deux. Un montant libre (sans article)
+            // se regroupe par son libellé.
+            'top_produits' => LigneVente::query()->from('lignes_vente as lv')
+                ->leftJoin('produits as p', 'p.id', '=', 'lv.produit_id')
+                ->whereIn('lv.vente_id', $valides()->select('ventes.id'))
+                ->selectRaw('COALESCE(MAX(p.nom), MAX(lv.nom_produit)) as nom, SUM(lv.quantite) as quantite, SUM(lv.total_ligne) as total')
+                ->groupBy(DB::raw('COALESCE(lv.produit_id, lv.nom_produit)'))->orderByDesc('total')->limit(10)->get()
                 ->map(fn ($r) => ['nom' => (string) $r->nom, 'quantite' => (int) $r->quantite, 'total' => (int) $r->total]),
             'marge' => [
                 'chiffre_couvert' => $chiffreCouvert,

@@ -16,6 +16,7 @@
             ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
             ['route' => 'achats.index', 'label' => 'Achats', 'permission' => 'achats.view'],
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
+            ['route' => 'statistiques.index', 'label' => 'Statistiques', 'permission' => 'rapports.view'],
             ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
             ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],
             ['route' => 'utilisateurs.index', 'label' => 'Équipe', 'permission' => 'utilisateurs.view'],

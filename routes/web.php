@@ -72,6 +72,7 @@ Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
     Route::get('boutiques', \App\Livewire\Boutiques\Index::class)->name('boutiques.index');
     Route::get('achats', \App\Livewire\Achats\Index::class)->name('achats.index')->middleware('permission:achats.view');
     Route::get('rapports', \App\Livewire\Rapports\Index::class)->name('rapports.index')->middleware('permission:rapports.view');
+    Route::get('statistiques', \App\Livewire\Statistiques\Index::class)->name('statistiques.index')->middleware('permission:rapports.view');
     Route::get('rapports/imprimer', [\App\Http\Controllers\ExportController::class, 'imprimer'])->name('rapports.imprimer')->middleware('permission:rapports.view');
     Route::get('exports/ventes', [\App\Http\Controllers\ExportController::class, 'ventes'])->name('exports.ventes')->middleware('permission:rapports.view');
     Route::get('exports/stocks', [\App\Http\Controllers\ExportController::class, 'stocks'])->name('exports.stocks')->middleware('permission:rapports.view');

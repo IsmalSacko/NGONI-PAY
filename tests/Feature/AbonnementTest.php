@@ -255,7 +255,7 @@ class AbonnementTest extends TestCase
     public function test_les_seances_de_caisse_sont_reservees_au_pro(): void
     {
         // Essai : tout est inclus.
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', ['seances_caisse']);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', ['seances_caisse', 'statistiques_avancees']);
         $session = $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
 
         // Passé en Basic : plus de nouvelle séance, mais la vente passe sans,

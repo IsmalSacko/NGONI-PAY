@@ -92,6 +92,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
     Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');
+    Route::get('statistiques', \App\Http\Controllers\Api\StatistiqueController::class)->middleware('permission:rapports.view');
     Route::get('journee', [ClotureController::class, 'journee']);
     Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
     Route::post('clotures', [ClotureController::class, 'store'])->middleware('permission:rapports.view');

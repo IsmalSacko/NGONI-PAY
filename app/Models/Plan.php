@@ -19,12 +19,16 @@ class Plan extends Model
     /** Séances de caisse (fond d'ouverture, clôture, écart) : réservées au Pro. */
     public const SEANCES_CAISSE = 'seances_caisse';
 
+    /** Affluence, marge par article, stock dormant, clients, équipe : réservées au Pro. */
+    public const STATISTIQUES_AVANCEES = 'statistiques_avancees';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
      */
     public const FONCTIONNALITES = [
         self::SEANCES_CAISSE => 'Séances de caisse et suivi des écarts',
+        self::STATISTIQUES_AVANCEES => 'Statistiques avancées (affluence, marges, stock, clients, équipe)',
     ];
 
     protected $fillable = [

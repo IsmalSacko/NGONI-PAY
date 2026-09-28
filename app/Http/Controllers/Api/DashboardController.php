@@ -14,7 +14,9 @@ class DashboardController extends Controller
 {
     public function index(): JsonResponse
     {
-        $aujourdhui = Vente::valides()->whereDate('created_at', today());
+        // Journée d'affaires en cours, comme le rapport et le ticket Z : après une
+        // clôture, les ventes du soir comptent déjà pour le lendemain.
+        $aujourdhui = Vente::valides()->where('jour_affaire', app(\App\Services\Journee::class)->courante()->toDateString());
 
         return response()->json([
             'ventes_jour' => [
