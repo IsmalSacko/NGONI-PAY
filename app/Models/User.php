@@ -20,7 +20,8 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['boutique_id', 'name', 'phone', 'email', 'password', 'is_active'])]
-#[Hidden(['password', 'remember_token'])]
+// Présence (vu_*) : pour la console, pas pour les réponses de l'application.
+#[Hidden(['password', 'remember_token', 'vu_le', 'vu_plateforme', 'vu_modele', 'vu_version', 'vu_boutique_id'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -38,6 +39,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'est_admin_plateforme' => 'boolean',
+            'vu_le' => 'datetime',
         ];
     }
 

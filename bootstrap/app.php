@@ -42,6 +42,10 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: SetTenantContext::class,
         );
 
+        // Dernière activité, pour la console : l'application comme le back-office.
+        $middleware->appendToGroup('api', \App\Http\Middleware\NoterPresence::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\NoterPresence::class);
+
         $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo('connexion');
     })
