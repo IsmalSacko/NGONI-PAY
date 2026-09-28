@@ -21,6 +21,14 @@
                         {{ $demande->boutique?->nom ?? '—' }} · {{ ucfirst($demande->plan) }} {{ strtolower($demande->cycle->libelle()) }}
                         · {{ number_format($demande->montant, 0, ',', ' ') }} {{ $demande->devise }}
                     </p>
+                    @php($parrainage = app(\App\Services\Parrainage::class)->pourDemande($demande))
+                    @if ($parrainage)
+                        <p class="mt-1 inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-bold text-accent-dark">
+                            🎁 {{ $parrainage['etat'] === 'a_venir'
+                                ? 'Filleul de '.$parrainage['parrain'].' : approuver lui fera gagner son mois offert'
+                                : 'A rapporté le mois offert à '.$parrainage['parrain'] }}
+                        </p>
+                    @endif
                     <p class="text-muted flex flex-wrap gap-x-2">
                         {{ $demande->proprietaire?->name }} ·
                         <x-telephone :numero="$demande->telephone_contact ?: $demande->proprietaire?->phone" />

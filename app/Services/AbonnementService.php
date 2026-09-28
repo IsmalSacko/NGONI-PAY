@@ -183,6 +183,10 @@ class AbonnementService
 
         $alerte = ($boutique->nom ?? 'Une boutique').' demande '.$plan->nom.' ('.mb_strtolower($cycle->libelle()).') · '
             .number_format($tarif->montant, 0, ',', ' ').' '.$tarif->devise;
+        $parrainage = app(Parrainage::class)->pourDemande($demande);
+        if ($parrainage !== null) {
+            $alerte .= " · 🎁 filleul de {$parrainage['parrain']}";
+        }
         app(AlertesExploitant::class)->envoyer('Demande d’abonnement', $alerte, '/console/demandes');
 
         return $demande;
@@ -230,7 +234,10 @@ class AbonnementService
             // parrainant s'ajoutent, et le parrain de ce compte est récompensé.
             $parrainage = app(Parrainage::class);
             $parrainage->appliquerJoursOfferts($abonnement);
-            $parrainage->recompenser($demande->user_id);
+            $parrain = $parrainage->recompenser($demande->user_id);
+            if ($parrain !== null) {
+                $demande->update(['parrain_recompense_id' => $parrain->id]);
+            }
 
             return $abonnement->fresh();
         });

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\StatutDemande;
 use App\Models\Abonnement;
+use App\Models\DemandeAbonnement;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -79,12 +81,15 @@ class Parrainage
     /**
      * Premier abonnement payé d'un filleul : le parrain gagne ses jours. Sans
      * effet pour un compte sans parrain, ou déjà compté.
+     *
+     * Rend le parrain quand c'est ce paiement-ci qui compte (même plafonné) :
+     * la demande le garde, et la console la distingue des renouvellements.
      */
-    public function recompenser(string $filleulId): void
+    public function recompenser(string $filleulId): ?User
     {
         $filleul = User::find($filleulId);
         if ($filleul === null || $filleul->parraine_par === null || $filleul->parrainage_recompense_le !== null) {
-            return;
+            return null;
         }
 
         $parrain = User::find($filleul->parraine_par);
@@ -98,7 +103,7 @@ class Parrainage
         $filleul->forceFill(['parrainage_recompense_le' => now()])->save();
 
         if ($parrain === null || $abonnement === null || $dejaCettAnnee >= self::MAX_PAR_AN) {
-            return;
+            return $parrain;
         }
 
         if ($abonnement->estEnCours() && $abonnement->fin === null) {
@@ -114,6 +119,8 @@ class Parrainage
         }
 
         $this->prevenir($parrain, 'Merci pour votre parrainage !', $message);
+
+        return $parrain;
     }
 
     /** Jours mis de côté, ajoutés à l'abonnement qui vient d'être approuvé. */
@@ -154,6 +161,32 @@ class Parrainage
                 'abonne' => $f->parrainage_recompense_le !== null,
             ])->values(),
         ];
+    }
+
+    /**
+     * Ce que la console dit d'une demande côté parrainage, ou null :
+     * - en attente, filleul jamais compté : l'approuver récompensera le parrain ;
+     * - approuvée et porteuse de la récompense : elle l'a fait.
+     * Les renouvellements d'un filleul ne sont pas marqués — ils ne rapportent rien.
+     *
+     * @return array{etat: 'a_venir'|'recompense', parrain: string}|null
+     */
+    public function pourDemande(DemandeAbonnement $demande): ?array
+    {
+        if ($demande->parrain_recompense_id !== null) {
+            $nom = $demande->parrainRecompense?->name;
+
+            return $nom === null ? null : ['etat' => 'recompense', 'parrain' => $nom];
+        }
+
+        $filleul = $demande->proprietaire;
+        if ($demande->statut !== StatutDemande::EnAttente || $filleul?->parraine_par === null || $filleul->parrainage_recompense_le !== null) {
+            return null;
+        }
+
+        $nom = $filleul->parrain?->name;
+
+        return $nom === null ? null : ['etat' => 'a_venir', 'parrain' => $nom];
     }
 
     /**

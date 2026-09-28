@@ -81,7 +81,7 @@ class Demandes extends Component
 
     public function render()
     {
-        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'boutique', 'demandeur'])
+        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'proprietaire.parrain:id,name', 'parrainRecompense:id,name', 'boutique', 'demandeur'])
             ->when($this->filtre === 'en_attente', fn ($q) => $q->enAttente())
             ->orderByRaw('CASE WHEN statut = ? THEN 0 ELSE 1 END', [StatutDemande::EnAttente->value])
             ->latest('id')

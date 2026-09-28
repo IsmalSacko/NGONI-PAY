@@ -206,6 +206,28 @@ class ParrainageTest extends TestCase
         $this->assertStringContainsString('illimité', NotificationApp::where('user_id', $this->awa->id)->sole()->message);
     }
 
+    public function test_seule_la_demande_qui_recompense_est_marquee_dans_la_console(): void
+    {
+        ['user' => $fatou, 'boutique' => $boutiqueFatou] = $this->inscrire('Fatou', '76008202', $this->codeAwa());
+        $service = app(AbonnementService::class);
+        $parrainage = app(Parrainage::class);
+        $this->exploitant->forceFill(['est_admin_plateforme' => true])->save();
+
+        $premiere = $service->soumettre($boutiqueFatou, $fatou, 'basic', CycleFacturation::Mensuel);
+        $this->assertSame(['etat' => 'a_venir', 'parrain' => 'Awa'], $parrainage->pourDemande($premiere->fresh()));
+        $this->api($this->exploitant)->getJson('/api/plateforme/demandes')
+            ->assertOk()->assertJsonPath('data.0.parrainage.etat', 'a_venir')->assertJsonPath('data.0.parrainage.parrain', 'Awa');
+
+        $service->approuver($premiere, $this->exploitant);
+        $this->assertSame(['etat' => 'recompense', 'parrain' => 'Awa'], $parrainage->pourDemande($premiere->fresh()));
+
+        // Le renouvellement du filleul n'est pas marqué : il ne rapporte rien.
+        $renouvellement = $service->soumettre($boutiqueFatou, $fatou, 'basic', CycleFacturation::Mensuel);
+        $this->assertNull($parrainage->pourDemande($renouvellement->fresh()));
+        $service->approuver($renouvellement, $this->exploitant);
+        $this->assertNull($parrainage->pourDemande($renouvellement->fresh()));
+    }
+
     public function test_seul_l_admin_voit_le_parrainage(): void
     {
         $caissier = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Caissier', 'phone' => '+22370000001', 'password' => 'password123']);

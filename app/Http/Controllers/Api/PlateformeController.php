@@ -16,6 +16,7 @@ use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
 use App\Services\GestionAnnonces;
+use App\Services\Parrainage;
 use App\Services\Plateforme\Activite;
 use App\Services\SuppressionCompte;
 use App\Support\Periode;
@@ -66,7 +67,7 @@ class PlateformeController extends Controller
 
     public function demandes(Request $request): JsonResponse
     {
-        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'boutique', 'demandeur'])
+        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'proprietaire.parrain:id,name', 'parrainRecompense:id,name', 'boutique', 'demandeur'])
             ->when($request->query('filtre', 'en_attente') === 'en_attente', fn ($q) => $q->enAttente())
             ->orderByRaw('CASE WHEN statut = ? THEN 0 ELSE 1 END', [StatutDemande::EnAttente->value])
             ->latest('id')
@@ -92,6 +93,7 @@ class PlateformeController extends Controller
             'whatsapp' => WhatsApp::link($d->telephone_contact ?: $d->proprietaire?->phone),
             'demandeur' => $d->demandeur && $d->demandeur->id !== $d->proprietaire?->id ? $d->demandeur->name : null,
             'abonnement' => $this->abonnement($d->proprietaire?->abonnement),
+            'parrainage' => app(Parrainage::class)->pourDemande($d),
         ])]);
     }
 

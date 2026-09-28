@@ -21,7 +21,7 @@ class DemandeAbonnement extends Model
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
         'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note',
-        'statut', 'decide_le', 'decide_par', 'note_decision',
+        'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id',
     ];
 
     protected function casts(): array
@@ -49,6 +49,16 @@ class DemandeAbonnement extends Model
     public function demandeur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'demande_par');
+    }
+
+    /**
+     * Le parrain que cette demande, première payée d'un filleul, a récompensé.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function parrainRecompense(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parrain_recompense_id');
     }
 
     /**
