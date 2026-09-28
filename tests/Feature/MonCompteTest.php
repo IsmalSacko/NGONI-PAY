@@ -56,7 +56,10 @@ class MonCompteTest extends TestCase
     {
         Livewire::actingAs($this->awa)->test(MonCompte::class)
             ->set('telephone', '+33605758494')->call('enregistrerProfil')
-            ->assertHasErrors(['telephone']);
+            ->assertHasErrors(['telephone'])
+            // Corrigé : l'erreur disparaît.
+            ->set('telephone', '76008201')->call('enregistrerProfil')
+            ->assertHasNoErrors();
 
         // L'application passe par la même règle : 422, et non plus une erreur serveur.
         $this->withToken($this->awa->createToken('app')->plainTextToken)

@@ -129,7 +129,55 @@ class ConsoleMobileTest extends TestCase
     public function test_envoyer_une_annonce_depuis_l_application(): void
     {
         $this->console()->postJson('/api/plateforme/annonces', ['titre' => 'Maintenance', 'message' => 'Ce soir à 22 h.', 'audience' => 'tous'])
-            ->assertOk()->assertJsonPath('resultat.notifies', 2);
+            ->assertCreated()->assertJsonPath('resultat.notifies', 2);
         $this->assertSame(1, NotificationApp::where('user_id', $this->awa->id)->where('titre', 'Maintenance')->count());
+    }
+
+    public function test_l_application_a_les_memes_annonces_que_le_web(): void
+    {
+        $liste = $this->console()->getJson('/api/plateforme/annonces')->assertOk();
+        $this->assertSame(['mise_a_jour', 'message', 'campagne'], array_keys($liste->json('types')));
+        $this->assertArrayHasKey('selection', $liste->json('audiences'));
+        $this->assertSame(['hebdomadaire', 'mensuelle'], array_keys($liste->json('recurrences')));
+
+        // Une mise à jour arrive préremplie ; une campagne se programme.
+        $this->console()->getJson('/api/plateforme/annonces/modele/mise_a_jour')->assertOk()
+            ->assertJsonPath('type', 'mise_a_jour')->assertJsonPath('quand', 'maintenant')
+            ->assertJsonPath('titre', 'Nouvelle version de l’application');
+        $this->console()->getJson('/api/plateforme/annonces/modele/campagne')->assertOk()->assertJsonPath('quand', 'programmer');
+    }
+
+    public function test_une_campagne_programmee_ne_part_pas_et_peut_etre_arretee(): void
+    {
+        $this->console()->postJson('/api/plateforme/annonces', [
+            'type' => 'campagne', 'titre' => 'Promo Pro', 'message' => 'Un mois offert.', 'audience' => 'tous',
+            'quand' => 'programmer', 'programmee_le' => now()->addDay()->toIso8601String(), 'recurrence' => 'mensuelle',
+        ])->assertCreated()->assertJsonPath('resultat', null)->assertJsonPath('message', fn ($m) => str_contains($m, 'programmée'));
+        $this->assertSame(0, NotificationApp::where('titre', 'Promo Pro')->count(), 'rien envoyé avant la date');
+
+        $annonce = $this->console()->getJson('/api/plateforme/annonces')->json('data.0');
+        $this->assertSame(['campagne', 'programmee', 'mensuelle'], [$annonce['type'], $annonce['statut'], $annonce['recurrence']]);
+
+        $this->console()->postJson("/api/plateforme/annonces/{$annonce['id']}/arreter")->assertOk();
+        $this->assertSame('brouillon', $this->console()->getJson('/api/plateforme/annonces')->json('data.0.statut'));
+
+        $this->console()->postJson("/api/plateforme/annonces/{$annonce['id']}/envoyer")->assertOk();
+        $this->assertSame(2, NotificationApp::where('titre', 'Promo Pro')->count(), 'envoyée à la demande');
+    }
+
+    public function test_une_annonce_a_des_comptes_choisis(): void
+    {
+        $trouves = $this->console()->getJson('/api/plateforme/annonces/comptes?q='.urlencode($this->awa->name))->assertOk()->json('data');
+        $this->assertSame([$this->awa->id], array_column($trouves, 'id'));
+        $this->console()->getJson('/api/plateforme/annonces/comptes?q=a')->assertOk()->assertJsonCount(0, 'data');
+
+        $this->console()->postJson('/api/plateforme/annonces/apercu', ['audience' => 'selection', 'cibles' => [$this->awa->id]])
+            ->assertOk()->assertJsonPath('destinataires', 1);
+        $this->console()->postJson('/api/plateforme/annonces', ['titre' => 'Rien que pour vous', 'message' => '…', 'audience' => 'selection'])
+            ->assertUnprocessable()->assertJsonValidationErrors('cibles');
+
+        $this->console()->postJson('/api/plateforme/annonces', ['titre' => 'Rien que pour vous', 'message' => '…', 'audience' => 'selection', 'cibles' => [$this->awa->id]])
+            ->assertCreated()->assertJsonPath('resultat.notifies', 1);
+        $this->assertSame([$this->awa->id], NotificationApp::where('titre', 'Rien que pour vous')->pluck('user_id')->all());
     }
 }

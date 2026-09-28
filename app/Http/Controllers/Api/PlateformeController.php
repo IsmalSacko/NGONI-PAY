@@ -15,7 +15,7 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
-use App\Services\DiffusionAnnonces;
+use App\Services\GestionAnnonces;
 use App\Services\Plateforme\Activite;
 use App\Services\SuppressionCompte;
 use App\Support\Periode;
@@ -234,37 +234,82 @@ class PlateformeController extends Controller
         return response()->json([...$resultat, 'message' => "Compte de {$user->name} supprimé, avec {$resultat['boutiques']} boutique(s) et {$resultat['comptes']} compte(s)."]);
     }
 
+    /** Historique des annonces, et tout ce qu'il faut pour en écrire une (types, audiences, rythmes). */
     public function annonces(): JsonResponse
     {
         return response()->json([
+            'types' => Annonce::TYPES,
             'audiences' => Annonce::AUDIENCES,
-            'data' => Annonce::latest('id')->limit(30)->get(['id', 'type', 'titre', 'message', 'version', 'audience', 'statut', 'programmee_le', 'derniere_diffusion', 'nb_notifies']),
+            'recurrences' => array_filter(Annonce::RECURRENCES, fn ($k) => $k !== '', ARRAY_FILTER_USE_KEY),
+            'data' => Annonce::withCount('cibles')->latest('id')->limit(30)->get()->map(fn (Annonce $a) => [
+                'id' => $a->id,
+                'type' => $a->type,
+                'titre' => $a->titre,
+                'message' => $a->message,
+                'version' => $a->version,
+                'lien' => $a->lien,
+                'audience' => $a->audience,
+                'cibles' => $a->cibles_count,
+                'par_email' => (bool) $a->par_email,
+                'statut' => $a->statut,
+                'programmee_le' => $a->programmee_le?->toIso8601String(),
+                'recurrence' => $a->recurrence,
+                'derniere_diffusion' => $a->derniere_diffusion?->toIso8601String(),
+                'nb_notifies' => (int) $a->nb_notifies,
+                'nb_emails' => (int) $a->nb_emails,
+            ]),
         ]);
     }
 
-    /** Message envoyé tout de suite (les campagnes programmées restent dans la console web). */
-    public function envoyerAnnonce(Request $request, DiffusionAnnonces $diffusion): JsonResponse
+    /** Ce que le formulaire propose d'emblée pour un type (mise à jour : dernière version, lien du Play Store). */
+    public function modeleAnnonce(string $type, GestionAnnonces $annonces): JsonResponse
+    {
+        return response()->json($annonces->modele($type));
+    }
+
+    /** Combien de comptes l'annonce toucherait, avant de l'envoyer. */
+    public function apercuAnnonce(Request $request, GestionAnnonces $annonces): JsonResponse
     {
         $data = $request->validate([
-            'titre' => ['required', 'string', 'max:120'],
-            'message' => ['required', 'string', 'max:2000'],
-            'audience' => ['required', Rule::in(array_diff(array_keys(Annonce::AUDIENCES), ['selection']))],
-            'par_email' => ['boolean'],
+            'audience' => ['required', Rule::in(array_keys(Annonce::AUDIENCES))],
+            'cibles' => ['array'],
+            'cibles.*' => ['string'],
         ]);
 
-        $annonce = Annonce::create([
-            'type' => 'message',
-            'titre' => $data['titre'],
-            'message' => $data['message'],
-            'audience' => $data['audience'],
-            'par_email' => (bool) ($data['par_email'] ?? false),
-            'statut' => 'programmee',
-            'programmee_le' => now(),
-            'cree_par' => $request->user()->id,
-        ]);
-        $r = $diffusion->diffuser($annonce);
+        return response()->json(['destinataires' => $annonces->destinatairesPrevus($data['audience'], $data['cibles'] ?? [])]);
+    }
 
-        return response()->json(['message' => "Envoyée : {$r['notifies']} notification(s), {$r['pushs']} push, {$r['emails']} e-mail(s).", 'resultat' => $r]);
+    /** Comptes à choisir pour une annonce ciblée. */
+    public function comptesAnnonce(Request $request, GestionAnnonces $annonces): JsonResponse
+    {
+        return response()->json(['data' => $annonces->rechercherComptes((string) $request->query('q'))->map(fn (User $u) => [
+            'id' => $u->id, 'nom' => $u->name, 'telephone' => $u->phone, 'email' => $u->email,
+        ])]);
+    }
+
+    /** Mise à jour, message libre ou campagne ; tout de suite ou programmée (voir GestionAnnonces). */
+    public function envoyerAnnonce(Request $request, GestionAnnonces $annonces): JsonResponse
+    {
+        ['annonce' => $annonce, 'resultat' => $r] = $annonces->creer($request->all() + ['type' => 'message', 'quand' => 'maintenant'], $request->user());
+
+        return response()->json([
+            'message' => $r !== null
+                ? GestionAnnonces::resume($annonce, $r)
+                : "« {$annonce->titre} » programmée le {$annonce->programmee_le->timezone('Africa/Bamako')->format('d/m/Y à H:i')}.",
+            'resultat' => $r,
+        ], 201);
+    }
+
+    public function envoyerAnnonceMaintenant(Annonce $annonce, GestionAnnonces $annonces): JsonResponse
+    {
+        return response()->json(['message' => GestionAnnonces::resume($annonce, $annonces->envoyerMaintenant($annonce))]);
+    }
+
+    public function arreterAnnonce(Annonce $annonce, GestionAnnonces $annonces): JsonResponse
+    {
+        $annonces->arreter($annonce);
+
+        return response()->json(['message' => 'Envoi programmé arrêté.']);
     }
 
     /** @return array<string, mixed>|null */

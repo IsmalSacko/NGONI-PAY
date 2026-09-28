@@ -60,6 +60,11 @@ Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->control
     Route::delete('utilisateurs/{user}', 'supprimerCompte');
     Route::get('annonces', 'annonces');
     Route::post('annonces', 'envoyerAnnonce');
+    Route::get('annonces/modele/{type}', 'modeleAnnonce');
+    Route::post('annonces/apercu', 'apercuAnnonce');
+    Route::get('annonces/comptes', 'comptesAnnonce');
+    Route::post('annonces/{annonce}/envoyer', 'envoyerAnnonceMaintenant');
+    Route::post('annonces/{annonce}/arreter', 'arreterAnnonce');
 });
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
