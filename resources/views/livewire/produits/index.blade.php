@@ -26,7 +26,7 @@
             <div class="grid grid-cols-[1fr_auto] md:grid-cols-[2fr_1fr_1fr_0.8fr_0.8fr_1fr] gap-x-3 gap-y-2 px-5 py-3 border-b border-separateur items-center text-sm">
                 <div class="flex items-center gap-3">
                     @if ($produit->photo_url)
-                        <img src="{{ $produit->photo_url }}" alt="" loading="lazy" class="w-11 h-11 rounded-lg object-contain bg-white border border-border shrink-0">
+                        <img src="{{ $produit->vignette_url }}" alt="" loading="lazy" class="w-11 h-11 rounded-lg object-contain bg-white border border-border shrink-0">
                     @else
                         <span class="w-11 h-11 rounded-lg bg-puce text-accent text-xs font-extrabold flex items-center justify-center shrink-0">{{ mb_strtoupper($produit->code ?: mb_substr($produit->nom, 0, 2)) }}</span>
                     @endif

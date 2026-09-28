@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBoutique;
+use App\Services\Images;
 use Database\Factories\ProduitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -21,11 +22,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Produit extends Model
 {
     /** Adresse de la photo, pour la caisse. */
-    protected $appends = ['photo_url'];
+    protected $appends = ['photo_url', 'vignette_url'];
 
     public function getPhotoUrlAttribute(): ?string
     {
-        return $this->photo ? route('image.produit', ['produit' => $this->id, 'v' => $this->updated_at?->timestamp]) : null;
+        return $this->photo ? route('image.produit', ['produit' => $this->id, 'v' => Images::version($this->photo)]) : null;
+    }
+
+    /** Photo à la taille d'une tuile de caisse : ce que l'application charge d'abord. */
+    public function getVignetteUrlAttribute(): ?string
+    {
+        return $this->photo ? route('image.produit.vignette', ['produit' => $this->id, 'v' => Images::version($this->photo)]) : null;
     }
 
     /** @use HasFactory<ProduitFactory> */

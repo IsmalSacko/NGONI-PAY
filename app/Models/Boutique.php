@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBoutique;
+use App\Services\Images;
 use Database\Factories\BoutiqueFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -26,11 +27,17 @@ use Illuminate\Support\Facades\Storage;
 class Boutique extends Model
 {
     /** Adresse du logo, pour l'application et les tickets. */
-    protected $appends = ['logo_url'];
+    protected $appends = ['logo_url', 'logo_vignette_url'];
 
     public function getLogoUrlAttribute(): ?string
     {
-        return $this->logo ? route('image.logo', ['boutique' => $this->id, 'v' => $this->updated_at?->timestamp]) : null;
+        return $this->logo ? route('image.logo', ['boutique' => $this->id, 'v' => Images::version($this->logo)]) : null;
+    }
+
+    /** Logo réduit, pour l'affichage à l'écran ; l'impression garde la taille réelle. */
+    public function getLogoVignetteUrlAttribute(): ?string
+    {
+        return $this->logo ? route('image.logo.vignette', ['boutique' => $this->id, 'v' => Images::version($this->logo)]) : null;
     }
 
     /** @use HasFactory<BoutiqueFactory> */

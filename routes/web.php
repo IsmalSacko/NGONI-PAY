@@ -30,7 +30,9 @@ Route::get('robots.txt', [\App\Http\Controllers\SeoController::class, 'robots'])
 
 // Logo et photos d'articles, sans session (tickets, application).
 Route::get('images/logos/{boutique}', [\App\Http\Controllers\ImageController::class, 'logo'])->name('image.logo');
+Route::get('images/logos/{boutique}/vignette', [\App\Http\Controllers\ImageController::class, 'logoVignette'])->name('image.logo.vignette');
 Route::get('images/produits/{produit}', [\App\Http\Controllers\ImageController::class, 'photo'])->name('image.produit');
+Route::get('images/produits/{produit}/vignette', [\App\Http\Controllers\ImageController::class, 'photoVignette'])->name('image.produit.vignette');
 
 // Anciennes adresses du panneau Ngoni Pay, gardées en favoris.
 Route::redirect('login', '/connexion');

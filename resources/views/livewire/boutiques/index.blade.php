@@ -39,7 +39,7 @@
                 @if ($b->id === $active && $peutRegler)
                     <div class="flex items-center gap-3 mt-1">
                         @if ($b->logo_url)
-                            <img src="{{ $b->logo_url }}" alt="Logo" class="w-12 h-12 rounded-lg object-contain border border-[--color-border] bg-white">
+                            <img src="{{ $b->logo_vignette_url }}" alt="Logo" class="w-12 h-12 rounded-lg object-contain border border-[--color-border] bg-white">
                         @endif
                         <label class="text-xs font-bold text-accent cursor-pointer">
                             {{ $b->logo_url ? 'Changer le logo' : '+ Ajouter un logo (tickets)' }}
