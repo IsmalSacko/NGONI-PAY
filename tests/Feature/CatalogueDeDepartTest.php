@@ -24,7 +24,7 @@ class CatalogueDeDepartTest extends TestCase
         ]);
 
         $articles = Produit::withoutBoutiqueScope()->where('boutique_id', $boutique->id)->orderBy('nom')->get();
-        $this->assertSame(['Huile', 'Riz'], $articles->pluck('nom')->all());
+        $this->assertSame(['Huile (exemple)', 'Riz (exemple)'], $articles->pluck('nom')->all());
         $this->assertSame([1500, 3500], $articles->pluck('prix_vente')->all(), 'prix en franc CFA');
         $this->assertSame('Alimentation', CategorieProduit::withoutGlobalScopes()->where('boutique_id', $boutique->id)->value('nom'));
         foreach ($articles as $article) {
@@ -48,5 +48,22 @@ class CatalogueDeDepartTest extends TestCase
 
         $this->assertSame('EUR', $boutique->devise);
         $this->assertSame([250, 450], Produit::withoutBoutiqueScope()->where('boutique_id', $boutique->id)->orderBy('nom')->pluck('prix_vente')->all());
+    }
+
+    public function test_les_exemples_deja_installes_sont_marques_sauf_ceux_repris_par_le_commercant(): void
+    {
+        Storage::fake('local');
+        ['boutique' => $boutique] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Boutique Fanta', 'pays' => 'ML', 'telephone' => '76008202',
+            'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Fanta',
+        ]);
+        $articles = Produit::withoutBoutiqueScope()->where('boutique_id', $boutique->id);
+        // État d'avant : les noms sans « (exemple) », et l'huile reprise par la commerçante.
+        (clone $articles)->where('code', 'RIZ')->update(['nom' => 'Riz']);
+        (clone $articles)->where('code', 'HUI')->update(['nom' => 'Huile', 'format' => '20 L']);
+
+        (require database_path('migrations/2026_09_28_000100_articles_de_depart_marques_exemple.php'))->up();
+
+        $this->assertSame(['Huile', 'Riz (exemple)'], (clone $articles)->orderBy('nom')->pluck('nom')->all());
     }
 }

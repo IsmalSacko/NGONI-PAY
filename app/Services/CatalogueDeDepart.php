@@ -16,13 +16,17 @@ use Illuminate\Support\Facades\Storage;
  * caisse n'est jamais vide au premier lancement, et le guide de démarrage
  * peut faire faire une vraie première vente. Le commerçant les modifie ou
  * les supprime comme les siens.
+ *
+ * « (exemple) » est dans le nom lui-même : c'est lui que montrent le bouton de
+ * caisse, le ticket, le stock et les rapports, et le commerçant voit partout
+ * ce qu'il lui reste à renommer.
  */
 class CatalogueDeDepart
 {
     /** Nom, format, code, prix (franc CFA / devise à centimes), stock, photo. */
     private const ARTICLES = [
-        ['Riz', '5 kg', 'RIZ', 3500, 450, 20, 'riz.png'],
-        ['Huile', '1 L', 'HUI', 1500, 250, 24, 'huile.png'],
+        ['Riz (exemple)', '5 kg', 'RIZ', 3500, 450, 20, 'riz.png'],
+        ['Huile (exemple)', '1 L', 'HUI', 1500, 250, 24, 'huile.png'],
     ];
 
     /** À appeler dans le contexte de la boutique (tenant posé). */
