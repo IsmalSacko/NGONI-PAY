@@ -245,6 +245,32 @@ class TableauPlateformeTest extends TestCase
         $this->actingAs($this->awa)->get('/plateforme')->assertForbidden();
     }
 
+    public function test_l_application_lit_la_meme_activite_que_la_console_web(): void
+    {
+        $this->vu($this->awa, now()->subMinute(), 'android', 'Samsung SM-A155F');
+        $this->vente($this->pressing, 12_500);
+        $lagos = Boutique::create(['nom' => 'Lagos Market', 'pays' => 'NG', 'devise' => 'NGN']);
+        $this->vente($lagos, 250_000);
+
+        $json = $this->withToken($this->exploitant->createToken('app')->plainTextToken)
+            ->getJson('/api/plateforme/activite?periode=7j')->assertOk()->json();
+
+        $this->assertSame(3, $json['en_ligne_minutes']);
+        $this->assertSame(1, $json['en_ligne']['nombre']);
+        $this->assertSame(['Awa', 'Pressing Awa', 'Android', 'Samsung SM-A155F'], [
+            $json['en_ligne']['recents'][0]['nom'], $json['en_ligne']['recents'][0]['boutique'],
+            $json['en_ligne']['recents'][0]['plateforme_libelle'], $json['en_ligne']['recents'][0]['modele'],
+        ]);
+        $this->assertSame(12_500, $json['total_fcfa']);
+        $this->assertSame(['NGN' => 250_000], $json['hors_fcfa']);
+        $this->assertSame(['Pressing Awa', 'Lagos Market'], array_column($json['par_boutique'], 'nom'));
+        $this->assertCount(7, $json['par_jour']);
+        $this->assertSame('ML', $json['pays_plus_actif']['code']);
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->awa->createToken('app')->plainTextToken)->getJson('/api/plateforme/activite')->assertForbidden();
+    }
+
     // --- Aides ---------------------------------------------------------------
 
     private function vente(Boutique $boutique, int $total, ?\DateTimeInterface $le = null, string $statut = 'validee'): void

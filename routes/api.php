@@ -45,6 +45,7 @@ Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiser
 // boutique (pas de « tenant »), elle voit tous les comptes.
 Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->controller(\App\Http\Controllers\Api\PlateformeController::class)->group(function (): void {
     Route::get('tableau', 'tableau');
+    Route::get('activite', 'activite');
     Route::get('demandes', 'demandes');
     Route::get('demandes/{demande}/preuve', 'preuve')->name('api.plateforme.preuve');
     Route::post('demandes/{demande}/approuver', 'approuver');

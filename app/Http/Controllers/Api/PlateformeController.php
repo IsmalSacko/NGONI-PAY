@@ -16,7 +16,9 @@ use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
 use App\Services\DiffusionAnnonces;
+use App\Services\Plateforme\Activite;
 use App\Services\SuppressionCompte;
+use App\Support\Periode;
 use App\Support\WhatsApp;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -54,6 +56,12 @@ class PlateformeController extends Controller
                 ->whereIn('boutique_id', Boutique::withoutGlobalScopes()->whereIn('devise', ['XOF', 'XAF'])->select('id'))
                 ->sum('total'),
         ]);
+    }
+
+    /** En ligne, encaissements, boutiques actives, pays, appareils : la console de l'application. */
+    public function activite(Request $request, Activite $activite): JsonResponse
+    {
+        return response()->json($activite->pour(Periode::depuis($request->query('periode'))));
     }
 
     public function demandes(Request $request): JsonResponse
