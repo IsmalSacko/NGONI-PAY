@@ -92,7 +92,7 @@ class Parrainage
         }
 
         $parrain = User::find($filleul->parraine_par);
-        $abonnement = $parrain?->abonnement()->first();
+        $abonnement = $parrain === null ? null : $this->abonnementDe($parrain);
 
         $dejaCettAnnee = $parrain === null ? 0 : User::where('parraine_par', $parrain->id)
             ->where('parrainage_recompense_le', '>=', now()->subYear())->count();
@@ -105,7 +105,10 @@ class Parrainage
             return;
         }
 
-        if ($abonnement->estEnCours() && ! $abonnement->estEssai() && $abonnement->fin !== null) {
+        if ($abonnement->estEnCours() && $abonnement->fin === null) {
+            // Accès illimité : rien à ajouter, le merci reste.
+            $message = "{$filleul->name} s’est abonné(e) grâce à vous. Merci ! Votre abonnement étant illimité, aucun jour n’est à ajouter.";
+        } elseif ($abonnement->estEnCours() && ! $abonnement->estEssai()) {
             $fin = Carbon::parse($abonnement->fin)->addDays(self::JOURS_PARRAIN);
             $abonnement->update(['fin' => $fin->toDateString()]);
             $message = "{$filleul->name} s’est abonné(e) grâce à vous : 1 mois offert, votre abonnement court maintenant jusqu’au {$fin->format('d/m/Y')}.";
@@ -148,13 +151,30 @@ class Parrainage
             'jours_filleul' => self::JOURS_ESSAI_FILLEUL,
             'jours_parrain' => self::JOURS_PARRAIN,
             'mois_gagnes' => $filleuls->whereNotNull('parrainage_recompense_le')->count(),
-            'jours_en_attente' => (int) ($user->abonnement()->value('jours_offerts') ?? 0),
+            'jours_en_attente' => (int) ($this->abonnementDe($user)?->jours_offerts ?? 0),
             'filleuls' => $filleuls->map(fn (User $f) => [
                 'nom' => $f->name,
                 'inscrit_le' => $f->created_at?->toDateString(),
                 'abonne' => $f->parrainage_recompense_le !== null,
             ])->values(),
         ];
+    }
+
+    /**
+     * L'abonnement qui profite du parrainage : celui du compte, ou — pour un
+     * administrateur qui n'est pas propriétaire — celui du propriétaire de sa
+     * boutique, qui paie pour elle.
+     */
+    private function abonnementDe(User $user): ?Abonnement
+    {
+        $propre = $user->abonnement()->first();
+        if ($propre !== null) {
+            return $propre;
+        }
+
+        $proprietaire = $user->boutique()->value('proprietaire_id');
+
+        return $proprietaire === null ? null : Abonnement::where('user_id', $proprietaire)->first();
     }
 
     private function prevenir(User $parrain, string $titre, string $message): void

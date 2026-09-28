@@ -178,6 +178,34 @@ class ParrainageTest extends TestCase
         );
     }
 
+    public function test_le_code_d_un_admin_non_proprietaire_profite_a_l_abonnement_de_la_boutique(): void
+    {
+        $ismo = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Ismo', 'phone' => '+22374988201', 'password' => 'password123']);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutique->id);
+        $ismo->assignRole('admin');
+        $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addDays(10)->toDateString()]);
+
+        $code = $this->api($ismo)->getJson('/api/parrainage')->assertOk()->json('data.code');
+        ['user' => $fatou, 'boutique' => $boutiqueFatou] = $this->inscrire('Fatou', '76008202', $code);
+        $this->payer($fatou, $boutiqueFatou);
+
+        $this->assertSame(now()->addDays(40)->toDateString(), $this->awa->abonnement()->first()->fin->toDateString());
+        $this->assertSame(1, NotificationApp::where('user_id', $ismo->id)->count());
+    }
+
+    public function test_un_abonnement_illimite_recoit_un_merci_sans_jours(): void
+    {
+        $this->awa->abonnement()->update(['plan' => 'pro', 'fin' => null, 'est_actif' => true]);
+        ['user' => $fatou, 'boutique' => $boutiqueFatou] = $this->inscrire('Fatou', '76008202', $this->codeAwa());
+
+        $this->payer($fatou, $boutiqueFatou);
+
+        $abonnement = $this->awa->abonnement()->first();
+        $this->assertNull($abonnement->fin);
+        $this->assertSame(0, $abonnement->jours_offerts);
+        $this->assertStringContainsString('illimité', NotificationApp::where('user_id', $this->awa->id)->sole()->message);
+    }
+
     public function test_seul_l_admin_voit_le_parrainage(): void
     {
         $caissier = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Caissier', 'phone' => '+22370000001', 'password' => 'password123']);
