@@ -1,9 +1,12 @@
 {
+  "id": "/espace",
   "name": "Ngoni Caisse",
   "short_name": "Ngoni Caisse",
-  "description": "La caisse moderne pour les commerçants en Afrique.",
-  "start_url": "/",
+  "description": "Le back-office de votre caisse : pilotage, statistiques, stocks, ventes.",
+  "start_url": "/espace",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#EEF2F8",
   "theme_color": "#0F2A5C",
   "lang": "fr",
@@ -11,5 +14,11 @@
     {"src": "/icone-192.png", "sizes": "192x192", "type": "image/png"},
     {"src": "/icone-512.png", "sizes": "512x512", "type": "image/png"},
     {"src": "/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Pilotage", "url": "/tableau-de-bord", "icons": [{"src": "/icone-192.png", "sizes": "192x192"}]},
+    {"name": "Statistiques", "url": "/statistiques", "icons": [{"src": "/icone-192.png", "sizes": "192x192"}]},
+    {"name": "Ventes", "url": "/ventes", "icons": [{"src": "/icone-192.png", "sizes": "192x192"}]},
+    {"name": "Mon compte", "url": "/mon-compte", "icons": [{"src": "/icone-192.png", "sizes": "192x192"}]}
   ]
 }

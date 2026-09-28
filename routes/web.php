@@ -41,6 +41,14 @@ Route::redirect('admin/{reste?}', '/plateforme')->where('reste', '.*');
 // Site vitrine pour les visiteurs ; un compte connecté va à son espace.
 Route::get('/', \App\Http\Controllers\VitrineController::class)->name('vitrine');
 
+// Page de départ du site installé (manifeste) : la connexion, ou l'espace du
+// compte — jamais la vitrine, qui s'adresse aux visiteurs.
+Route::get('espace', function () {
+    $user = Auth::user();
+
+    return redirect($user === null ? route('connexion') : ($user->est_admin_plateforme ? '/plateforme' : route('tableau-de-bord')));
+})->name('espace');
+
 Route::middleware('guest')->group(function (): void {
     Route::get('connexion', Login::class)->name('connexion');
     Route::get('mot-de-passe-oublie', \App\Livewire\Auth\MotDePasseOublie::class)->name('mot-de-passe-oublie');

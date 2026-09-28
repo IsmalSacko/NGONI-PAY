@@ -9,6 +9,33 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0F2A5C">
+{{-- Installable comme une application (écran d'accueil, plein écran). --}}
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ngoni Caisse">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>
+    // Service worker : page « hors connexion » (voir public/sw.js).
+    if ('serviceWorker' in navigator) {
+        addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+    // « Installer l'app » n'apparaît que si le navigateur le propose, et
+    // disparaît une fois l'application installée.
+    addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.ngoniInstallation = e;
+        document.querySelectorAll('[data-installer]').forEach((b) => b.hidden = false);
+    });
+    addEventListener('appinstalled', () => document.querySelectorAll('[data-installer]').forEach((b) => b.hidden = true));
+    addEventListener('click', async (e) => {
+        const bouton = e.target.closest('[data-installer]');
+        if (!bouton || !window.ngoniInstallation) return;
+        window.ngoniInstallation.prompt();
+        await window.ngoniInstallation.userChoice;
+        window.ngoniInstallation = null;
+        document.querySelectorAll('[data-installer]').forEach((b) => b.hidden = true);
+    });
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=Poppins:wght@600;700;800&display=swap">

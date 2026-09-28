@@ -33,6 +33,7 @@
                 <x-icone nom="site" class="w-4 h-4" />
                 <span class="hidden sm:inline">Voir le site</span>
             </a>
+            <button type="button" data-installer hidden class="h-10 px-3 rounded-xl text-sm font-extrabold bg-jaune text-accent">Installer</button>
             <a href="{{ route('mon-compte') }}" title="Mon compte"
                class="h-10 px-3 rounded-xl text-sm font-bold inline-flex items-center {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                 <span class="hidden sm:inline">{{ auth()->user()->name }}</span><span class="sm:hidden">Compte</span>

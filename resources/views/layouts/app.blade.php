@@ -52,6 +52,7 @@
             @endforeach
             <a href="{{ route('mon-compte') }}"
                class="h-12 px-3 rounded-xl flex items-center font-bold no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'bg-nuit-clair text-white' }}">Mon compte</a>
+            <button type="button" data-installer hidden class="col-span-2 h-12 px-3 rounded-xl bg-jaune text-accent font-extrabold text-left">Installer l’app sur ce téléphone</button>
             <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
                 <button type="submit" class="h-12 px-3 w-full text-left rounded-xl font-bold text-rail">Quitter</button>
@@ -75,6 +76,8 @@
 
             <div class="flex-grow"></div>
 
+            <button type="button" data-installer hidden title="Installer l’app sur cet appareil"
+                    class="w-20 h-14 rounded-2xl text-[12px] font-extrabold leading-tight bg-jaune text-accent">Installer l’app</button>
             <a href="{{ route('mon-compte') }}"
                class="w-20 h-14 rounded-2xl flex items-center justify-center text-center px-1 text-[12px] font-bold leading-tight no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">Mon compte</a>
             <form method="POST" action="{{ route('deconnexion') }}">
