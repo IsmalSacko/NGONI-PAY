@@ -205,7 +205,7 @@ class AbonnementService
     {
         $this->exigerEnAttente($demande);
 
-        return DB::transaction(function () use ($demande, $exploitant, $note): Abonnement {
+        $abonnement = DB::transaction(function () use ($demande, $exploitant, $note): Abonnement {
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $demande->user_id],
                 [
@@ -234,6 +234,36 @@ class AbonnementService
 
             return $abonnement->fresh();
         });
+
+        $this->prevenirActivation($abonnement, $demande->demande_par);
+
+        return $abonnement;
+    }
+
+    /**
+     * Le propriétaire (et le membre qui a fait la demande, si ce n'est pas lui)
+     * apprend que son abonnement est actif, et jusqu'à quand.
+     */
+    private function prevenirActivation(Abonnement $abonnement, ?string $demandeurId = null): void
+    {
+        $plan = Plan::parCode($abonnement->plan);
+        $proprietaire = User::find($abonnement->user_id);
+        if ($proprietaire === null) {
+            return;
+        }
+
+        $jusqua = $abonnement->fin === null ? 'sans échéance' : 'jusqu’au '.$abonnement->fin->format('d/m/Y');
+        [$titre, $message] = $abonnement->estEssai()
+            ? ['Votre essai gratuit est prolongé', "Bonne nouvelle : votre essai gratuit est prolongé {$jusqua}. Toutes les fonctions restent ouvertes."]
+            : ["Votre abonnement {$plan?->nom} est activé", "Merci pour votre confiance ! Votre abonnement {$plan?->nom} est actif {$jusqua}. Toutes ses fonctions sont ouvertes."];
+
+        $notifier = app(NotifierCompte::class);
+        $notifier->envoyer($proprietaire, $titre, $message);
+
+        $demandeur = $demandeurId !== null && $demandeurId !== $proprietaire->id ? User::find($demandeurId) : null;
+        if ($demandeur !== null) {
+            $notifier->envoyer($demandeur, $titre, $message);
+        }
     }
 
     public function refuser(DemandeAbonnement $demande, User $exploitant, ?string $motif = null): void
@@ -246,6 +276,17 @@ class AbonnementService
             'decide_par' => $exploitant->id,
             'note_decision' => $motif,
         ]);
+
+        $proprietaire = User::find($demande->user_id);
+        if ($proprietaire !== null) {
+            $plan = Plan::parCode($demande->plan)?->nom ?? ucfirst($demande->plan);
+            app(NotifierCompte::class)->envoyer(
+                $proprietaire,
+                'Demande d’abonnement non validée',
+                "Votre demande {$plan} n’a pas pu être validée".(filled($motif) ? " : {$motif}" : '.')
+                    .' Vous pouvez en envoyer une nouvelle depuis la page Abonnement, ou nous écrire sur WhatsApp.',
+            );
+        }
     }
 
     /**
@@ -310,7 +351,7 @@ class AbonnementService
             throw ValidationException::withMessages(['plan' => ['Plan inconnu.']]);
         }
 
-        return DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note): Abonnement {
+        $abonnement = DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note): Abonnement {
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $proprietaire->id],
                 [
@@ -333,6 +374,10 @@ class AbonnementService
 
             return $abonnement;
         });
+
+        $this->prevenirActivation($abonnement);
+
+        return $abonnement;
     }
 
     /** Fin immédiate : plus aucune action possible dans ses boutiques. */

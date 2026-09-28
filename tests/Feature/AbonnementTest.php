@@ -9,9 +9,11 @@ use App\Enums\StatutDemande;
 use App\Livewire\Produits\Index as ProduitsIndex;
 use App\Livewire\Utilisateurs\Index as UtilisateursIndex;
 use App\Mail\DemandeAbonnementMail;
+use App\Mail\MessageCompteMail;
 use App\Models\Abonnement;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
+use App\Models\NotificationApp;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
@@ -259,9 +261,31 @@ class AbonnementTest extends TestCase
         $this->assertSame(now()->addMonths(3)->toDateString(), $abonnement->fin->toDateString());
         $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
 
+        // Le commerçant l'apprend : cloche, push et e-mail.
+        $avis = NotificationApp::where('user_id', $this->awa->id)->latest('id')->first();
+        $this->assertSame('Votre abonnement Basic est activé', $avis->titre);
+        $this->assertStringContainsString('jusqu’au '.now()->addMonths(3)->format('d/m/Y'), $avis->message);
+        $this->assertSame('/abonnement', $avis->lien);
+        Mail::assertSent(MessageCompteMail::class, fn ($mail) => $mail->hasTo('awa@example.com') && $mail->titre === $avis->titre);
+
         // Une demande tranchée ne se retranche pas.
         $this->expectException(ValidationException::class);
         $service->approuver($demande->fresh(), $exploitant);
+    }
+
+    public function test_un_refus_et_un_acces_offert_sont_annonces_au_commercant(): void
+    {
+        $service = app(AbonnementService::class);
+        $exploitant = User::create(['name' => 'Exploitant', 'phone' => '+33605758494', 'password' => 'x']);
+
+        $service->refuser($service->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel), $exploitant, 'Paiement non reçu');
+        $refus = NotificationApp::where('user_id', $this->awa->id)->latest('id')->first();
+        $this->assertSame('Demande d’abonnement non validée', $refus->titre);
+        $this->assertStringContainsString('Paiement non reçu', $refus->message);
+
+        $service->accorder($this->awa, 'pro', null, $exploitant);
+        $this->assertSame('Votre abonnement Pro est activé', NotificationApp::where('user_id', $this->awa->id)->latest('id')->first()->titre);
+        $this->assertStringContainsString('sans échéance', NotificationApp::where('user_id', $this->awa->id)->latest('id')->first()->message);
     }
 
     public function test_le_meme_plan_prolonge_et_un_autre_plan_convertit_les_jours(): void

@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Abonnement;
-use App\Models\NotificationApp;
 use App\Models\User;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -37,8 +35,6 @@ class Parrainage
 
     /** Sans 0/O ni 1/I/L : un code se dicte au téléphone. */
     private const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
-    public function __construct(private readonly PushFirebase $push) {}
 
     public function codePour(User $user): string
     {
@@ -179,15 +175,6 @@ class Parrainage
 
     private function prevenir(User $parrain, string $titre, string $message): void
     {
-        try {
-            $notification = NotificationApp::create([
-                'user_id' => $parrain->id, 'type' => 'abonnement', 'titre' => $titre, 'message' => $message, 'lien' => '/parrainage',
-            ]);
-            $this->push->envoyerAuxComptes([$parrain->id], [
-                'notification_id' => (string) $notification->id, 'titre' => $titre, 'message' => $message, 'lien' => '/parrainage', 'type' => 'abonnement',
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('Parrainage : parrain non prévenu', ['user_id' => $parrain->id, 'erreur' => $e->getMessage()]);
-        }
+        app(NotifierCompte::class)->envoyer($parrain, $titre, $message, '/parrainage');
     }
 }
