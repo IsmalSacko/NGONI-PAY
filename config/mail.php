@@ -35,6 +35,12 @@ return [
     |
     */
 
+    /*
+    | Envoi des annonces en nombre : un mailer à part, pour que leur volume
+    | n'épuise pas le quota des e-mails transactionnels.
+    */
+    'annonces_mailer' => env('MAIL_ANNONCES_MAILER', 'smtp'),
+
     'mailers' => [
 
         'smtp' => [
@@ -79,9 +85,25 @@ return [
             'transport' => 'array',
         ],
 
+        // Brevo : les e-mails transactionnels (inscription, mot de passe,
+        // abonnement), sur un quota séparé de celui des annonces.
+        'brevo' => [
+            'transport' => 'smtp',
+            'host' => env('BREVO_SMTP_HOST', 'smtp-relay.brevo.com'),
+            'port' => env('BREVO_SMTP_PORT', 587),
+            'username' => env('BREVO_SMTP_USERNAME'),
+            'password' => env('BREVO_SMTP_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        // Brevo d'abord, Mailjet (smtp) s'il est injoignable. Mailjet ne
+        // renvoie pas d'erreur quand son quota du jour est atteint — il retient
+        // l'e-mail —, d'où la séparation des usages plutôt qu'un simple secours.
         'failover' => [
             'transport' => 'failover',
             'mailers' => [
+                'brevo',
                 'smtp',
                 'log',
             ],

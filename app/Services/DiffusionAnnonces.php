@@ -71,7 +71,9 @@ class DiffusionAnnonces
                 }
 
                 try {
-                    Mail::to($user->email)->send(new AnnonceMail($annonce, $user->name));
+                    // Les annonces partent en nombre : sur leur propre quota
+                    // (Mailjet), pour ne jamais priver une inscription d'e-mail.
+                    Mail::mailer(config('mail.annonces_mailer'))->to($user->email)->send(new AnnonceMail($annonce, $user->name));
                     $emails++;
                 } catch (\Throwable $e) {
                     $echecs++;
