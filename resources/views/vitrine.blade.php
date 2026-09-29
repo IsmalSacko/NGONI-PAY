@@ -287,6 +287,37 @@
         </div>
         <p class="mt-6 text-center text-sm text-muted">Paiement par Orange Money, Wave, Moov Money, espèces ou virement. Tarifs trimestriels et semestriels dans l’application.</p>
         <p class="mt-2 text-center text-sm text-muted">Après l’essai, même sans abonnement, votre caisse reste ouverte sur les articles de votre catalogue.</p>
+
+        {{-- Abonnement à vie : sur demande, réglé une fois. Prix fixés ici, hors
+             des plans de la console : ce n'est pas une durée qu'on renouvelle. --}}
+        @php($aVie = [['Basic à vie', 100000, 'Toutes les fonctions du Basic, sans jamais renouveler.'], ['Pro à vie', 250000, 'Tout le Pro — statistiques avancées, séances de caisse, 5 boutiques — une fois pour toutes.']])
+        <div id="a-vie" class="mt-10 max-w-4xl mx-auto rounded-3xl border-2 border-jaune bg-white p-7 md:p-8">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+                <h3 class="font-display font-extrabold text-2xl">Abonnement à vie</h3>
+                <span class="rounded-full bg-jaune text-accent text-xs font-extrabold px-3 py-1">Payez une fois</span>
+            </div>
+            <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance.</p>
+            <div class="mt-6 grid sm:grid-cols-2 gap-4">
+                @foreach ($aVie as [$nom, $montant, $texte])
+                    <div class="rounded-2xl bg-paper border border-border p-5">
+                        <p class="font-bold">{{ $nom }}</p>
+                        <p class="mt-2"><span class="font-display font-extrabold text-3xl">{{ $prix($montant) }}</span> <span class="font-semibold">F CFA</span> <span class="text-sm text-muted">une seule fois</span></p>
+                        <p class="mt-2 text-sm text-muted">{{ $texte }}</p>
+                    </div>
+                @endforeach
+            </div>
+            <ul class="mt-5 flex flex-col gap-1.5 text-xs text-muted">
+                <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
+                <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
+                <li>• Remboursable dans les 14 jours suivant l’activation, pas au-delà.</li>
+            </ul>
+            @if ($waMessage)
+                <a href="{{ $wa }}?text={{ rawurlencode('Bonjour, je suis intéressé(e) par l’abonnement à vie de Ngoni Caisse.') }}" target="_blank" rel="noopener"
+                   class="mt-6 inline-flex h-12 px-6 items-center gap-2 rounded-xl bg-whatsapp text-white font-bold hover:opacity-90">
+                    <x-icone nom="whatsapp" class="w-5 h-5" /> Demander l’abonnement à vie
+                </a>
+            @endif
+        </div>
     </section>
 
     {{-- Parrainage : l'offre et ses conditions, lisibles avant l'inscription. Les

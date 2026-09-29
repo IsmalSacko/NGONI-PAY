@@ -115,7 +115,9 @@ class VitrineEtAdminTest extends TestCase
             ->assertSee('14 jours d’essai au lieu de 7', false)
             ->assertSee('Au plus 12 mois offerts', false)
             ->assertSee('Statistiques avancées')
-            ->assertSee('Que se passe-t-il à la fin de l’essai ?', false);
+            ->assertSee('Que se passe-t-il à la fin de l’essai ?', false)
+            ->assertSee('Abonnement à vie')
+            ->assertSee('250 000', false);
     }
 
     public function test_la_console_ouvre_la_vitrine_en_apercu(): void
