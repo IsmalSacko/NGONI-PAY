@@ -120,6 +120,24 @@
         ci‑dessous.
     </p>
 
+    @php($wa = \App\Support\WhatsApp::link((string) config('ecaisse.support_whatsapp')))
+    <h2 id="suppression-compte">Supprimer votre compte Ngoni Caisse</h2>
+    <p>
+        Pour supprimer votre compte et ses données, envoyez-nous une demande depuis le numéro de
+        téléphone de votre compte
+        @if ($wa)
+            <a href="{{ $wa }}?text={{ rawurlencode('Bonjour, je souhaite supprimer mon compte Ngoni Caisse.') }}">par WhatsApp</a>
+        @endif
+        ou par e-mail à <strong>privacy@conttron.com</strong>, en indiquant ce numéro.
+    </p>
+    <p>
+        Nous supprimons alors, sous 30 jours : votre compte, vos boutiques et leurs données
+        (articles, ventes, clients, stocks, équipe), vos notifications et vos appareils enregistrés.
+        Une sauvegarde technique de la suppression est conservée par l'éditeur, pour pouvoir
+        corriger une erreur ; elle n'est accessible qu'à lui.
+        La suppression est définitive : exportez ce que vous souhaitez garder avant de la demander.
+    </p>
+
     <h2>8. Enfants</h2>
     <p>
         Si notre application s’adresse à des enfants de moins de 13 ans, nous appliquons des règles
