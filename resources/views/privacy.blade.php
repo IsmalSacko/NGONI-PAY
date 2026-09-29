@@ -91,6 +91,15 @@
         prestataires de service strictement nécessaires (hébergement, messagerie, analytics),
         uniquement pour fournir le service et dans le respect de la confidentialité.
     </p>
+    <p>
+        <strong>Meta (Facebook).</strong> L'application intègre le kit officiel de Meta pour
+        mesurer nos campagnes publicitaires sur Facebook et Instagram. Il transmet à Meta
+        l'installation de l'application, son ouverture et la création d'un compte, avec
+        l'identifiant publicitaire du téléphone et son modèle. Aucune donnée de votre boutique
+        n'y circule : ni nom, ni numéro de téléphone, ni e-mail, ni vente, ni client. Vous pouvez
+        supprimer ou réinitialiser l'identifiant publicitaire à tout moment dans les réglages de
+        votre téléphone (Google → Annonces).
+    </p>
 
     <h2>5. Conservation</h2>
     <p>
