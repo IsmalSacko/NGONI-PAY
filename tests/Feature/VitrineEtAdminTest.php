@@ -107,6 +107,17 @@ class VitrineEtAdminTest extends TestCase
         }
     }
 
+    public function test_la_vitrine_annonce_le_parrainage_ses_conditions_et_la_fin_d_essai(): void
+    {
+        $this->get('/')->assertOk()
+            ->assertSee('id="parrainage"', false)
+            ->assertSee('Les conditions pour en bénéficier')
+            ->assertSee('14 jours d’essai au lieu de 7', false)
+            ->assertSee('Au plus 12 mois offerts', false)
+            ->assertSee('Statistiques avancées')
+            ->assertSee('Que se passe-t-il à la fin de l’essai ?', false);
+    }
+
     public function test_la_console_ouvre_la_vitrine_en_apercu(): void
     {
         $exploitant = $this->exploitant();

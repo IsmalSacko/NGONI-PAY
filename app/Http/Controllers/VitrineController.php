@@ -35,12 +35,18 @@ class VitrineController extends Controller
                 'max_boutiques' => $p->max_boutiques,
                 'max_membres' => $p->max_membres,
                 'seances' => $p->inclut(Plan::SEANCES_CAISSE),
+                'statistiques' => $p->inclut(Plan::STATISTIQUES_AVANCEES),
                 'mensuel' => $p->tarif(CycleFacturation::Mensuel)?->montant,
                 'annuel' => $p->tarif(CycleFacturation::Annuel)?->montant,
             ])->values(),
             'storeUrl' => (string) config('mobile.store_url'),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
             'version' => \App\Support\VersionApplication::derniere(),
+            'parrainage' => [
+                'filleul' => \App\Services\Parrainage::JOURS_ESSAI_FILLEUL,
+                'parrain' => \App\Services\Parrainage::JOURS_PARRAIN,
+                'plafond' => \App\Services\Parrainage::MAX_PAR_AN,
+            ],
         ]);
     }
 }

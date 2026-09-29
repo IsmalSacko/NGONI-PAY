@@ -30,13 +30,17 @@
         ['Même sans réseau', "Coupure internet ? Continuez à vendre. Les ventes partent d'elles-mêmes dès le retour de la connexion.", 'M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01'],
         ['Votre équipe', "Ajoutez caissiers et gérants. Chacun voit ce qu'il doit voir : le caissier encaisse, le gérant pilote, vous gardez la main.", 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'],
         ['Plusieurs boutiques', "Une pharmacie, une annexe, un dépôt : passez de l'une à l'autre en un geste, chacune avec son stock et son équipe.", 'M3 9l1-5h16l1 5M3 9h18v11H3zM3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 20v-6h6v6'],
-        ['Pilotage du jour', "Chiffre d'affaires, panier moyen, meilleures ventes, moyens de paiement : votre journée sur un seul écran.", 'M3 3v18h18M7 15l4-4 3 3 5-6'],
-        ['Back-office web', "Sur ordinateur, gérez tout le catalogue, les stocks, les ventes et l'équipe confortablement.", 'M3 4h18v12H3zM8 20h8M12 16v4'],
+        ['Pilotage du jour', "Chiffre d'affaires, panier moyen, meilleures ventes, moyens de paiement — comparés à la période précédente : ça va mieux ou pas, d'un coup d'œil.", 'M3 3v18h18M7 15l4-4 3 3 5-6'],
+        ['Statistiques avancées', "Avec le plan Pro : heures d'affluence, marge par article, stock qui dort, articles à racheter, meilleurs clients, ventes de chaque membre de l'équipe.", 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+        ['Back-office web', "Sur ordinateur, gérez tout le catalogue, les stocks, les ventes et l'équipe confortablement — et installez-le comme une application.", 'M3 4h18v12H3zM8 20h8M12 16v4'],
+        ['Parrainage', "Recommandez Ngoni Caisse à un commerçant : il a {$parrainage['filleul']} jours d'essai, et vous gagnez un mois offert dès qu'il s'abonne.", 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z'],
     ];
     $questions = [
         ['Faut-il une connexion internet ?', "Non pour encaisser : les ventes sont gardées dans le téléphone et envoyées au retour du réseau. Il en faut une pour la première connexion et pour synchroniser."],
         ['Quelle imprimante utiliser ?', "Une imprimante thermique Bluetooth de 58 ou 80 mm, comme on en trouve chez les revendeurs de matériel de caisse. Sans imprimante, le reçu PDF part par WhatsApp."],
         ['Dans quelle monnaie ?', "Franc CFA par défaut, et toutes les devises courantes : euro, cedi, dirham… Les centimes sont gérés quand la devise en a."],
+        ['Que se passe-t-il à la fin de l’essai ?', "Sans abonnement, votre caisse reste ouverte : vous encaissez toujours les articles de votre catalogue et imprimez vos tickets. En revanche, plus rien ne se modifie — articles, prix, stocks, clients, équipe — et les ventes hors catalogue s’arrêtent. Deux jours avant la fin, un rappel vous prévient. Toutes vos données restent consultables."],
+        ['Comment fonctionne le parrainage ?', "Votre code est dans le menu Parrainage de l’application. Le commerçant que vous recommandez le saisit en créant son compte : il reçoit {$parrainage['filleul']} jours d’essai au lieu de {$essaiJours}. Dès qu’il paie son premier abonnement, vous gagnez un mois offert. Les conditions sont détaillées plus haut, dans la section Parrainage."],
         ['Comment payer l’abonnement ?', "Par Orange Money, Wave, Moov Money, espèces ou virement. Vous envoyez la preuve depuis l’application et l’abonnement est activé à réception."],
         ['J’utilisais Ngoni Pay, et mes données ?', "Elles sont conservées : Ngoni Caisse est la nouvelle version de Ngoni Pay. Mettez à jour l’application et reconnectez-vous avec le même numéro et le même mot de passe."],
         ['Et sur iPhone ?', "L’application est disponible sur Android. Le back-office fonctionne dans n’importe quel navigateur, iPhone compris."],
@@ -109,6 +113,7 @@
         <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-muted">
             <a href="#fonctions" class="hover:text-ink">Fonctions</a>
             <a href="#tarifs" class="hover:text-ink">Tarifs</a>
+            <a href="#parrainage" class="hover:text-ink">Parrainage</a>
             <a href="#questions" class="hover:text-ink">Questions</a>
             <a href="#partager" class="hover:text-ink">Partager</a>
         </nav>
@@ -271,6 +276,7 @@
                         <li>✓ Stocks, marges, clients</li>
                         <li>✓ Hors ligne et back-office web</li>
                         <li class="{{ $plan['seances'] ? '' : 'opacity-50' }}">{{ $plan['seances'] ? '✓' : '—' }} Séances de caisse et écarts{{ $plan['seances'] ? '' : ' (Pro)' }}</li>
+                        <li class="{{ $plan['statistiques'] ? '' : 'opacity-50' }}">{{ $plan['statistiques'] ? '✓' : '—' }} Statistiques avancées{{ $plan['statistiques'] ? '' : ' (Pro)' }}</li>
                     </ul>
                     <a href="{{ $storeUrl }}" rel="noopener"
                        class="mt-8 flex h-12 items-center justify-center rounded-xl font-bold {{ $pro ? 'bg-white text-accent-dark hover:bg-accent-soft' : 'bg-ink text-white hover:bg-black' }}">
@@ -280,6 +286,47 @@
             @endforeach
         </div>
         <p class="mt-6 text-center text-sm text-muted">Paiement par Orange Money, Wave, Moov Money, espèces ou virement. Tarifs trimestriels et semestriels dans l’application.</p>
+        <p class="mt-2 text-center text-sm text-muted">Après l’essai, même sans abonnement, votre caisse reste ouverte sur les articles de votre catalogue.</p>
+    </section>
+
+    {{-- Parrainage : l'offre et ses conditions, lisibles avant l'inscription. Les
+         durées viennent du service qui les applique : un chiffre changé là-bas
+         l'est ici aussi. --}}
+    <section id="parrainage" class="max-w-6xl mx-auto px-4 md:px-6 pb-16 md:pb-24">
+        <div class="rounded-3xl bg-white border border-border p-7 md:p-10 grid lg:grid-cols-[1fr_1.2fr] gap-8 md:gap-12">
+            <div>
+                <p class="text-sm font-bold text-accent uppercase tracking-wider">Parrainage</p>
+                <h2 class="mt-2 font-display font-extrabold text-3xl md:text-4xl">Invitez un commerçant, gagnez un mois offert.</h2>
+                <ol class="mt-6 flex flex-col gap-4">
+                    @foreach ([
+                        ['Votre code', 'Dans le menu Parrainage de l’application, ou sur la carte « Gagnez 1 mois offert » du Pilotage. Un bouton l’envoie sur WhatsApp.'],
+                        ['Il s’inscrit avec', "Le commerçant saisit votre code en créant son compte : {$parrainage['filleul']} jours d’essai au lieu de {$essaiJours}."],
+                        ['Vous gagnez un mois', 'Dès qu’il paie son premier abonnement, un mois s’ajoute au vôtre. Vous êtes prévenu dans l’application et par e-mail.'],
+                    ] as $i => [$etape, $texte])
+                        <li class="flex gap-4">
+                            <span class="shrink-0 w-9 h-9 rounded-full bg-accent text-white font-extrabold flex items-center justify-center">{{ $i + 1 }}</span>
+                            <div>
+                                <h3 class="font-bold">{{ $etape }}</h3>
+                                <p class="text-sm text-muted leading-relaxed">{{ $texte }}</p>
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+            </div>
+            <div class="rounded-2xl bg-paper border border-border p-6">
+                <h3 class="font-display font-bold text-lg">Les conditions pour en bénéficier</h3>
+                <ul class="mt-4 flex flex-col gap-2.5 text-sm leading-relaxed">
+                    <li>✓ <b>Le parrain</b> est l’administrateur d’une boutique inscrite : c’est lui qui voit le code.</li>
+                    <li>✓ <b>Le code se saisit à l’inscription</b>, et seulement à ce moment-là, avec un numéro de téléphone différent de celui du parrain.</li>
+                    <li>✓ <b>Le mois est gagné au premier abonnement payé du filleul</b>, une fois le paiement validé. Un accès offert par Ngoni Caisse ne compte pas.</li>
+                    <li>✓ <b>Un filleul rapporte une seule fois</b> : ses renouvellements ne comptent pas.</li>
+                    <li>✓ <b>Abonnement payé en cours</b> : le mois s’ajoute tout de suite à votre échéance. <b>En essai ou abonnement échu</b> : il est mis de côté et s’ajoute à votre prochain abonnement. Un abonnement illimité ne peut pas être prolongé.</li>
+                    <li>✓ <b>Au plus {{ $parrainage['plafond'] }} mois offerts</b> par période de douze mois.</li>
+                    <li>✓ <b>Les mois offerts</b> ne s’échangent pas contre de l’argent et ne se transfèrent pas ; ils peuvent être annulés en cas d’abus (comptes créés pour l’occasion, faux paiements).</li>
+                </ul>
+                <p class="mt-4 text-xs text-muted">Le programme peut évoluer ; les mois déjà gagnés restent acquis.</p>
+            </div>
+        </div>
     </section>
 
     {{-- Questions --}}
@@ -352,6 +399,7 @@
         <nav class="flex flex-wrap gap-x-6 gap-y-2">
             <a href="#fonctions" class="hover:text-ink">Fonctions</a>
             <a href="#tarifs" class="hover:text-ink">Tarifs</a>
+            <a href="#parrainage" class="hover:text-ink">Parrainage</a>
             <a href="{{ route('connexion') }}" class="hover:text-ink">Back-office</a>
             <a href="{{ url('/privacy') }}" class="hover:text-ink">Confidentialité</a>
             @if ($waMessage)<a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 hover:text-ink"><x-icone nom="whatsapp" class="w-4 h-4 text-whatsapp" /> Contact WhatsApp</a>@endif
