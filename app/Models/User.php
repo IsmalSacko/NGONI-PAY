@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -133,6 +134,26 @@ class User extends Authenticatable
     public function boutiquesPossedees(): HasMany
     {
         return $this->hasMany(Boutique::class, 'proprietaire_id');
+    }
+
+    /**
+     * Recherche de la console : nom, téléphone, e-mail, ou nom d'une boutique
+     * — possédée ou où le compte travaille. L'exploitant cherche souvent la
+     * boutique (« Sacko multi Services ») et non la personne (« Sacko
+     * Fassely ») : une recherche qui ignorait les boutiques ne trouvait rien.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeRecherche(Builder $query, string $terme): void
+    {
+        $motif = '%'.mb_strtolower(trim($terme)).'%';
+
+        $query->where(fn (Builder $q) => $q
+            ->whereRaw('LOWER(name) LIKE ?', [$motif])
+            ->orWhereRaw('LOWER(phone) LIKE ?', [$motif])
+            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$motif])
+            ->orWhereHas('boutiquesPossedees', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$motif]))
+            ->orWhereHas('boutique', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$motif])));
     }
 
     /**

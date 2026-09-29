@@ -121,7 +121,7 @@ class GestionAnnonces
         }
 
         return User::where('est_admin_plateforme', false)
-            ->where(fn ($q) => $q->where('name', 'like', "%{$terme}%")->orWhere('phone', 'like', "%{$terme}%"))
+            ->recherche($terme)
             ->orderBy('name')->limit(20)->get(['id', 'name', 'phone', 'email']);
     }
 

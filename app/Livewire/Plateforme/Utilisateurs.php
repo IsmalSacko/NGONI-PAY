@@ -116,8 +116,6 @@ class Utilisateurs extends Component
 
     public function render()
     {
-        $needle = '%'.mb_strtolower($this->recherche).'%';
-
         // Activité et usage, en sous-requêtes : une seule requête pour la page.
         $users = User::query()
             ->select('users.*')
@@ -128,10 +126,7 @@ class Utilisateurs extends Component
                 'nb_appareils' => DB::table('appareils')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id'),
             ])
             ->with('boutique')
-            ->when($this->recherche !== '', fn ($q) => $q->where(fn ($w) => $w
-                ->whereRaw('LOWER(name) LIKE ?', [$needle])
-                ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
-                ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$needle])))
+            ->when($this->recherche !== '', fn ($q) => $q->recherche($this->recherche))
             ->when($this->tri === 'recents', fn ($q) => $q->latest('users.created_at'), fn ($q) => $q->orderBy('name'))
             ->paginate(25);
 

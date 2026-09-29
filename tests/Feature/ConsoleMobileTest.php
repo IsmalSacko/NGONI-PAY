@@ -66,6 +66,19 @@ class ConsoleMobileTest extends TestCase
         $this->console()->getJson('/api/moi')->assertOk()->assertJsonPath('user.est_admin_plateforme', true);
     }
 
+    public function test_on_trouve_un_compte_par_le_nom_de_sa_boutique_partout(): void
+    {
+        // Le nom de la boutique n'est pas celui de la personne : c'est pourtant
+        // lui que l'exploitant tape.
+        ['user' => $fassely] = $this->inscrire('Sacko multi Services', '74174753', 'Sacko Fassely');
+
+        $this->console()->getJson('/api/plateforme/annonces/comptes?q=multi services')->assertOk()
+            ->assertJsonPath('data.0.id', $fassely->id);
+        $this->console()->getJson('/api/plateforme/utilisateurs?recherche=Sacko multi Services')->assertOk()
+            ->assertJsonFragment(['id' => $fassely->id]);
+        $this->assertSame([$fassely->id], app(\App\Services\GestionAnnonces::class)->rechercherComptes('MULTI serv')->pluck('id')->all());
+    }
+
     public function test_l_exploitant_est_prevenu_des_inscriptions_et_des_demandes(): void
     {
         $alertes = fn () => NotificationApp::where('user_id', $this->exploitant->id)->where('type', 'console');
