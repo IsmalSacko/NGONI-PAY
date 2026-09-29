@@ -16,6 +16,20 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_un_numero_deja_inscrit_est_refuse_clairement_et_non_par_une_erreur_serveur(): void
+    {
+        $inscription = [
+            'nom_boutique' => 'Boutique Koné', 'pays' => 'CI', 'telephone' => '0500144045',
+            'password' => 'password123', 'nom_utilisateur' => 'Koné',
+        ];
+        $this->postJson('/api/inscription', $inscription)->assertCreated();
+
+        $this->postJson('/api/inscription', [...$inscription, 'nom_boutique' => 'Autre boutique'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('telephone')
+            ->assertJsonFragment(['Ce numéro a déjà un compte Ngoni Caisse. Connectez-vous, ou utilisez « Mot de passe oublié ».']);
+    }
+
     public function test_registration_creates_a_boutique_with_an_admin_user(): void
     {
         $response = $this->postJson('/api/inscription', [

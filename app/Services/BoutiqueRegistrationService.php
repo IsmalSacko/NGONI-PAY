@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -34,12 +35,23 @@ class BoutiqueRegistrationService
      */
     public function register(array $data): array
     {
+        $paysSaisi = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
+        $telephone = PhoneNumber::normalize($data['telephone'], $paysSaisi);
+
+        // Un numéro déjà inscrit : le dire, plutôt que de laisser la base
+        // refuser l'insertion — l'application affichait une erreur serveur, et
+        // le commerçant recommençait sans comprendre.
+        if (User::withTrashed()->where('phone', $telephone)->exists()) {
+            throw ValidationException::withMessages(['telephone' => [
+                'Ce numéro a déjà un compte Ngoni Caisse. Connectez-vous, ou utilisez « Mot de passe oublié ».',
+            ]]);
+        }
+
         // Code vérifié avant de rien créer : une faute de frappe se corrige
         // sans laisser de compte à moitié inscrit.
         $parrain = null;
         if (filled($data['code_parrainage'] ?? null)) {
-            $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
-            $parrain = app(Parrainage::class)->parrainPour($data['code_parrainage'], PhoneNumber::normalize($data['telephone'], $pays));
+            $parrain = app(Parrainage::class)->parrainPour($data['code_parrainage'], $telephone);
         }
 
         $resultat = DB::transaction(function () use ($data, $parrain): array {
