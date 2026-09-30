@@ -21,9 +21,11 @@
         ];
     @endphp
     <header class="bg-accent text-white sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center gap-3 md:gap-5">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 h-16 flex items-center gap-1.5 sm:gap-3 md:gap-5">
             <a href="{{ route('plateforme.tableau') }}" class="flex items-center gap-3 min-w-0">
-                <x-logo taille="w-10 h-10" :nom="true" class="shrink-0" />
+                {{-- Téléphone : le ticket seul ; le nom, à côté des boutons, n'y tient pas. --}}
+                <span class="shrink-0 sm:hidden"><x-logo taille="w-10 h-10" /></span>
+                <span class="shrink-0 hidden sm:block"><x-logo taille="w-10 h-10" :nom="true" /></span>
                 <span class="hidden lg:inline pl-3 ml-1 border-l border-white/20 text-sm font-semibold text-rail">Console plateforme</span>
             </a>
             <div class="flex-grow"></div>
@@ -33,18 +35,18 @@
             </button>
             {{-- La vitrine telle que la voient les visiteurs (aperçu, même connecté). --}}
             <a href="{{ route('vitrine', ['apercu' => 1]) }}" target="_blank" rel="noopener"
-               class="inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold" title="Ouvrir le site vitrine">
+               class="shrink-0 inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold" title="Ouvrir le site vitrine">
                 <x-icone nom="site" class="w-4 h-4" />
                 <span class="hidden sm:inline">Voir le site</span>
             </a>
             <button type="button" data-installer hidden class="h-10 px-3 rounded-xl text-sm font-extrabold bg-jaune text-accent">Installer</button>
             <a href="{{ route('mon-compte') }}" title="Mon compte"
-               class="h-10 px-3 rounded-xl text-sm font-bold inline-flex items-center {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
+               class="shrink-0 h-10 px-2.5 sm:px-3 rounded-xl text-sm font-bold inline-flex items-center {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                 <span class="hidden sm:inline">{{ auth()->user()->name }}</span><span class="sm:hidden">Compte</span>
             </a>
             <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
-                <button class="h-10 px-3 rounded-xl text-sm font-bold text-rail hover:text-white hover:bg-nuit-clair">Quitter</button>
+                <button class="shrink-0 h-10 px-2.5 sm:px-3 rounded-xl text-sm font-bold text-rail hover:text-white hover:bg-nuit-clair">Quitter</button>
             </form>
         </div>
         {{-- Onglets : défilants sur téléphone, l'actif en jaune. --}}

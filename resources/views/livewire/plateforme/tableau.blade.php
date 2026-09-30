@@ -13,10 +13,11 @@
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Tableau de bord</h1>
             <p class="text-muted text-sm">Vue d’ensemble de la plateforme · {{ $periodeLibelle }}</p>
         </div>
-        <div class="flex gap-1 rounded-xl bg-white border border-border p-1" role="group" aria-label="Période">
+        {{-- Téléphone : toute la largeur, quatre parts égales, chaque libellé sur une ligne. --}}
+        <div class="flex w-full sm:w-auto gap-1 rounded-xl bg-white border border-border p-1" role="group" aria-label="Période">
             @foreach ($choix as $code => $libelle)
                 <button type="button" wire:click="$set('periode', '{{ $code }}')"
-                        class="h-9 px-3.5 rounded-lg text-sm font-bold {{ $periode === $code ? 'bg-accent text-white' : 'text-muted hover:text-ink' }}"
+                        class="flex-1 sm:flex-none h-9 px-2 sm:px-3.5 rounded-lg text-[13px] sm:text-sm font-bold whitespace-nowrap {{ $periode === $code ? 'bg-accent text-white' : 'text-muted hover:text-ink' }}"
                         aria-pressed="{{ $periode === $code ? 'true' : 'false' }}">{{ $libelle }}</button>
             @endforeach
         </div>
