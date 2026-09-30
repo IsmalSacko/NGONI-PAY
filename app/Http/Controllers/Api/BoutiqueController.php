@@ -71,6 +71,16 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $reglages->mettreAJour($boutique, $request->all())]);
     }
 
+    /** Objectif de chiffre d'affaires du mois (null : pas d'objectif). */
+    public function objectif(Request $request): JsonResponse
+    {
+        $data = $request->validate(['objectif_mensuel' => ['present', 'nullable', 'integer', 'min:1', 'max:100000000000']]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->forceFill(['objectif_mensuel' => $data['objectif_mensuel']])->save();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
     /** Logo de la boutique active, imprimé sur les tickets. */
     public function logo(Request $request, \App\Services\Images $images): JsonResponse
     {

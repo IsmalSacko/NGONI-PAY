@@ -29,6 +29,15 @@ class Boutique extends Model
     /** Adresse du logo, pour l'application et les tickets. */
     protected $appends = ['logo_url', 'logo_vignette_url'];
 
+    protected function casts(): array
+    {
+        return [
+            'objectif_mensuel' => 'integer',
+            'fidelite_seuil' => 'integer',
+            'fidelite_remise_pct' => 'integer',
+        ];
+    }
+
     public function getLogoUrlAttribute(): ?string
     {
         return $this->logo ? route('image.logo', ['boutique' => $this->id, 'v' => Images::version($this->logo)]) : null;

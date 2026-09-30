@@ -32,6 +32,8 @@ class DashboardController extends Controller
                 ->where('stock', '>', 0)
                 ->whereColumn('stock', '<=', 'seuil_alerte')
                 ->count(),
+            // Objectif du mois et série de journées avec vente.
+            ...app(\App\Services\Elan::class)->pour(\App\Models\Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId())),
         ]);
     }
 }
