@@ -9,6 +9,7 @@ use App\Models\Achat;
 use App\Models\Fournisseur;
 use App\Models\Produit;
 use App\Services\AchatService;
+use App\Services\Fournisseurs;
 use App\Support\Money\Montant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +42,13 @@ class Index extends Component
     public string $telFournisseur = '';
 
     public ?string $paiementPour = null;
+
+    /** Fournisseur en cours de modification. */
+    public ?string $fournisseurEdite = null;
+
+    public string $nomEdite = '';
+
+    public string $telEdite = '';
 
     public string $paiementMontant = '';
 
@@ -122,6 +130,49 @@ class Index extends Component
         $f = Fournisseur::create(['nom' => $this->nomFournisseur, 'telephone' => $this->telFournisseur ?: null]);
         $this->reset(['nomFournisseur', 'telFournisseur', 'fournisseurOuvert']);
         $this->fournisseurId = $f->id;
+    }
+
+    public function modifierFournisseur(string $id): void
+    {
+        Auth::user()->can('achats.create') || abort(403);
+        $this->resetValidation();
+        $f = Fournisseur::findOrFail($id);
+        $this->fournisseurEdite = $f->id;
+        $this->nomEdite = $f->nom;
+        $this->telEdite = (string) $f->telephone;
+    }
+
+    public function enregistrerFournisseur(Fournisseurs $fournisseurs): void
+    {
+        Auth::user()->can('achats.create') || abort(403);
+        $this->resetValidation();
+        try {
+            $fournisseurs->modifier(Fournisseur::findOrFail($this->fournisseurEdite), ['nom' => $this->nomEdite, 'telephone' => $this->telEdite ?: null]);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $champ => $messages) {
+                $this->addError($champ === 'nom' ? 'nomEdite' : 'telEdite', $messages[0]);
+            }
+
+            return;
+        }
+        $this->fournisseurEdite = null;
+    }
+
+    public function supprimerFournisseur(string $id, Fournisseurs $fournisseurs): void
+    {
+        Auth::user()->can('achats.create') || abort(403);
+        $this->info = null;
+        try {
+            $fournisseurs->retirer(Fournisseur::findOrFail($id));
+        } catch (ValidationException $e) {
+            $this->addError('fournisseur', collect($e->errors())->flatten()->first());
+
+            return;
+        }
+        if ($this->fournisseurId === $id) {
+            $this->fournisseurId = '';
+        }
+        $this->info = 'Fournisseur retiré ; ses achats restent dans l’historique.';
     }
 
     public function ouvrirPaiement(string $id): void

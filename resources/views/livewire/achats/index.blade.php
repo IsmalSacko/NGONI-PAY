@@ -21,16 +21,20 @@
                     <span><span class="font-semibold">{{ $f->nom }}</span> <span class="text-[--color-muted]">{{ $f->telephone }}</span></span>
                     <span class="flex items-center gap-2">
                         <span class="font-bold {{ $doit > 0 ? 'text-danger-fg' : 'text-[--color-muted]' }}">{{ $doit > 0 ? 'Vous devez '.$m($doit) : 'Rien à payer' }}</span>
-                        @if ($doit > 0)
-                            @can('achats.create')
+                        @can('achats.create')
+                            @if ($doit > 0)
                                 <button wire:click="ouvrirPaiement('{{ $f->id }}')" class="h-8 px-3 rounded-lg bg-accent text-white text-xs font-bold">Payer</button>
-                            @endcan
-                        @endif
+                            @endif
+                            <button wire:click="modifierFournisseur('{{ $f->id }}')" class="h-8 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Modifier</button>
+                            <button wire:click="supprimerFournisseur('{{ $f->id }}')" wire:confirm="Supprimer {{ $f->nom }} ? Ses achats passés restent dans l’historique."
+                                    class="h-8 px-3 rounded-lg border border-danger-fg text-danger-fg text-xs font-bold">Supprimer</button>
+                        @endcan
                     </span>
                 </div>
             @empty
                 <p class="text-sm text-[--color-muted]">Aucun fournisseur. Créez-le pendant une réception.</p>
             @endforelse
+            @error('fournisseur') <p class="mt-3 rounded-lg bg-danger-bg text-danger-fg px-3 py-2 text-sm font-semibold">{{ $message }}</p> @enderror
         </section>
         <section class="bg-white border border-[--color-border] rounded-2xl p-5">
             <h2 class="font-bold mb-3">Dernières réceptions</h2>
@@ -102,6 +106,27 @@
                 <div class="flex gap-3 mt-2">
                     <button type="button" wire:click="$set('receptionOuverte', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
                     <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer la réception</button>
+                </div>
+            </form>
+        </div>
+    @endif
+
+    @if ($fournisseurEdite)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('fournisseurEdite', null)">
+            <form wire:submit="enregistrerFournisseur" class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-sm flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl">Modifier le fournisseur</h2>
+                <label class="text-sm font-semibold">Nom
+                    <input wire:model="nomEdite" type="text" class="mt-1 w-full h-11 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                </label>
+                @error('nomEdite') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                <label class="text-sm font-semibold">Téléphone
+                    <input wire:model="telEdite" type="tel" class="mt-1 w-full h-11 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                    <span class="block text-xs text-[--color-muted] font-normal mt-1">Pour lui envoyer vos commandes sur WhatsApp depuis l’application.</span>
+                </label>
+                @error('telEdite') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                <div class="flex gap-3 mt-2">
+                    <button type="button" wire:click="$set('fournisseurEdite', null)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
+                    <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
                 </div>
             </form>
         </div>

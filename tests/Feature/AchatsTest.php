@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Livewire\Achats\Index;
+use App\Livewire\Achats\Index as AchatsIndex;
 use App\Models\Boutique;
 use App\Models\Fournisseur;
 use App\Models\Produit;
 use App\Models\User;
+use App\Services\AchatService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -109,6 +111,45 @@ class AchatsTest extends TestCase
         $this->api($autre)->putJson("/api/fournisseurs/{$id}", ['nom' => 'Piraté'])->assertNotFound();
         $this->api($autre)->deleteJson("/api/fournisseurs/{$id}")->assertNotFound();
         $this->api($this->admin)->getJson('/api/fournisseurs')->assertJsonPath('data.0.nom', 'Grossiste');
+    }
+
+    public function test_le_back_office_modifie_et_supprime_un_fournisseur(): void
+    {
+        $f = Fournisseur::create(['nom' => 'Grosiste', 'telephone' => '76001122']);
+        $this->actingAs($this->admin);
+
+        Livewire::test(AchatsIndex::class)
+            ->call('modifierFournisseur', $f->id)
+            ->assertSet('nomEdite', 'Grosiste')->assertSet('telEdite', '76001122')
+            ->set('nomEdite', '')->call('enregistrerFournisseur')->assertHasErrors('nomEdite')
+            ->set('nomEdite', 'Grossiste Diallo')->set('telEdite', '+22376001133')->call('enregistrerFournisseur')
+            ->assertHasNoErrors()->assertSet('fournisseurEdite', null)
+            ->assertSee('Grossiste Diallo');
+        $this->assertSame('+22376001133', $f->fresh()->telephone);
+
+        // Une dette : refusé, avec le montant.
+        app(AchatService::class)->receptionner($this->admin, [['produit_id' => $this->riz->id, 'quantite' => 2, 'prix_achat' => 4000]], $f->id, null);
+        Livewire::test(AchatsIndex::class)
+            ->call('supprimerFournisseur', $f->id)
+            ->assertHasErrors('fournisseur')->assertSee('Vous lui devez encore');
+        $this->assertNotSoftDeleted($f);
+
+        app(AchatService::class)->payer($f->fresh(), $this->admin, 8000, 'especes');
+        Livewire::test(AchatsIndex::class)
+            ->call('supprimerFournisseur', $f->id)
+            ->assertHasNoErrors()->assertDontSee('Grossiste Diallo</span>', false);
+        $this->assertSoftDeleted($f);
+    }
+
+    public function test_le_caissier_ne_modifie_pas_un_fournisseur_depuis_le_back_office(): void
+    {
+        $f = Fournisseur::create(['nom' => 'Grossiste']);
+        $this->caissier->givePermissionTo('achats.view');
+        $this->actingAs($this->caissier);
+
+        Livewire::test(AchatsIndex::class)->call('modifierFournisseur', $f->id)->assertForbidden();
+        Livewire::test(AchatsIndex::class)->call('supprimerFournisseur', $f->id)->assertForbidden();
+        $this->assertNotSoftDeleted($f);
     }
 
     public function test_regles_et_droits(): void
