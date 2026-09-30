@@ -31,6 +31,18 @@
         </div>
     </form>
 
+    @if ($titulaire)
+        <section class="bg-white border border-border rounded-2xl p-5 md:p-6">
+            <label class="flex items-start justify-between gap-4 cursor-pointer">
+                <span>
+                    <span class="block font-display font-extrabold text-lg">Bilan du soir</span>
+                    <span class="block text-sm text-muted">Chaque soir à 20 h, une notification avec les ventes du jour de vos boutiques.</span>
+                </span>
+                <input type="checkbox" wire:model.live="bilanQuotidien" class="mt-1 w-5 h-5 shrink-0" aria-label="Recevoir le bilan du soir">
+            </label>
+        </section>
+    @endif
+
     <form wire:submit="changerMotDePasse" class="bg-white border border-border rounded-2xl p-5 md:p-6 flex flex-col gap-4">
         <div>
             <h2 class="font-display font-extrabold text-lg">Mot de passe</h2>

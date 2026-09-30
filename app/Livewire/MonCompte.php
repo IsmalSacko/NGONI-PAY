@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\Boutique;
 use App\Services\MonCompte as Compte;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -30,12 +31,25 @@ class MonCompte extends Component
 
     public ?string $statutMotDePasse = null;
 
+    /** Bilan du soir en notification : pour le titulaire d'une boutique, à qui il part. */
+    public bool $bilanQuotidien = true;
+
+    public bool $titulaire = false;
+
     public function mount(): void
     {
         $user = Auth::user();
         $this->name = (string) $user->name;
         $this->telephone = (string) $user->phone;
         $this->email = (string) $user->email;
+        $this->bilanQuotidien = (bool) $user->bilan_quotidien;
+        $this->titulaire = Boutique::where('proprietaire_id', $user->id)->exists();
+    }
+
+    /** Enregistré dès que la case change, comme dans l'application. */
+    public function updatedBilanQuotidien(bool $actif): void
+    {
+        Auth::user()->forceFill(['bilan_quotidien' => $actif])->save();
     }
 
     public function enregistrerProfil(Compte $compte): void

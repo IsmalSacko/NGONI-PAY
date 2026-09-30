@@ -35,6 +35,11 @@
                 <span class="truncate font-extrabold">{{ $boutiqueActive?->nom }}</span>
                 <span class="truncate text-xs text-rail">{{ auth()->user()->name }}</span>
             </span>
+            {{-- Installé comme application, le back-office n'a pas de bouton « actualiser » du navigateur. --}}
+            <button type="button" onclick="location.reload()" title="Actualiser la page" aria-label="Actualiser la page"
+                    class="h-10 w-10 shrink-0 rounded-xl bg-nuit-clair text-white flex items-center justify-center">
+                <x-icone nom="actualiser" />
+            </button>
             <button type="button" @click="menu = !menu" :aria-expanded="menu" aria-controls="menu-telephone"
                     class="h-10 px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold">
                 <span x-text="menu ? 'Fermer' : 'Menu'">Menu</span>
@@ -92,6 +97,10 @@
         <main class="flex-grow min-w-0 p-4 md:p-8">
             {{-- Boutique de travail : un compte peut en gérer plusieurs. --}}
             <div class="flex items-center justify-end gap-3 mb-4">
+                <button type="button" onclick="location.reload()" title="Actualiser la page" aria-label="Actualiser la page"
+                        class="hidden md:inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-border text-accent hover:border-accent">
+                    <x-icone nom="actualiser" />
+                </button>
                 @if ($mesBoutiques->count() > 1)
                     <form method="POST" action="{{ route('boutique-active') }}" class="flex items-center gap-2 text-sm w-full md:w-auto">
                         @csrf

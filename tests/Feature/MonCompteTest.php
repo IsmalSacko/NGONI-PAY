@@ -43,6 +43,25 @@ class MonCompteTest extends TestCase
         $this->assertSame(['Awa Traoré', '+22376008299', 'awa@exemple.ml'], [$this->awa->fresh()->name, $this->awa->fresh()->phone, $this->awa->fresh()->email]);
     }
 
+    public function test_le_titulaire_coupe_le_bilan_du_soir_depuis_le_back_office(): void
+    {
+        $this->actingAs($this->awa)->get('/mon-compte')->assertSee('Bilan du soir');
+
+        Livewire::actingAs($this->awa)->test(MonCompte::class)
+            ->assertSet('bilanQuotidien', true)
+            ->set('bilanQuotidien', false);
+        $this->assertFalse($this->awa->fresh()->bilan_quotidien);
+
+        Livewire::actingAs($this->awa)->test(MonCompte::class)->assertSet('bilanQuotidien', false)->set('bilanQuotidien', true);
+        $this->assertTrue($this->awa->fresh()->bilan_quotidien);
+    }
+
+    public function test_un_membre_qui_n_est_pas_titulaire_ne_voit_pas_le_bilan(): void
+    {
+        $caissier = User::create(['boutique_id' => $this->awa->boutique_id, 'name' => 'Moussa', 'phone' => '+22370000002', 'password' => 'password123']);
+        Livewire::actingAs($caissier)->test(MonCompte::class)->assertSet('titulaire', false)->assertDontSee('Bilan du soir');
+    }
+
     public function test_l_exploitant_a_sa_page_dans_la_console(): void
     {
         $this->actingAs($this->exploitant)->get('/mon-compte')->assertOk()->assertSee('Console plateforme');

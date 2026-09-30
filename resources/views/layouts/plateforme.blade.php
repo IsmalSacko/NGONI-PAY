@@ -27,6 +27,10 @@
                 <span class="hidden lg:inline pl-3 ml-1 border-l border-white/20 text-sm font-semibold text-rail">Console plateforme</span>
             </a>
             <div class="flex-grow"></div>
+            <button type="button" onclick="location.reload()" title="Actualiser la page" aria-label="Actualiser la page"
+                    class="h-10 w-10 shrink-0 rounded-xl text-rail hover:text-white hover:bg-nuit-clair inline-flex items-center justify-center">
+                <x-icone nom="actualiser" />
+            </button>
             {{-- La vitrine telle que la voient les visiteurs (aperçu, même connecté). --}}
             <a href="{{ route('vitrine', ['apercu' => 1]) }}" target="_blank" rel="noopener"
                class="inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold" title="Ouvrir le site vitrine">
