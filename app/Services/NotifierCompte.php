@@ -19,7 +19,7 @@ class NotifierCompte
 {
     public function __construct(private readonly PushFirebase $push) {}
 
-    public function envoyer(User $user, string $titre, string $message, string $lien = '/abonnement', string $type = 'abonnement'): void
+    public function envoyer(User $user, string $titre, string $message, string $lien = '/abonnement', string $type = 'abonnement', bool $email = true): void
     {
         try {
             $notification = NotificationApp::create([
@@ -32,7 +32,7 @@ class NotifierCompte
             Log::error('Notification non envoyée', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
         }
 
-        if (blank($user->email)) {
+        if (! $email || blank($user->email)) {
             return;
         }
 

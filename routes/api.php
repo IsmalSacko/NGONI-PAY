@@ -72,6 +72,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('moi', [AuthController::class, 'me']);
     // Son propre compte, pour tout membre : profil et mot de passe (jamais le rôle).
     Route::put('moi', [\App\Http\Controllers\Api\ProfilController::class, 'update']);
+    Route::put('moi/preferences', [\App\Http\Controllers\Api\ProfilController::class, 'preferences']);
     Route::put('moi/mot-de-passe', [\App\Http\Controllers\Api\ProfilController::class, 'motDePasse'])->middleware('throttle:10,1');
 
     Route::post('appareils', [AppareilController::class, 'store']);

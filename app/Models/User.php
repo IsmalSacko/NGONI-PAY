@@ -42,6 +42,7 @@ class User extends Authenticatable
             'est_admin_plateforme' => 'boolean',
             'vu_le' => 'datetime',
             'parrainage_recompense_le' => 'datetime',
+            'bilan_quotidien' => 'boolean',
         ];
     }
 

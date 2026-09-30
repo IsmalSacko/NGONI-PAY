@@ -40,6 +40,17 @@ Artisan::command('ecaisse:rappeler-fin-essai {--simulation : Liste qui serait pr
 
 \Illuminate\Support\Facades\Schedule::command('ecaisse:rappeler-fin-essai')->dailyAt('09:00')->withoutOverlapping();
 
+// Bilan du soir : ventes et encaissements de la journée, poussés au
+// propriétaire. Vingt heures à Bamako (UTC) : la boutique ferme, il regarde.
+Artisan::command('ecaisse:bilan-du-soir', function () {
+    $n = app(\App\Services\BilanDuSoir::class)->envoyer(today());
+    if ($n > 0) {
+        $this->info("Bilan du soir envoyé à {$n} propriétaire(s).");
+    }
+})->purpose('Envoie le bilan de la journée aux propriétaires');
+
+\Illuminate\Support\Facades\Schedule::command('ecaisse:bilan-du-soir')->dailyAt('20:00')->withoutOverlapping();
+
 // Restes de boutiques effacées sans leurs données : aperçu par défaut,
 // effacement (après sauvegarde) seulement avec --confirmer.
 Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde} {--comptes-seulement : Seulement les restes de comptes effacés, pas les boutiques}', function () {

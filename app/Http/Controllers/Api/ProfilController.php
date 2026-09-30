@@ -20,6 +20,15 @@ class ProfilController extends Controller
         return response()->json(['message' => 'Profil mis à jour.', 'user' => $compte->modifierProfil($request->user(), $request->all())]);
     }
 
+    /** Préférences du compte : pour l'instant, recevoir le bilan du soir ou non. */
+    public function preferences(Request $request): JsonResponse
+    {
+        $data = $request->validate(['bilan_quotidien' => ['required', 'boolean']]);
+        $request->user()->forceFill(['bilan_quotidien' => $data['bilan_quotidien']])->save();
+
+        return response()->json(['message' => 'Préférences enregistrées.', 'user' => $request->user()->fresh()]);
+    }
+
     public function motDePasse(Request $request, MonCompte $compte): JsonResponse
     {
         // Les autres appareils sont déconnectés ; celui-ci reste connecté.
