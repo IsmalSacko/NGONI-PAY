@@ -61,14 +61,15 @@
     </header>
 
     <div class="flex min-h-screen">
-        {{-- Ordinateur et tablette : colonne de navigation, onglet actif en jaune. --}}
-        <nav aria-label="Navigation principale" class="hidden md:flex w-24 shrink-0 bg-accent flex-col items-center py-4 gap-1.5 sticky top-0 h-screen overflow-y-auto">
+        {{-- Ordinateur et tablette : colonne de navigation, onglet actif en jaune.
+             Étroite sur tablette, large sur ordinateur : des libellés lisibles. --}}
+        <nav aria-label="Navigation principale" class="hidden md:flex w-28 lg:w-56 shrink-0 bg-accent flex-col items-center py-4 gap-1.5 sticky top-0 h-screen overflow-y-auto">
             <x-logo taille="w-12 h-12" class="mb-4" />
 
             @foreach ($liens as $lien)
                 @can($lien['permission'])
                     <a href="{{ route($lien['route']) }}"
-                       class="w-20 h-14 rounded-2xl flex items-center justify-center text-center px-1 text-[12px] font-bold leading-tight no-underline {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
+                       class="w-24 lg:w-48 h-12 rounded-2xl flex items-center justify-center lg:justify-start text-center lg:text-left px-2 lg:px-4 text-[13px] lg:text-[15px] font-bold leading-tight no-underline {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                         {{ $lien['label'] }}
                     </a>
                 @endcan
@@ -77,12 +78,12 @@
             <div class="flex-grow"></div>
 
             <button type="button" data-installer hidden title="Installer l’app sur cet appareil"
-                    class="w-20 h-14 rounded-2xl text-[12px] font-extrabold leading-tight bg-jaune text-accent">Installer l’app</button>
+                    class="w-24 lg:w-48 h-12 rounded-2xl text-[13px] lg:text-[15px] font-extrabold leading-tight bg-jaune text-accent">Installer l’app</button>
             <a href="{{ route('mon-compte') }}"
-               class="w-20 h-14 rounded-2xl flex items-center justify-center text-center px-1 text-[12px] font-bold leading-tight no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">Mon compte</a>
+               class="w-24 lg:w-48 h-12 rounded-2xl flex items-center justify-center lg:justify-start text-center lg:text-left px-2 lg:px-4 text-[13px] lg:text-[15px] font-bold leading-tight no-underline {{ request()->routeIs('mon-compte') ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">Mon compte</a>
             <form method="POST" action="{{ route('deconnexion') }}">
                 @csrf
-                <button type="submit" class="w-20 h-12 rounded-2xl text-[12px] font-bold text-rail hover:text-white hover:bg-nuit-clair">
+                <button type="submit" class="w-24 lg:w-48 h-12 rounded-2xl flex items-center justify-center lg:justify-start lg:px-4 text-[13px] lg:text-[15px] font-bold text-rail hover:text-white hover:bg-nuit-clair">
                     Quitter
                 </button>
             </form>
