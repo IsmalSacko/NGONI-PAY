@@ -51,6 +51,16 @@ Artisan::command('ecaisse:bilan-du-soir', function () {
 
 \Illuminate\Support\Facades\Schedule::command('ecaisse:bilan-du-soir')->dailyAt('20:00')->withoutOverlapping();
 
+// Bilan du mois précédent, le 1er à 8 h : PDF par e-mail et notification.
+Artisan::command('ecaisse:bilan-mensuel', function () {
+    $n = app(\App\Services\BilanMensuel::class)->envoyer(today());
+    if ($n > 0) {
+        $this->info("Bilan mensuel envoyé pour {$n} boutique(s).");
+    }
+})->purpose('Envoie le bilan du mois précédent aux propriétaires');
+
+\Illuminate\Support\Facades\Schedule::command('ecaisse:bilan-mensuel')->monthlyOn(1, '08:00')->withoutOverlapping();
+
 // Restes de boutiques effacées sans leurs données : aperçu par défaut,
 // effacement (après sauvegarde) seulement avec --confirmer.
 Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde} {--comptes-seulement : Seulement les restes de comptes effacés, pas les boutiques}', function () {

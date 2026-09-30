@@ -104,6 +104,17 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
     Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');
+    // Bilan d'un mois en PDF (?mois=AAAA-MM, le mois précédent par défaut).
+    Route::get('rapports/mensuel', function (\Illuminate\Http\Request $request, \App\Services\BilanMensuel $bilan) {
+        $data = $request->validate(['mois' => ['nullable', 'date_format:Y-m']], ['mois.date_format' => 'Indiquez le mois au format AAAA-MM.']);
+        $mois = isset($data['mois']) ? \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $data['mois'].'-01') : today()->subMonthNoOverflow();
+        $boutique = \App\Models\Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+
+        return response($bilan->pdf($boutique, $mois), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$bilan->nomFichier($boutique, $mois).'"',
+        ]);
+    })->middleware('permission:rapports.view');
     Route::get('statistiques', \App\Http\Controllers\Api\StatistiqueController::class)->middleware('permission:rapports.view');
     Route::get('journee', [ClotureController::class, 'journee']);
     Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
