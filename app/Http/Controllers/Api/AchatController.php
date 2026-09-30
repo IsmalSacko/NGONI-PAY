@@ -8,10 +8,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Achat;
 use App\Models\Fournisseur;
 use App\Services\AchatService;
+use App\Support\Money\Montant;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /** Fournisseurs, réceptions de marchandise et paiements (gérant, admin). */
 class AchatController extends Controller
@@ -37,6 +39,34 @@ class AchatController extends Controller
         ]);
 
         return response()->json(Fournisseur::create($data), 201);
+    }
+
+    public function modifierFournisseur(Request $request, Fournisseur $fournisseur): JsonResponse
+    {
+        $data = $request->validate([
+            'nom' => ['required', 'string', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:30'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+        $fournisseur->update($data);
+
+        return response()->json($fournisseur->fresh());
+    }
+
+    /**
+     * Retiré de la liste ; ses achats passés restent dans l'historique. Tant que
+     * la boutique lui doit de l'argent, il reste : la dette disparaîtrait avec lui.
+     */
+    public function supprimerFournisseur(Fournisseur $fournisseur): JsonResponse
+    {
+        if (($du = $fournisseur->soldeDu()) > 0) {
+            throw ValidationException::withMessages([
+                'fournisseur' => ['Vous lui devez encore '.Montant::format($du).' : réglez-le avant de le retirer.'],
+            ]);
+        }
+        $fournisseur->delete();
+
+        return response()->json(['message' => 'Fournisseur retiré.']);
     }
 
     public function index(): JsonResponse

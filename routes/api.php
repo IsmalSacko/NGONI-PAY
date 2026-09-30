@@ -14,10 +14,22 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaysController;
+use App\Http\Controllers\Api\PlateformeController;
 use App\Http\Controllers\Api\ProduitController;
+use App\Http\Controllers\Api\ProfilController;
+use App\Http\Controllers\Api\PublicationPlayController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\SessionCaisseController;
+use App\Http\Controllers\Api\StatistiqueController;
 use App\Http\Controllers\Api\VenteController;
+use App\Models\Boutique;
+use App\Services\BilanMensuel;
+use App\Services\CommandeFournisseur;
+use App\Services\Parrainage;
+use App\Support\Tenancy\TenantContext;
+use App\Support\VersionApplication;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 
 Route::get('pays', [PaysController::class, 'index']);
@@ -26,12 +38,12 @@ Route::get('pays', [PaysController::class, 'index']);
 // ce qui annonce aux applications Ngoni Pay 1.x qu'elles doivent se mettre à
 // jour (et devenir e-caisse) après la bascule.
 Route::get('app-version', fn () => response()->json([
-    'latest_version' => \App\Support\VersionApplication::derniere(),
+    'latest_version' => VersionApplication::derniere(),
     'store_url' => config('mobile.store_url'),
     'minimum_version' => config('mobile.minimum_version'),
 ]));
 // Version publiée sur le Play Store, signalée par la CI (jeton secret) : annonce automatique.
-Route::post('publication-play', \App\Http\Controllers\Api\PublicationPlayController::class)->middleware('throttle:10,1');
+Route::post('publication-play', PublicationPlayController::class)->middleware('throttle:10,1');
 
 // Catalogue public des plans : l'écran d'abonnement s'affiche même abonnement expiré.
 Route::get('plans', [AbonnementController::class, 'plans']);
@@ -43,7 +55,7 @@ Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiser
 
 // Console de l'exploitant dans l'application : hors du contexte d'une
 // boutique (pas de « tenant »), elle voit tous les comptes.
-Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->controller(\App\Http\Controllers\Api\PlateformeController::class)->group(function (): void {
+Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->controller(PlateformeController::class)->group(function (): void {
     Route::get('tableau', 'tableau');
     Route::get('activite', 'activite');
     Route::get('demandes', 'demandes');
@@ -71,9 +83,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
     // Son propre compte, pour tout membre : profil et mot de passe (jamais le rôle).
-    Route::put('moi', [\App\Http\Controllers\Api\ProfilController::class, 'update']);
-    Route::put('moi/preferences', [\App\Http\Controllers\Api\ProfilController::class, 'preferences']);
-    Route::put('moi/mot-de-passe', [\App\Http\Controllers\Api\ProfilController::class, 'motDePasse'])->middleware('throttle:10,1');
+    Route::put('moi', [ProfilController::class, 'update']);
+    Route::put('moi/preferences', [ProfilController::class, 'preferences']);
+    Route::put('moi/mot-de-passe', [ProfilController::class, 'motDePasse'])->middleware('throttle:10,1');
 
     Route::post('appareils', [AppareilController::class, 'store']);
     Route::get('notifications', [NotificationController::class, 'index']);
@@ -99,23 +111,23 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('abonnement/demandes', [AbonnementController::class, 'demander'])->middleware('permission:abonnement.manage');
     Route::delete('abonnement/demandes/{demande}', [AbonnementController::class, 'annuler'])->middleware('permission:abonnement.manage');
     // Code du propriétaire, ses filleuls et ce qu'ils lui ont rapporté.
-    Route::get('parrainage', fn (\Illuminate\Http\Request $request) => response()->json(['data' => app(\App\Services\Parrainage::class)->resume($request->user())]))
+    Route::get('parrainage', fn (Request $request) => response()->json(['data' => app(Parrainage::class)->resume($request->user())]))
         ->middleware('permission:abonnement.manage');
 
     Route::get('dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view');
     Route::get('rapports', RapportController::class)->middleware('permission:rapports.view');
     // Bilan d'un mois en PDF (?mois=AAAA-MM, le mois précédent par défaut).
-    Route::get('rapports/mensuel', function (\Illuminate\Http\Request $request, \App\Services\BilanMensuel $bilan) {
+    Route::get('rapports/mensuel', function (Request $request, BilanMensuel $bilan) {
         $data = $request->validate(['mois' => ['nullable', 'date_format:Y-m']], ['mois.date_format' => 'Indiquez le mois au format AAAA-MM.']);
-        $mois = isset($data['mois']) ? \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $data['mois'].'-01') : today()->subMonthNoOverflow();
-        $boutique = \App\Models\Boutique::findOrFail(app(\App\Support\Tenancy\TenantContext::class)->boutiqueId());
+        $mois = isset($data['mois']) ? Carbon::createFromFormat('Y-m-d', $data['mois'].'-01') : today()->subMonthNoOverflow();
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
 
         return response($bilan->pdf($boutique, $mois), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$bilan->nomFichier($boutique, $mois).'"',
         ]);
     })->middleware('permission:rapports.view');
-    Route::get('statistiques', \App\Http\Controllers\Api\StatistiqueController::class)->middleware('permission:rapports.view');
+    Route::get('statistiques', StatistiqueController::class)->middleware('permission:rapports.view');
     Route::get('journee', [ClotureController::class, 'journee']);
     Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
     Route::post('clotures', [ClotureController::class, 'store'])->middleware('permission:rapports.view');
@@ -127,7 +139,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('produits', [ProduitController::class, 'index'])->middleware('permission:produits.view');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
-    Route::get('stocks/a-commander', fn (\App\Services\CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
+    Route::get('stocks/a-commander', fn (CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
         ->middleware('permission:achats.create');
     Route::post('produits', [ProduitController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('produits/{produit}', [ProduitController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
@@ -150,6 +162,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::get('fournisseurs', [AchatController::class, 'fournisseurs'])->middleware('permission:achats.view');
     Route::post('fournisseurs', [AchatController::class, 'creerFournisseur'])->middleware(['permission:achats.create', 'abonnement']);
+    Route::put('fournisseurs/{fournisseur}', [AchatController::class, 'modifierFournisseur'])->middleware('permission:achats.create');
+    Route::delete('fournisseurs/{fournisseur}', [AchatController::class, 'supprimerFournisseur'])->middleware('permission:achats.create');
     Route::post('fournisseurs/{fournisseur}/paiements', [AchatController::class, 'payer'])->middleware(['permission:achats.create', 'abonnement']);
     Route::get('achats', [AchatController::class, 'index'])->middleware('permission:achats.view');
     Route::post('achats', [AchatController::class, 'store'])->middleware(['permission:achats.create', 'abonnement']);

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Achats\Index;
 use App\Models\Boutique;
+use App\Models\Fournisseur;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -70,6 +73,44 @@ class AchatsTest extends TestCase
             ->assertCreated()->assertJsonPath('solde_du', 0);
     }
 
+    public function test_un_fournisseur_se_modifie_et_se_retire_une_fois_regle(): void
+    {
+        $id = $this->api($this->admin)->postJson('/api/fournisseurs', ['nom' => 'Grosiste', 'telephone' => '76001122'])->json('id');
+
+        $this->api($this->admin)->putJson("/api/fournisseurs/{$id}", ['nom' => 'Grossiste Diallo', 'telephone' => '+22376001133'])
+            ->assertOk()->assertJsonPath('nom', 'Grossiste Diallo')->assertJsonPath('telephone', '+22376001133');
+        $this->api($this->admin)->putJson("/api/fournisseurs/{$id}", ['nom' => ''])->assertJsonValidationErrors('nom');
+        $this->api($this->caissier)->putJson("/api/fournisseurs/{$id}", ['nom' => 'X'])->assertForbidden();
+        $this->api($this->caissier)->deleteJson("/api/fournisseurs/{$id}")->assertForbidden();
+
+        // Une dette en cours : il reste.
+        $this->api($this->admin)->postJson('/api/achats', [
+            'fournisseur_id' => $id, 'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 2, 'prix_achat' => 4000]],
+        ])->assertCreated();
+        $this->api($this->admin)->deleteJson("/api/fournisseurs/{$id}")
+            ->assertUnprocessable()->assertJsonValidationErrors('fournisseur');
+        $this->assertStringContainsString('8 000', $this->api($this->admin)->deleteJson("/api/fournisseurs/{$id}")->json('errors.fournisseur.0'));
+
+        // Réglée : il sort de la liste, son achat reste dans l'historique.
+        $this->api($this->admin)->postJson("/api/fournisseurs/{$id}/paiements", ['montant' => 8000, 'moyen_paiement' => 'especes'])->assertCreated();
+        $this->api($this->admin)->deleteJson("/api/fournisseurs/{$id}")->assertOk();
+        $this->api($this->admin)->getJson('/api/fournisseurs')->assertJsonCount(0, 'data');
+        $this->api($this->admin)->getJson('/api/achats')->assertJsonCount(1, 'data');
+        $this->assertSoftDeleted('fournisseurs', ['id' => $id]);
+    }
+
+    public function test_le_fournisseur_d_une_autre_boutique_est_introuvable(): void
+    {
+        ['user' => $autre] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Autre', 'pays' => 'ML', 'telephone' => '76008299', 'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Bina',
+        ]);
+        $id = $this->api($this->admin)->postJson('/api/fournisseurs', ['nom' => 'Grossiste'])->json('id');
+
+        $this->api($autre)->putJson("/api/fournisseurs/{$id}", ['nom' => 'Piraté'])->assertNotFound();
+        $this->api($autre)->deleteJson("/api/fournisseurs/{$id}")->assertNotFound();
+        $this->api($this->admin)->getJson('/api/fournisseurs')->assertJsonPath('data.0.nom', 'Grossiste');
+    }
+
     public function test_regles_et_droits(): void
     {
         // Un reste à payer sans fournisseur : impossible à suivre.
@@ -92,7 +133,7 @@ class AchatsTest extends TestCase
         app(TenantContext::class)->setBoutique($this->boutique->id);
         app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutique->id);
 
-        $c = \Livewire\Livewire::test(\App\Livewire\Achats\Index::class)
+        $c = Livewire::test(Index::class)
             ->call('nouvelleReception')
             ->set('fournisseurOuvert', true)->set('nomFournisseur', 'Grossiste')->call('creerFournisseur')
             ->set('lignes.0.produit_id', $this->riz->id)
@@ -105,7 +146,7 @@ class AchatsTest extends TestCase
         $this->assertSame(13, $this->riz->fresh()->stock);
         $this->assertSame(4100, $this->riz->fresh()->prix_achat);
 
-        $f = \App\Models\Fournisseur::firstOrFail();
+        $f = Fournisseur::firstOrFail();
         $c->call('ouvrirPaiement', $f->id)->assertSet('paiementMontant', '40000')->call('payer')->assertHasNoErrors();
         $this->assertSame(0, $f->soldeDu());
 
