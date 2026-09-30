@@ -1,7 +1,13 @@
 <?php
 
+use App\Services\BilanDuSoir;
+use App\Services\BilanMensuel;
+use App\Services\DiffusionAnnonces;
+use App\Services\NettoyageOrphelins;
+use App\Services\RappelFinEssai;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -9,22 +15,22 @@ Artisan::command('inspire', function () {
 
 // Annonces programmées de la console (campagnes, rappels) : chaque minute.
 Artisan::command('ecaisse:diffuser-annonces', function () {
-    $n = app(\App\Services\DiffusionAnnonces::class)->diffuserLesEcheances();
+    $n = app(DiffusionAnnonces::class)->diffuserLesEcheances();
     if ($n > 0) {
         $this->info("{$n} annonce(s) diffusée(s).");
     }
 })->purpose('Diffuse les annonces programmées arrivées à échéance');
 
-\Illuminate\Support\Facades\Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlapping();
+Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlapping();
 
 // Nouvelle version de l'application (MOBILE_LATEST_VERSION changée) : annoncée
 // d'elle-même à tous les comptes, une seule fois par version.
-\Illuminate\Support\Facades\Schedule::command('ecaisse:annoncer-mise-a-jour')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('ecaisse:annoncer-mise-a-jour')->everyFiveMinutes()->withoutOverlapping();
 
 // Fin d'essai dans deux jours : le propriétaire est prévenu (application,
 // push, e-mail), une fois par échéance. Neuf heures à Bamako (UTC).
 Artisan::command('ecaisse:rappeler-fin-essai {--simulation : Liste qui serait prévenu, sans rien envoyer}', function () {
-    $rappel = app(\App\Services\RappelFinEssai::class);
+    $rappel = app(RappelFinEssai::class);
     if ($this->option('simulation')) {
         foreach ($rappel->aPrevenir()->get() as $a) {
             $this->line("• {$a->proprietaire->name} — essai jusqu'au {$a->fin->format('d/m/Y')}");
@@ -38,33 +44,34 @@ Artisan::command('ecaisse:rappeler-fin-essai {--simulation : Liste qui serait pr
     }
 })->purpose('Prévient les propriétaires deux jours avant la fin de leur essai');
 
-\Illuminate\Support\Facades\Schedule::command('ecaisse:rappeler-fin-essai')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('ecaisse:rappeler-fin-essai')->dailyAt('09:00')->withoutOverlapping();
 
 // Bilan du soir : ventes et encaissements de la journée, poussés au
 // propriétaire. Vingt heures à Bamako (UTC) : la boutique ferme, il regarde.
 Artisan::command('ecaisse:bilan-du-soir', function () {
-    $n = app(\App\Services\BilanDuSoir::class)->envoyer(today());
+    $n = app(BilanDuSoir::class)->envoyer(now());
     if ($n > 0) {
         $this->info("Bilan du soir envoyé à {$n} propriétaire(s).");
     }
 })->purpose('Envoie le bilan de la journée aux propriétaires');
 
-\Illuminate\Support\Facades\Schedule::command('ecaisse:bilan-du-soir')->dailyAt('20:00')->withoutOverlapping();
+// Chaque heure : le bilan part à 20 h à l'heure du pays de chaque propriétaire.
+Schedule::command('ecaisse:bilan-du-soir')->hourly()->withoutOverlapping();
 
 // Bilan du mois précédent, le 1er à 8 h : PDF par e-mail et notification.
 Artisan::command('ecaisse:bilan-mensuel', function () {
-    $n = app(\App\Services\BilanMensuel::class)->envoyer(today());
+    $n = app(BilanMensuel::class)->envoyer(today());
     if ($n > 0) {
         $this->info("Bilan mensuel envoyé pour {$n} boutique(s).");
     }
 })->purpose('Envoie le bilan du mois précédent aux propriétaires');
 
-\Illuminate\Support\Facades\Schedule::command('ecaisse:bilan-mensuel')->monthlyOn(1, '08:00')->withoutOverlapping();
+Schedule::command('ecaisse:bilan-mensuel')->monthlyOn(1, '08:00')->withoutOverlapping();
 
 // Restes de boutiques effacées sans leurs données : aperçu par défaut,
 // effacement (après sauvegarde) seulement avec --confirmer.
 Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, après sauvegarde} {--comptes-seulement : Seulement les restes de comptes effacés, pas les boutiques}', function () {
-    $nettoyage = app(\App\Services\NettoyageOrphelins::class);
+    $nettoyage = app(NettoyageOrphelins::class);
     $apercu = $nettoyage->apercu();
     $comptes = $nettoyage->restesDeComptes();
     if ($apercu === [] && $comptes === []) {

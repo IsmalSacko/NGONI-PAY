@@ -13,6 +13,7 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -33,6 +34,8 @@ class BilanDuSoirTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
+        // 20 h à Bamako (UTC) : l'heure du bilan pour une boutique du Mali.
+        $this->travelTo(Carbon::parse('2026-09-30 20:00:00', 'UTC'));
         ['user' => $this->awa, 'boutique' => $this->boutique] = app(BoutiqueRegistrationService::class)->register([
             'nom' => 'Pressing Awa', 'pays' => 'ML', 'telephone' => '76008201', 'email' => 'awa@example.com',
             'password' => 'password123', 'nom_utilisateur' => 'Awa',
@@ -103,6 +106,54 @@ class BilanDuSoirTest extends TestCase
 
         $this->assertSame(0, $this->bilans()->count());
         $this->api($this->awa)->getJson('/api/moi')->assertJsonPath('user.bilan_quotidien', false);
+    }
+
+    public function test_le_bilan_part_a_20_h_a_l_heure_du_pays_de_la_boutique(): void
+    {
+        $this->boutique->update(['pays' => 'CM']); // Douala : UTC+1
+        $this->travelTo(Carbon::parse('2026-09-30 10:00:00', 'UTC'));
+        $this->vendre(3000);
+
+        $this->travelTo(Carbon::parse('2026-09-30 20:00:00', 'UTC')); // 21 h à Douala
+        $this->artisan('ecaisse:bilan-du-soir');
+        $this->assertSame(0, $this->bilans()->count(), 'trop tard à Douala : pas à 21 h');
+
+        $this->travelTo(Carbon::parse('2026-09-30 19:00:00', 'UTC')); // 20 h à Douala
+        $this->artisan('ecaisse:bilan-du-soir');
+        $this->assertSame(1, $this->bilans()->count());
+    }
+
+    public function test_en_france_l_heure_d_ete_est_suivie(): void
+    {
+        $this->boutique->update(['pays' => 'FR', 'devise' => 'EUR']); // Paris : UTC+2 fin septembre
+        $this->travelTo(Carbon::parse('2026-09-30 09:00:00', 'UTC'));
+        $this->vendre(3000);
+
+        $this->travelTo(Carbon::parse('2026-09-30 18:00:00', 'UTC'));
+        $this->artisan('ecaisse:bilan-du-soir');
+        $this->assertSame(1, $this->bilans()->count(), '18 h UTC = 20 h à Paris');
+    }
+
+    public function test_rien_en_dehors_de_20_h(): void
+    {
+        $this->vendre(3000);
+        foreach (['12:00', '19:00', '21:00', '23:00'] as $heure) {
+            $this->travelTo(Carbon::parse("2026-09-30 {$heure}:00", 'UTC'));
+            $this->artisan('ecaisse:bilan-du-soir');
+        }
+        $this->assertSame(0, $this->bilans()->count());
+    }
+
+    public function test_le_lendemain_a_20_h_un_nouveau_bilan(): void
+    {
+        $this->vendre(3000);
+        $this->artisan('ecaisse:bilan-du-soir');
+        $this->travelTo(Carbon::parse('2026-10-01 20:00:00', 'UTC'));
+        $this->vendre(5000);
+        $this->artisan('ecaisse:bilan-du-soir');
+
+        $this->assertSame(2, $this->bilans()->count());
+        $this->assertStringContainsString('5 000 F CFA (+67 % par rapport à hier)', $this->bilans()->latest('created_at')->first()->message);
     }
 
     public function test_plusieurs_boutiques_tiennent_dans_un_seul_message(): void
