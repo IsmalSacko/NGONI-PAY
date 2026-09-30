@@ -27,20 +27,31 @@ class CommandeFournisseur
      */
     public function aCommander(): array
     {
-        $produits = Produit::where('actif', true)->whereColumn('stock', '<=', 'seuil_alerte')->orderBy('nom')->get();
-        if ($produits->isEmpty()) {
+        // Articles de la boutique active (portée tenant du modèle) : la table
+        // des lignes, lue sans modèle, n'a pas cette portée.
+        $actifs = Produit::where('actif', true)->orderBy('nom')->get();
+        if ($actifs->isEmpty()) {
             return [];
         }
-        $ids = $produits->pluck('id')->all();
 
         $vendus = DB::table('lignes_vente as lv')
             ->join('ventes as v', 'v.id', '=', 'lv.vente_id')
-            ->whereIn('lv.produit_id', $ids)
+            ->whereIn('lv.produit_id', $actifs->pluck('id'))
             ->where('v.statut', 'validee')
             ->where('v.jour_affaire', '>=', today()->subDays(self::JOURS_COUVERTS - 1)->toDateString())
             ->groupBy('lv.produit_id')
             ->selectRaw('lv.produit_id, SUM(lv.quantite) as vendus')
             ->pluck('vendus', 'produit_id');
+
+        // Au seuil d'alerte, ou à moins d'une semaine de stock au rythme récent
+        // (les « À racheter » du pilotage) : la même liste des deux côtés.
+        $produits = $actifs
+            ->filter(fn (Produit $p) => $p->stock <= $p->seuil_alerte || $this->manqueSousPeu($p, (int) ($vendus[$p->id] ?? 0)))
+            ->values();
+        if ($produits->isEmpty()) {
+            return [];
+        }
+        $ids = $produits->pluck('id')->all();
 
         // Fournisseur du dernier achat de chaque article.
         $derniers = DB::table('lignes_achat as la')
@@ -76,5 +87,15 @@ class CommandeFournisseur
         uasort($groupes, fn ($a, $b) => [$a['fournisseur'] === null, $a['fournisseur']['nom'] ?? ''] <=> [$b['fournisseur'] === null, $b['fournisseur']['nom'] ?? '']);
 
         return array_values($groupes);
+    }
+
+    /** Moins de `Statistiques::JOURS_COUVERTURE_MIN` jours de stock au rythme des trente derniers. */
+    private function manqueSousPeu(Produit $p, int $vendus): bool
+    {
+        if ($vendus === 0 || $p->stock <= 0) {
+            return false;
+        }
+
+        return floor($p->stock / ($vendus / Statistiques::JOURS_VITESSE)) < Statistiques::JOURS_COUVERTURE_MIN;
     }
 }

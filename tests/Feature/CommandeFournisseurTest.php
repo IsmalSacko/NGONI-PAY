@@ -82,6 +82,25 @@ class CommandeFournisseurTest extends TestCase
         $this->assertSame($sucre->id, $groupes[1]['articles'][0]['produit_id']);
     }
 
+    public function test_un_article_a_moins_d_une_semaine_de_stock_est_propose_comme_dans_le_pilotage(): void
+    {
+        // Seuil de 2, mais 50 vendus en un mois : les 10 restants tiennent 6 jours.
+        $huile = Produit::create(['nom' => 'Huile 1 L', 'prix_vente' => 1500, 'taux_tva' => 0, 'stock' => 60, 'seuil_alerte' => 2]);
+        $this->api($this->awa)->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $huile->id, 'quantite' => 50]], 'moyen_paiement' => 'especes',
+        ])->assertCreated();
+
+        $groupes = $this->api($this->awa)->getJson('/api/stocks/a-commander')->assertOk()->json('data');
+
+        $this->assertSame($huile->id, $groupes[0]['articles'][0]['produit_id']);
+        $this->assertSame(40, $groupes[0]['articles'][0]['quantite'], 'un mois de ventes (50) − 10 en stock');
+
+        // Le pilotage le range bien dans « À racheter » : les deux listes s'accordent.
+        $jour = now()->toDateString();
+        $aRacheter = $this->api($this->awa)->getJson("/api/statistiques?du={$jour}&au={$jour}")->json('analyse.stock.a_racheter');
+        $this->assertContains($huile->id, array_column($aRacheter, 'produit_id'));
+    }
+
     public function test_rien_a_commander_et_reserve_a_qui_achete(): void
     {
         Produit::create(['nom' => 'Savon', 'prix_vente' => 300, 'taux_tva' => 0, 'stock' => 40, 'seuil_alerte' => 5]);
