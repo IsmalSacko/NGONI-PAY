@@ -81,6 +81,18 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $boutique->fresh()]);
     }
 
+    /** Programme de fidélité : seuil d'achats et remise (seuil null : aucun). */
+    public function fidelite(Request $request, \App\Services\Fidelite $fidelite): JsonResponse
+    {
+        $request->validate(['seuil' => ['present', 'nullable', 'integer'], 'remise_pct' => ['nullable', 'integer']]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+
+        return response()->json(['data' => $fidelite->regler($boutique, [
+            'seuil' => $request->filled('seuil') ? $request->integer('seuil') : null,
+            'remise_pct' => $request->filled('remise_pct') ? $request->integer('remise_pct') : null,
+        ])]);
+    }
+
     /** Logo de la boutique active, imprimé sur les tickets. */
     public function logo(Request $request, \App\Services\Images $images): JsonResponse
     {

@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('boutiques', [BoutiqueController::class, 'store']);
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware('permission:boutique.update');
+    Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware('permission:boutique.update');
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);

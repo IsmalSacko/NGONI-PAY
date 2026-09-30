@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Enums\MoyenPaiement;
 use App\Models\Client;
+use App\Services\Fidelite;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,8 @@ class ClientController extends Controller
         $query = Client::query()
             ->withCount(['ventes as achats' => fn ($q) => $q->valides()])
             ->withSum(['ventes as total_achats' => fn ($q) => $q->valides()], 'total')
-            ->avecSoldeDu();
+            ->avecSoldeDu()
+            ->addSelect(Fidelite::colonneAchats());
 
         if ($request->filled('recherche')) {
             $terme = '%'.$request->string('recherche').'%';

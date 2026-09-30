@@ -123,7 +123,14 @@ class VenteService
                 ];
             }
 
-            $remise = min($data['remise'] ?? 0, $sousTotal);
+            // Fidélité : remise calculée ici, au pourcentage de la boutique.
+            // Sans programme (retiré entre-temps), la remise saisie reste.
+            $programme = ($data['remise_fidelite'] ?? false) && ! empty($data['client_id'])
+                ? app(Fidelite::class)->programme(Boutique::findOrFail($boutiqueId))
+                : null;
+            $remise = $programme !== null
+                ? app(Fidelite::class)->remise($sousTotal, $programme['remise_pct'])
+                : min($data['remise'] ?? 0, $sousTotal);
             $total = $sousTotal - $remise;
 
             $moyenPaiement = MoyenPaiement::from($data['moyen_paiement']);
@@ -166,6 +173,7 @@ class VenteService
                 'monnaie_rendue' => $montantRecu !== null ? $montantRecu - $total : null,
                 'statut' => 'validee',
                 'vendue_hors_ligne' => $data['vendue_hors_ligne'] ?? false,
+                'remise_fidelite' => $programme !== null,
                 'synchronisee_le' => now(),
             ]);
 

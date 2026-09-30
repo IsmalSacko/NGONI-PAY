@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
-    'jour_affaire', 'numero_jour',
+    'jour_affaire', 'numero_jour', 'remise_fidelite',
 ])]
 class Vente extends Model
 {
@@ -46,6 +46,7 @@ class Vente extends Model
         return [
             'moyen_paiement' => MoyenPaiement::class,
             'vendue_hors_ligne' => 'boolean',
+            'remise_fidelite' => 'boolean',
             'synchronisee_le' => 'datetime',
             'annulee_le' => 'datetime',
             'jour_affaire' => 'date:Y-m-d',

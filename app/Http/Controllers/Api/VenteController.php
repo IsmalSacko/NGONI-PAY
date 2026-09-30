@@ -60,7 +60,13 @@ class VenteController extends Controller
             'moyen_paiement' => ['required', Rule::enum(MoyenPaiement::class)],
             'montant_recu' => ['nullable', 'integer', 'min:0'],
             'vendue_hors_ligne' => ['nullable', 'boolean'],
+            // Remise de fidélité demandée : le serveur la calcule lui-même.
+            'remise_fidelite' => ['nullable', 'boolean'],
         ]);
+
+        if (($data['remise_fidelite'] ?? false) && empty($data['client_id'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['client_id' => ['La remise de fidélité va à un client : choisissez-le.']]);
+        }
 
         // À crédit : on doit savoir qui doit.
         if (($data['moyen_paiement'] ?? null) === MoyenPaiement::CreditClient->value && empty($data['client_id'])) {
