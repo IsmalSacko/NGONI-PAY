@@ -113,6 +113,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::delete('categories/{categorie}', [CategorieProduitController::class, 'destroy'])->middleware(['permission:categories.delete', 'abonnement']);
 
     Route::get('produits', [ProduitController::class, 'index'])->middleware('permission:produits.view');
+    // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
+    Route::get('stocks/a-commander', fn (\App\Services\CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
+        ->middleware('permission:achats.create');
     Route::post('produits', [ProduitController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('produits/{produit}', [ProduitController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
     Route::post('produits/{produit}/ajuster-stock', [ProduitController::class, 'ajusterStock'])->middleware(['permission:stocks.update', 'abonnement']);
