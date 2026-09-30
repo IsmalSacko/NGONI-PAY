@@ -30,7 +30,7 @@
             <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto flex flex-col gap-3">
                 <div class="flex justify-between items-baseline">
                     <h2 class="font-display font-extrabold text-xl">Ticket n° {{ $detail->numeroFormate() }}@if ($detail->numero_jour) <span class="text-[--color-muted] text-base">· n° {{ $detail->numero_jour }} du jour</span>@endif</h2>
-                    <span class="text-xs text-[--color-muted]">{{ $detail->created_at->format('d/m/Y H:i') }}</span>
+                    <span class="text-xs text-[--color-muted]">{{ \App\Support\Fuseau::heure($detail->created_at) }}</span>
                 </div>
                 <div class="text-sm text-[--color-muted]">
                     {{ $detail->caissier->name }} @if($detail->client) · {{ $detail->client->nom }} @endif
@@ -62,7 +62,7 @@
 
                 @if ($detail->estAnnulee())
                     <div class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm">
-                        <strong>Vente annulée</strong> le {{ $detail->annulee_le?->format('d/m/Y à H:i') }}@if ($detail->annule_par_nom) par {{ $detail->annule_par_nom }}@endif.
+                        <strong>Vente annulée</strong> le {{ \App\Support\Fuseau::heure($detail->annulee_le, 'd/m/Y à H:i') }}@if ($detail->annule_par_nom) par {{ $detail->annule_par_nom }}@endif.
                         @if ($detail->motif_annulation)<br>Motif : {{ $detail->motif_annulation }}@endif
                     </div>
                 @elseif (auth()->user()->can('ventes.delete'))

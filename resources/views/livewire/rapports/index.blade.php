@@ -115,7 +115,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-[--color-border] pt-3 text-sm">
                 <button wire:click="$set('du', '{{ $z->jour_affaire->toDateString() }}'); $set('au', '{{ $z->jour_affaire->toDateString() }}')" class="text-left">
                     <strong>Z n° {{ $z->numero }}</strong> · {{ $z->jour_affaire->format('d/m/Y') }}
-                    <span class="text-[--color-muted]">· clôturée le {{ $z->created_at->format('d/m/Y à H:i') }} par {{ $z->auteur?->name }}</span>
+                    <span class="text-[--color-muted]">· clôturée le {{ \App\Support\Fuseau::heure($z->created_at, 'd/m/Y à H:i') }} par {{ $z->auteur?->name }}</span>
                 </button>
                 <span class="flex items-center gap-3">
                     <strong>{{ $m($z->totaux['ventes']['total'] ?? 0) }} {{ $devise }}</strong>

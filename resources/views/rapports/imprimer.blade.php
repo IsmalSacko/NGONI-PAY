@@ -20,12 +20,12 @@
 <body>
     <div class="actions"><button onclick="window.print()">Imprimer ou enregistrer en PDF</button></div>
     <h1>{{ $boutique->nom }} — @if ($z) Clôture Z n° {{ $z->numero }} @else Rapport d’activité @endif</h1>
-    @if ($z)<p class="muted">Journée clôturée le {{ $z->created_at->format('d/m/Y à H:i') }} par {{ $z->auteur?->name }}</p>@endif
+    @if ($z)<p class="muted">Journée clôturée le {{ \App\Support\Fuseau::heure($z->created_at, 'd/m/Y à H:i', $boutique->pays) }} par {{ $z->auteur?->name }}</p>@endif
     <p class="muted">
         Du {{ \Illuminate\Support\Carbon::parse($r['du'])->format('d/m/Y') }} au {{ \Illuminate\Support\Carbon::parse($r['au'])->format('d/m/Y') }}
         @if ($boutique->identifiant_fiscal) · NIF {{ $boutique->identifiant_fiscal }} @endif
         @if ($boutique->rccm) · RCCM {{ $boutique->rccm }} @endif
-        · édité le {{ now()->format('d/m/Y à H:i') }} · montants en {{ $boutique->devise }}
+        · édité le {{ \App\Support\Fuseau::heure(now(), 'd/m/Y à H:i', $boutique->pays) }} · montants en {{ $boutique->devise }}
     </p>
     <div class="kpi">
         <div>Chiffre d’affaires<b>{{ $m($r['ventes']['total']) }}</b></div>

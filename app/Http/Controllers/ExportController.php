@@ -10,6 +10,7 @@ use App\Models\Cloture;
 use App\Models\Produit;
 use App\Models\Vente;
 use App\Services\Rapports;
+use App\Support\Fuseau;
 use App\Support\Money\Montant;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
@@ -29,19 +30,23 @@ class ExportController extends Controller
     {
         [$du, $au] = $this->periode($request);
         $devise = $this->boutique()->devise;
+        // Du 1er au 30 à l'heure de la boutique : les dates enregistrées sont en UTC.
+        $fuseau = Fuseau::pourPays($this->boutique()->pays);
+        $debut = Carbon::parse($du->toDateString(), $fuseau)->startOfDay()->utc();
+        $fin = Carbon::parse($au->toDateString(), $fuseau)->endOfDay()->utc();
 
         return $this->csv("ventes-{$du->toDateString()}-{$au->toDateString()}", [
             'Date', 'Heure', 'N° facture', 'Statut', 'Caissier', 'Client', 'Paiement',
             'Article', 'Quantité', 'Prix unitaire', 'Total ligne', 'Remise (vente)', 'Total vente', 'Devise',
-        ], function ($ecrire) use ($du, $au, $devise): void {
+        ], function ($ecrire) use ($debut, $fin, $devise, $fuseau): void {
             Vente::with(['lignes', 'caissier:id,name', 'client:id,nom'])
-                ->whereBetween('created_at', [$du->copy()->startOfDay(), $au->copy()->endOfDay()])
+                ->whereBetween('created_at', [$debut, $fin])
                 ->orderBy('created_at')
-                ->chunk(200, function ($ventes) use ($ecrire, $devise): void {
+                ->chunk(200, function ($ventes) use ($ecrire, $devise, $fuseau): void {
                     foreach ($ventes as $v) {
                         foreach ($v->lignes as $i => $l) {
                             $ecrire([
-                                $v->created_at->format('d/m/Y'), $v->created_at->format('H:i'), $v->numero_facture,
+                                $v->created_at->copy()->setTimezone($fuseau)->format('d/m/Y'), $v->created_at->copy()->setTimezone($fuseau)->format('H:i'), $v->numero_facture,
                                 $v->estAnnulee() ? 'Annulée' : 'Validée', $v->caissier?->name, $v->client?->nom,
                                 $v->moyen_paiement->label(), $l->nom_produit, $l->quantite,
                                 $this->nombre($l->prix_unitaire, $devise), $this->nombre($l->total_ligne, $devise),

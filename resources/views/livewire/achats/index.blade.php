@@ -40,7 +40,7 @@
             <h2 class="font-bold mb-3">Dernières réceptions</h2>
             @forelse ($achats as $a)
                 <div class="py-2 border-b border-separateur text-sm" wire:key="a-{{ $a->id }}">
-                    <div class="flex justify-between"><span class="font-semibold">{{ $a->created_at->format('d/m/Y H:i') }} · {{ $a->fournisseur?->nom ?? 'Sans fournisseur' }} @if ($a->reference) · {{ $a->reference }} @endif</span><span class="font-bold">{{ $m($a->total) }}</span></div>
+                    <div class="flex justify-between"><span class="font-semibold">{{ \App\Support\Fuseau::heure($a->created_at) }} · {{ $a->fournisseur?->nom ?? 'Sans fournisseur' }} @if ($a->reference) · {{ $a->reference }} @endif</span><span class="font-bold">{{ $m($a->total) }}</span></div>
                     <div class="text-xs text-[--color-muted]">{{ $a->lignes->map(fn ($l) => $l->nom_produit.' × '.$l->quantite)->join(', ') }}</div>
                 </div>
             @empty

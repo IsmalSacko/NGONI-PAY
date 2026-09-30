@@ -76,7 +76,7 @@
             @endforeach
         </table>
 
-        <p class="pied">Édité le {{ now()->format('d/m/Y à H:i') }} par Ngoni Caisse · ngonipay.ismael-dev.com</p>
+        <p class="pied">Édité le {{ \App\Support\Fuseau::heure(now(), 'd/m/Y à H:i', $boutique->pays) }} par Ngoni Caisse · ngonipay.ismael-dev.com</p>
     </div>
 </body>
 </html>

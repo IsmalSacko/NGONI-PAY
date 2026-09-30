@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Livewire\Concerns\EstScopeParBoutique;
+use App\Models\Boutique;
 use App\Models\LigneVente;
 use App\Models\Produit;
 use App\Models\Vente;
+use App\Services\Journee;
+use App\Support\Fuseau;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -18,16 +21,16 @@ class Dashboard extends Component
 
     public function render()
     {
-        $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
+        $boutique = Boutique::find($this->boutiqueActiveId());
         // Journée d'affaires en cours, comme le rapport et le ticket Z.
-        $ventesJour = Vente::valides()->where('jour_affaire', app(\App\Services\Journee::class)->courante()->toDateString())->get();
+        $ventesJour = Vente::valides()->where('jour_affaire', app(Journee::class)->courante()->toDateString())->get();
 
         $total = (int) $ventesJour->sum('total');
         $tickets = $ventesJour->count();
         $tva = (int) $ventesJour->sum('tva');
         $panierMoyen = $tickets > 0 ? (int) round($total / $tickets) : 0;
 
-        $parHeure = $ventesJour->groupBy(fn (Vente $v) => $v->created_at->format('H'))
+        $parHeure = $ventesJour->groupBy(fn (Vente $v) => Fuseau::heure($v->created_at, 'H', $boutique?->pays))
             ->map(fn ($groupe) => (int) $groupe->sum('total'));
         $ventesParHeure = collect(range(6, 22))->map(fn (int $h) => [
             'heure' => $h,
