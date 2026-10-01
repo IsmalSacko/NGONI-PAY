@@ -18,6 +18,7 @@ use App\Services\ComptesPlateforme;
 use App\Services\GestionAnnonces;
 use App\Services\Parrainage;
 use App\Services\Plateforme\Activite;
+use App\Services\ReinitialisationBoutique;
 use App\Services\SuppressionCompte;
 use App\Support\Periode;
 use App\Support\WhatsApp;
@@ -178,7 +179,7 @@ class PlateformeController extends Controller
 
     public function utilisateurs(Request $request): JsonResponse
     {
-        
+
         $users = User::query()
             ->select('users.*')
             ->addSelect([
@@ -230,6 +231,30 @@ class PlateformeController extends Controller
         $resultat = $suppression->supprimer($user, $request->user());
 
         return response()->json([...$resultat, 'message' => "Compte de {$user->name} supprimé, avec {$resultat['boutiques']} boutique(s) et {$resultat['comptes']} compte(s)."]);
+    }
+
+    /** Boutiques du compte et ce que leur remise à zéro effacerait (rien n'est touché). */
+    public function apercuReinitialisation(User $user, ReinitialisationBoutique $reinitialisation): JsonResponse
+    {
+        return response()->json($reinitialisation->apercu($user));
+    }
+
+    /** Remise à zéro des données d'essai d'une boutique : il faut taper REINITIALISER. */
+    public function reinitialiserBoutique(string $boutique, Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
+    {
+        $request->validate([
+            'confirmation' => ['required', 'in:REINITIALISER'],
+            'garder_catalogue' => ['boolean'],
+            'garder_fournisseurs' => ['boolean'],
+        ], ['confirmation.in' => 'Tapez REINITIALISER pour confirmer.']);
+        $resultat = $reinitialisation->reinitialiser(
+            $boutique,
+            $request->user(),
+            $request->boolean('garder_catalogue', true),
+            $request->boolean('garder_fournisseurs', true),
+        );
+
+        return response()->json([...$resultat, 'message' => "{$resultat['boutique']} est remise à zéro."]);
     }
 
     /** Historique des annonces, et tout ce qu'il faut pour en écrire une (types, audiences, rythmes). */

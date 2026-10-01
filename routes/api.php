@@ -70,6 +70,8 @@ Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->control
     Route::post('utilisateurs/{user}/mot-de-passe', 'motDePasse');
     Route::get('utilisateurs/{user}/suppression', 'apercuSuppression');
     Route::delete('utilisateurs/{user}', 'supprimerCompte');
+    Route::get('comptes/{user}/reinitialisation', 'apercuReinitialisation');
+    Route::post('boutiques/{boutique}/reinitialiser', 'reinitialiserBoutique');
     Route::get('annonces', 'annonces');
     Route::post('annonces', 'envoyerAnnonce');
     Route::get('annonces/modele/{type}', 'modeleAnnonce');
