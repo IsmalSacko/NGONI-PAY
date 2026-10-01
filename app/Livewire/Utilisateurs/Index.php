@@ -7,17 +7,20 @@ namespace App\Livewire\Utilisateurs;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Boutique;
 use App\Services\EquipeService;
+use App\Support\Authorization\Permissions;
 use App\Support\WhatsApp;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Équipe de la boutique active. Les règles (limites du plan, compte déjà
  * existant, propriétaire intouchable) sont dans {@see EquipeService}, partagé
- * avec l'application.
+ * avec l'application. Le propriétaire ou un admin y coche aussi les droits de
+ * chaque gérant et caissier (Permissions::DROITS).
  */
 #[Layout('layouts.app')]
 class Index extends Component
@@ -34,6 +37,14 @@ class Index extends Component
 
     public string $role = 'caissier';
 
+    /** Droits du nouveau membre, ceux du rôle choisi au départ. */
+    public array $droits = [];
+
+    /** Membre dont on règle les droits, et ses droits cochés. */
+    public ?string $droitsDe = null;
+
+    public array $droitsMembre = [];
+
     public ?string $info = null;
 
     public ?string $alerte = null;
@@ -48,7 +59,40 @@ class Index extends Component
         $this->resetValidation();
         $this->reset(['name', 'telephone', 'password', 'info', 'alerte', 'motDePasseProvisoire', 'lienWhatsApp']);
         $this->role = 'caissier';
+        $this->droits = Permissions::DROITS_PAR_DEFAUT['caissier'];
         $this->modaleOuverte = true;
+    }
+
+    /** Un autre rôle : ses droits par défaut, que l'on peut ensuite ajuster. */
+    public function updatedRole(string $role): void
+    {
+        $this->droits = Permissions::DROITS_PAR_DEFAUT[$role] ?? [];
+    }
+
+    public function ouvrirDroits(EquipeService $equipe, string $userId): void
+    {
+        Auth::user()->can('utilisateurs.update') || abort(403);
+        $this->reset(['info', 'alerte', 'motDePasseProvisoire', 'lienWhatsApp']);
+        $membre = $equipe->membre($this->boutique(), $userId);
+        $this->droitsDe = $membre->id;
+        $this->droitsMembre = $equipe->droitsDans($this->boutique(), $membre);
+    }
+
+    public function enregistrerDroits(EquipeService $equipe): void
+    {
+        Auth::user()->can('utilisateurs.update') || abort(403);
+        $boutique = $this->boutique();
+        $membre = $equipe->membre($boutique, (string) $this->droitsDe);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($boutique->id);
+        $role = $membre->load('roles')->roles->first()?->name ?? 'caissier';
+
+        try {
+            $user = $equipe->changerRole($boutique, Auth::user(), $membre->id, $role, array_values($this->droitsMembre));
+            $this->info = "Droits de {$user->name} enregistrés.";
+            $this->droitsDe = null;
+        } catch (ValidationException $e) {
+            $this->alerte = collect($e->errors())->flatten()->first();
+        }
     }
 
     private function boutique(): Boutique
@@ -69,9 +113,10 @@ class Index extends Component
             'telephone' => ['required', 'string', 'max:30'],
             'password' => ['nullable', 'string', 'min:8'],
             'role' => ['required', Rule::in(EquipeService::ROLES)],
+            'droits.*' => [Rule::in(array_keys(Permissions::DROITS))],
         ]);
 
-        $resultat = $equipe->ajouter($this->boutique(), $this->name, $this->telephone, $this->role, $this->password ?: null);
+        $resultat = $equipe->ajouter($this->boutique(), $this->name, $this->telephone, $this->role, $this->password ?: null, array_values($this->droits));
         $user = $resultat['user'];
 
         $this->modaleOuverte = false;
@@ -141,6 +186,9 @@ class Index extends Component
             'proprietaireId' => $boutique->proprietaire_id,
             'peutGerer' => Auth::user()->can('utilisateurs.update'),
             'peutAjouter' => Auth::user()->can('utilisateurs.create'),
+            'catalogueDroits' => Permissions::DROITS,
+            'droitsParMembre' => $equipe->membres($boutique)->mapWithKeys(fn ($m) => [$m->id => $equipe->droitsDans($boutique, $m)])->all(),
+            'membreDroits' => $this->droitsDe ? $equipe->membres($boutique)->firstWhere('id', $this->droitsDe) : null,
         ]);
     }
 }

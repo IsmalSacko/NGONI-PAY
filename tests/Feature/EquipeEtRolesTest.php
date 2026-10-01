@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\EquipeService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -45,6 +46,8 @@ class EquipeEtRolesTest extends TestCase
         $this->dansLaBoutique();
         $this->gerant = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Gérant', 'phone' => '+22370000001', 'password' => 'password123']);
         $this->gerant->assignRole('gerant');
+        // Comme un gérant ajouté depuis l'équipe : ses droits par défaut.
+        EquipeService::droitsParDefaut($this->gerant, 'gerant');
         $this->caissier = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Caissier', 'phone' => '+22370000002', 'password' => 'password123']);
         $this->caissier->assignRole('caissier');
     }

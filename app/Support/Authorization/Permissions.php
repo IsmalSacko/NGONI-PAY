@@ -28,6 +28,64 @@ use App\Console\Commands\SyncRolePermissions;
 class Permissions
 {
     /**
+     * Droits que le propriétaire (ou un admin) accorde ou retire à chaque
+     * gérant et caissier, en plus de son rôle : le rôle fixe la base, ces
+     * interrupteurs le reste. Un admin a toujours tout.
+     *
+     * @var array<string, array{libelle: string, explication: string, permissions: list<string>}>
+     */
+    public const DROITS = [
+        'chiffre_affaires' => [
+            'libelle' => 'Voir le chiffre d’affaires',
+            'explication' => 'Pilotage, rapports, statistiques, clôture de la journée et les ventes de toute la boutique.',
+            'permissions' => ['dashboard.view', 'rapports.view', 'ventes.view_all'],
+        ],
+        'articles' => [
+            'libelle' => 'Modifier les articles et les prix',
+            'explication' => 'Créer, modifier ou supprimer des articles et des catégories, corriger le stock.',
+            'permissions' => ['produits.create', 'produits.update', 'produits.delete', 'categories.create', 'categories.update', 'categories.delete', 'stocks.update'],
+        ],
+        'annuler_ventes' => [
+            'libelle' => 'Annuler des ventes',
+            'explication' => 'Annuler un ticket ; le stock est remis.',
+            'permissions' => ['ventes.delete'],
+        ],
+        'achats' => [
+            'libelle' => 'Achats et fournisseurs',
+            'explication' => 'Réceptions de marchandise, fournisseurs et ce qu’on leur doit.',
+            'permissions' => ['achats.view', 'achats.create'],
+        ],
+        'backoffice' => [
+            'libelle' => 'Back-office web',
+            'explication' => 'Gérer la boutique depuis un ordinateur.',
+            'permissions' => ['backoffice.access'],
+        ],
+    ];
+
+    /** Ce que chaque rôle reçoit si l'on ne précise rien (à la création, au changement de rôle). */
+    public const DROITS_PAR_DEFAUT = [
+        'gerant' => ['chiffre_affaires', 'articles', 'annuler_ventes', 'achats', 'backoffice'],
+        'caissier' => [],
+    ];
+
+    /**
+     * Permissions d'une liste de droits.
+     *
+     * @param  list<string>  $droits
+     * @return list<string>
+     */
+    public static function permissionsDes(array $droits): array
+    {
+        return array_values(array_unique(array_merge([], ...array_map(fn (string $d) => self::DROITS[$d]['permissions'] ?? [], $droits))));
+    }
+
+    /** @return list<string> Toutes les permissions réglables par droit. */
+    public static function permissionsReglables(): array
+    {
+        return self::permissionsDes(array_keys(self::DROITS));
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public static function catalogue(): array
@@ -81,7 +139,10 @@ class Permissions
             'boutique.update',
             'utilisateurs.create', 'utilisateurs.update', 'utilisateurs.delete',
             'abonnement.manage',
-        ]));
+        ], self::permissionsReglables()));
+        // Le reste (chiffre d'affaires, articles, annulations, achats,
+        // back-office) n'est plus dans le rôle : accordé membre par membre
+        // (DROITS), un gérant de plus dans le rôle aurait tout d'office.
 
         $caissier = [
             'produits.view', 'categories.view', 'stocks.view',

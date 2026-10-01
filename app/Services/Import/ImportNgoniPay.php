@@ -15,6 +15,7 @@ use App\Models\LigneVente;
 use App\Models\User;
 use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\EquipeService;
 use App\Support\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Database\ConnectionInterface;
@@ -171,7 +172,10 @@ class ImportNgoniPay
 
             // Le propriétaire est déjà admin de sa boutique.
             if (! $user->hasRole('admin')) {
-                $user->assignRole(self::ROLES[$m->role] ?? 'caissier');
+                $role = self::ROLES[$m->role] ?? 'caissier';
+                $user->assignRole($role);
+                // Un gérant importé garde ce que son rôle donnait (chiffre d'affaires…).
+                EquipeService::droitsParDefaut($user, $role);
                 $this->compter('membres');
             }
         }

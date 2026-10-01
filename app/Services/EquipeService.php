@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\Country;
 use App\Models\Boutique;
 use App\Models\User;
+use App\Support\Authorization\Permissions;
 use App\Support\Phone\PhoneNumber;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,11 @@ use Spatie\Permission\PermissionRegistrar;
  * boutique). Ajouter un numéro qui a déjà un compte le rattache ; le retirer
  * ne touche qu'à cette boutique. Le propriétaire reste admin de sa boutique,
  * et personne ne change son propre rôle.
+ *
+ * En plus du rôle, chaque gérant ou caissier a ses droits (voir
+ * Permissions::DROITS : chiffre d'affaires, articles, annulations, achats,
+ * back-office), que le propriétaire ou un admin coche un par un. Ils sont
+ * rangés en permissions directes, par boutique comme les rôles.
  */
 class EquipeService
 {
@@ -43,9 +49,10 @@ class EquipeService
      *
      * @return array{user: User, cree: bool, mot_de_passe: ?string}
      */
-    public function ajouter(Boutique $boutique, string $nom, string $telephone, string $role, ?string $motDePasse = null): array
+    public function ajouter(Boutique $boutique, string $nom, string $telephone, string $role, ?string $motDePasse = null, ?array $droits = null): array
     {
         $this->roleValide($role);
+        $this->droitsValides($droits);
 
         if (! $this->abonnements->peutAjouterMembre($boutique, count($this->membreIds($boutique)))) {
             throw ValidationException::withMessages(['telephone' => [
@@ -67,6 +74,7 @@ class EquipeService
 
             // Compte existant : rattaché, il garde son mot de passe.
             $existant->assignRole($role);
+            $this->appliquerDroits($existant, $role, $droits);
 
             return ['user' => $existant, 'cree' => false, 'mot_de_passe' => null];
         }
@@ -80,13 +88,19 @@ class EquipeService
             'password' => Hash::make($provisoire ?? $motDePasse),
         ]);
         $user->assignRole($role);
+        $this->appliquerDroits($user, $role, $droits);
 
         return ['user' => $user, 'cree' => true, 'mot_de_passe' => $provisoire];
     }
 
-    public function changerRole(Boutique $boutique, User $acteur, string $userId, string $role): User
+    /**
+     * Change le rôle et les droits d'un membre. `$droits` à null : ceux par
+     * défaut du rôle s'il change, sinon ceux qu'il a déjà.
+     */
+    public function changerRole(Boutique $boutique, User $acteur, string $userId, string $role, ?array $droits = null): User
     {
         $this->roleValide($role);
+        $this->droitsValides($droits);
         $user = $this->membre($boutique, $userId);
 
         if ($user->id === $acteur->id) {
@@ -97,7 +111,9 @@ class EquipeService
         }
 
         $this->equipe($boutique);
+        $ancien = $user->roles->first()?->name;
         $user->syncRoles([$role]);
+        $this->appliquerDroits($user, $role, $droits ?? ($ancien === $role ? $this->droitsDe($user) : null));
 
         return $user->load('roles');
     }
@@ -115,6 +131,7 @@ class EquipeService
 
         $this->equipe($boutique);
         $user->syncRoles([]);
+        $user->syncPermissions([]);
 
         // Sa boutique par défaut était celle-ci : on en choisit une autre.
         if ($user->boutique_id === $boutique->id) {
@@ -162,6 +179,58 @@ class EquipeService
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Droits d'un membre dans la boutique en cours (voir equipe()) : ceux dont
+     * il a toutes les permissions. Un admin les a tous.
+     *
+     * @return list<string>
+     */
+    public function droitsDe(User $user): array
+    {
+        if ($user->hasRole('admin')) {
+            return array_keys(Permissions::DROITS);
+        }
+        $directes = $user->getDirectPermissions()->pluck('name')->all();
+
+        return array_values(array_filter(array_keys(Permissions::DROITS),
+            fn (string $d) => array_diff(Permissions::DROITS[$d]['permissions'], $directes) === []));
+    }
+
+    /** Droits d'un membre, dans sa boutique (pour l'affichage de l'équipe). */
+    public function droitsDans(Boutique $boutique, User $user): array
+    {
+        $this->equipe($boutique);
+
+        return $this->droitsDe($user->load('roles', 'permissions'));
+    }
+
+    /**
+     * Range les droits en permissions directes. Un admin n'en a pas besoin
+     * (son rôle a tout) ; null : ceux par défaut du rôle.
+     *
+     * @param  list<string>|null  $droits
+     */
+    /** Pour qui reçoit un rôle hors de ce service (import) : les droits par défaut du rôle. */
+    public static function droitsParDefaut(User $user, string $role): void
+    {
+        $user->givePermissionTo(Permissions::permissionsDes($role === 'admin' ? [] : Permissions::DROITS_PAR_DEFAUT[$role] ?? []));
+    }
+
+    private function appliquerDroits(User $user, string $role, ?array $droits): void
+    {
+        $droits = $role === 'admin' ? [] : ($droits ?? Permissions::DROITS_PAR_DEFAUT[$role] ?? []);
+        $user->syncPermissions(Permissions::permissionsDes($droits));
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /** @param  list<string>|null  $droits */
+    private function droitsValides(?array $droits): void
+    {
+        if ($droits !== null && array_diff($droits, array_keys(Permissions::DROITS)) !== []) {
+            throw ValidationException::withMessages(['droits' => ['Droit inconnu.']]);
+        }
     }
 
     private function roleValide(string $role): void

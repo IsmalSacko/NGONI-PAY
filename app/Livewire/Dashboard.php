@@ -19,6 +19,27 @@ class Dashboard extends Component
 {
     use EstScopeParBoutique;
 
+    /** Pages d'accueil possibles, dans l'ordre du menu, avec leur permission. */
+    private const REPLIS = [
+        'produits.index' => 'produits.view', 'stocks.index' => 'stocks.view', 'achats.index' => 'achats.view',
+        'ventes.index' => 'ventes.view', 'clients.index' => 'clients.view', 'utilisateurs.index' => 'utilisateurs.view',
+    ];
+
+    public function mount()
+    {
+        // Le chiffre d'affaires est un droit du membre (Permissions::DROITS) :
+        // sans lui, l'accueil est la première page qu'il peut ouvrir.
+        if (auth()->user()->can('dashboard.view')) {
+            return null;
+        }
+        foreach (self::REPLIS as $route => $permission) {
+            if (auth()->user()->can($permission)) {
+                return $this->redirectRoute($route, navigate: false);
+            }
+        }
+        abort(403);
+    }
+
     public function render()
     {
         $boutique = Boutique::find($this->boutiqueActiveId());

@@ -87,7 +87,9 @@ Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
     Route::get('exports/ventes', [\App\Http\Controllers\ExportController::class, 'ventes'])->name('exports.ventes')->middleware('permission:rapports.view');
     Route::get('exports/stocks', [\App\Http\Controllers\ExportController::class, 'stocks'])->name('exports.stocks')->middleware('permission:rapports.view');
     Route::get('exports/credits', [\App\Http\Controllers\ExportController::class, 'credits'])->name('exports.credits')->middleware('permission:rapports.view');
-    Route::get('tableau-de-bord', Dashboard::class)->name('tableau-de-bord')->middleware('permission:dashboard.view');
+    // Accueil du back-office : sans le droit de voir le chiffre d'affaires,
+    // Dashboard::mount renvoie à la première page permise (pas de 403).
+    Route::get('tableau-de-bord', Dashboard::class)->name('tableau-de-bord');
 
     Route::get('produits', ProduitsIndex::class)->name('produits.index')->middleware('permission:produits.view');
     Route::get('categories', CategoriesIndex::class)->name('categories.index')->middleware('permission:categories.view');

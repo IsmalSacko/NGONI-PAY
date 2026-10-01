@@ -14,8 +14,9 @@
         <summary class="font-bold cursor-pointer">Qui peut faire quoi ?</summary>
         <ul class="mt-2 flex flex-col gap-1 text-[--color-muted]">
             <li><strong class="text-[--color-ink]">Admin</strong> : tout, y compris l’équipe, les réglages de la boutique et l’abonnement.</li>
-            <li><strong class="text-[--color-ink]">Gérant</strong> : caisse, pilotage, catalogue, stocks, clients, toutes les ventes et le back-office. Pas l’équipe ni l’abonnement.</li>
-            <li><strong class="text-[--color-ink]">Caissier</strong> : l’application seulement — encaisser, ses propres ventes, ajouter un client. Pas de back-office.</li>
+            <li><strong class="text-[--color-ink]">Gérant</strong> : caisse, catalogue, stocks, clients. Par défaut aussi le chiffre d’affaires, les achats et le back-office. Pas l’équipe ni l’abonnement.</li>
+            <li><strong class="text-[--color-ink]">Caissier</strong> : encaisser, ses propres ventes, ajouter un client.</li>
+            <li class="mt-1">Pour chaque gérant ou caissier, le bouton <strong class="text-[--color-ink]">Droits</strong> permet de cocher ce qu’il peut voir et faire en plus : chiffre d’affaires, articles et prix, annulations, achats, back-office.</li>
         </ul>
     </details>
 
@@ -48,6 +49,12 @@
                     @if ($membre->id === $proprietaireId)
                         <span class="ml-1 text-xs font-bold text-[--color-muted]">(propriétaire)</span>
                     @endif
+                    @if ($role !== 'admin')
+                        <span class="block text-xs font-normal text-[--color-muted]">
+                            @php($siens = $droitsParMembre[$membre->id] ?? [])
+                            {{ $siens === [] ? 'Aucun droit en plus' : collect($siens)->map(fn ($d) => $catalogueDroits[$d]['libelle'])->join(' · ') }}
+                        </span>
+                    @endif
                 </span>
                 <span><x-telephone :numero="$membre->phone" /></span>
                 <span>
@@ -70,6 +77,9 @@
                 </span>
                 @if ($modifiable)
                     <div class="flex gap-2 md:justify-self-end">
+                        @if ($role !== 'admin')
+                            <button wire:click="ouvrirDroits('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-accent text-accent text-xs font-bold">Droits</button>
+                        @endif
                         <button wire:click="retirer('{{ $membre->id }}')" wire:confirm="Retirer {{ $membre->name }} de l’équipe de cette boutique ?"
                                 class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Retirer</button>
                         <button wire:click="basculerActivation('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">
@@ -105,18 +115,54 @@
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-1">Rôle</label>
-                        <select wire:model="role" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong] bg-white">
+                        <select wire:model.live="role" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong] bg-white">
                             <option value="caissier">Caissier</option>
                             <option value="gerant">Gérant</option>
                             <option value="admin">Admin</option>
                         </select>
                         @error('role') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
+                    {{-- $this->role : $role désigne, plus haut, le rôle du dernier membre listé. --}}
+                    @if ($this->role !== 'admin')
+                        <fieldset class="flex flex-col gap-2">
+                            <legend class="text-sm font-semibold mb-1">Ce qu’il peut faire en plus</legend>
+                            @foreach ($catalogueDroits as $cle => $d)
+                                <label class="flex items-start gap-2 text-sm">
+                                    <input type="checkbox" wire:model="droits" value="{{ $cle }}" class="mt-1">
+                                    <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-[--color-muted]">{{ $d['explication'] }}</span></span>
+                                </label>
+                            @endforeach
+                        </fieldset>
+                    @endif
                     <div class="flex gap-3 mt-2">
                         <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
                         <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Ajouter</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Droits d'un membre : ce qu'il peut voir et faire en plus de son rôle. --}}
+    @if ($membreDroits)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 p-0 md:p-4" wire:click.self="$set('droitsDe', null)">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+                <div>
+                    <h2 class="font-display font-extrabold text-xl">Droits de {{ $membreDroits->name }}</h2>
+                    <p class="text-sm text-[--color-muted]">En plus de son rôle de {{ $libelles[$membreDroits->roles->first()?->name] ?? '' }}. Décochez ce qu’il ne doit ni voir ni faire.</p>
+                </div>
+                <div class="flex flex-col gap-3">
+                    @foreach ($catalogueDroits as $cle => $d)
+                        <label class="flex items-start gap-3 text-sm rounded-xl border border-[--color-border] px-3 py-2">
+                            <input type="checkbox" wire:model="droitsMembre" value="{{ $cle }}" class="mt-1">
+                            <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-[--color-muted]">{{ $d['explication'] }}</span></span>
+                        </label>
+                    @endforeach
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" wire:click="$set('droitsDe', null)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
+                    <button type="button" wire:click="enregistrerDroits" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
+                </div>
             </div>
         </div>
     @endif
