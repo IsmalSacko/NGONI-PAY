@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace App\Livewire\Plateforme;
 
 use App\Models\Abonnement;
+use App\Models\Boutique;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
+use App\Services\ReinitialisationBoutique;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 /**
  * Comptes propriétaires : leurs boutiques, leur abonnement, et les gestes de
- * l'exploitant (accorder, prolonger, révoquer).
+ * l'exploitant (accorder, prolonger, révoquer, réinitialiser une boutique).
  */
 #[Layout('layouts.plateforme', ['title' => 'Comptes'])]
 class Comptes extends Component
@@ -40,6 +43,17 @@ class Comptes extends Component
     public string $note = '';
 
     public ?string $info = null;
+
+    /** Boutique dont la remise à zéro est en cours de confirmation, et son aperçu. */
+    public ?string $aReinitialiser = null;
+
+    public array $apercu = [];
+
+    public bool $garderCatalogue = true;
+
+    public bool $garderFournisseurs = true;
+
+    public string $confirmation = '';
 
     public function updatingRecherche(): void
     {
@@ -83,6 +97,38 @@ class Comptes extends Component
         $this->compteOuvert = null;
     }
 
+    /** Ouvre la confirmation : ce qui partira, avant d'effacer quoi que ce soit. */
+    public function preparerReinitialisation(string $boutiqueId, ReinitialisationBoutique $reinitialisation): void
+    {
+        $this->reset(['info', 'confirmation', 'garderCatalogue', 'garderFournisseurs']);
+        $this->resetValidation();
+        $this->aReinitialiser = $boutiqueId;
+        $this->apercu = $reinitialisation->apercuBoutique(Boutique::withoutGlobalScopes()->findOrFail($boutiqueId));
+    }
+
+    public function annulerReinitialisation(): void
+    {
+        $this->reset(['aReinitialiser', 'apercu', 'confirmation']);
+    }
+
+    public function reinitialiser(ReinitialisationBoutique $reinitialisation): void
+    {
+        $this->validate(['confirmation' => ['required', 'in:REINITIALISER']], [
+            'confirmation.in' => 'Tapez REINITIALISER pour confirmer.', 'confirmation.required' => 'Tapez REINITIALISER pour confirmer.',
+        ]);
+
+        try {
+            $r = $reinitialisation->reinitialiser($this->aReinitialiser, Auth::user(), $this->garderCatalogue, $this->garderFournisseurs);
+        } catch (ValidationException $e) {
+            $this->addError('confirmation', collect($e->errors())->flatten()->first());
+
+            return;
+        }
+
+        $this->annulerReinitialisation();
+        $this->info = "{$r['boutique']} est remise à zéro.";
+    }
+
     public function revoquer(string $userId, AbonnementService $service): void
     {
         $proprietaire = User::findOrFail($userId);
@@ -92,8 +138,6 @@ class Comptes extends Component
 
     public function render()
     {
-        $needle = '%'.mb_strtolower($this->recherche).'%';
-
         $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
@@ -101,12 +145,7 @@ class Comptes extends Component
                 ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
                 ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
                 ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
-            ->when($this->recherche !== '', fn ($q) => $q->whereHas('proprietaire', function ($u) use ($needle) {
-                $u->whereRaw('LOWER(name) LIKE ?', [$needle])
-                    ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
-                    ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$needle])
-                    ->orWhereHas('boutiquesPossedees', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$needle]));
-            }))
+            ->when($this->recherche !== '', fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u->recherche($this->recherche)))
             ->when($this->filtre === 'actifs', fn ($q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today())))
             ->when($this->filtre === 'expires', fn ($q) => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
             ->latest('updated_at')

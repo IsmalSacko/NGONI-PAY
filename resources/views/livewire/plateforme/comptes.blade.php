@@ -19,6 +19,43 @@
         <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>
     @endif
 
+    {{-- Remise à zéro d'une boutique d'essai : l'aperçu d'abord, puis REINITIALISER à taper. --}}
+    @if ($aReinitialiser)
+        <div class="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center md:p-4" wire:click.self="annulerReinitialisation">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-lg max-h-[90vh] overflow-y-auto flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl text-danger-fg">Réinitialiser {{ $apercu['nom'] ?? '' }} ?</h2>
+                <p class="text-sm">Les données d’essai sont effacées pour repartir à zéro. Réglages, logo, programme fidélité, équipe et abonnement sont gardés. Une sauvegarde est gardée sur le serveur.</p>
+                <ul class="text-sm rounded-xl bg-danger-bg px-4 py-3 flex flex-col gap-1">
+                    <li><strong>{{ $apercu['ventes'] ?? 0 }}</strong> ventes, <strong>{{ $apercu['sessions'] ?? 0 }}</strong> séances de caisse</li>
+                    <li><strong>{{ $apercu['achats'] ?? 0 }}</strong> achats, <strong>{{ $apercu['clients'] ?? 0 }}</strong> clients</li>
+                    <li>
+                        @if ($garderCatalogue)
+                            <strong>{{ $apercu['articles'] ?? 0 }}</strong> articles gardés, stock remis à 0
+                        @else
+                            <strong>{{ $apercu['articles'] ?? 0 }}</strong> articles et <strong>{{ $apercu['categories'] ?? 0 }}</strong> catégories effacés
+                        @endif
+                    </li>
+                    <li><strong>{{ $apercu['fournisseurs'] ?? 0 }}</strong> fournisseurs {{ $garderFournisseurs ? 'gardés' : 'effacés' }}</li>
+                </ul>
+                <label class="flex items-center gap-2 text-sm"><input wire:model.live="garderCatalogue" type="checkbox"> Garder les articles (le stock repart de 0)</label>
+                <label class="flex items-center gap-2 text-sm"><input wire:model.live="garderFournisseurs" type="checkbox"> Garder les fournisseurs</label>
+                @if ($apercu['blocage'] ?? null)
+                    <p class="rounded-xl bg-warn-bg text-warn-fg px-4 py-3 text-sm font-semibold">{{ $apercu['blocage'] }}</p>
+                    <button wire:click="annulerReinitialisation" class="h-11 rounded-lg border border-border-strong font-bold">Fermer</button>
+                @else
+                    <label class="text-sm font-semibold">Tapez <span class="font-mono">REINITIALISER</span> pour confirmer
+                        <input wire:model="confirmation" type="text" autocomplete="off" class="mt-1 w-full h-11 px-3 rounded-lg border border-border-strong font-mono">
+                    </label>
+                    @error('confirmation') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                    <div class="flex gap-3">
+                        <button wire:click="annulerReinitialisation" class="flex-1 h-11 rounded-lg border border-border-strong font-bold">Annuler</button>
+                        <button wire:click="reinitialiser" wire:loading.attr="disabled" class="flex-1 h-11 rounded-lg bg-danger-fg text-white font-bold disabled:opacity-60">Réinitialiser</button>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <div class="flex flex-col gap-3">
         @forelse ($abonnements as $abonnement)
             @php($proprietaire = $abonnement->proprietaire)
@@ -46,6 +83,8 @@
                                         @if ($b->derniere_vente) · dernière le {{ \Illuminate\Support\Carbon::parse($b->derniere_vente)->format('d/m/Y') }} @endif
                                         · 30 j : {{ \App\Support\Money\Montant::format((int) $b->total_30j, $b->devise) }} {{ $b->devise }}
                                     </span>
+                                    <button wire:click="preparerReinitialisation('{{ $b->id }}')"
+                                            class="ml-1 text-xs font-bold text-danger-fg underline">Réinitialiser</button>
                                 </li>
                             @empty
                                 <li class="text-muted">aucune boutique</li>

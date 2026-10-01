@@ -123,18 +123,13 @@ class PlateformeController extends Controller
 
     public function comptes(Request $request): JsonResponse
     {
-        $needle = '%'.mb_strtolower((string) $request->query('recherche', '')).'%';
         $filtre = (string) $request->query('filtre', '');
 
         $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
             ]), 'proprietaire.boutiquesPossedees'])
-            ->when($request->filled('recherche'), fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u
-                ->whereRaw('LOWER(name) LIKE ?', [$needle])
-                ->orWhereRaw('LOWER(phone) LIKE ?', [$needle])
-                ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$needle])
-                ->orWhereHas('boutiquesPossedees', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$needle]))))
+            ->when($request->filled('recherche'), fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u->recherche((string) $request->query('recherche'))))
             ->when($filtre === 'actifs', fn ($q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today())))
             ->when($filtre === 'expires', fn ($q) => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
             ->latest('updated_at')

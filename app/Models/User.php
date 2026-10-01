@@ -143,18 +143,30 @@ class User extends Authenticatable
      * boutique (« Sacko multi Services ») et non la personne (« Sacko
      * Fassely ») : une recherche qui ignorait les boutiques ne trouvait rien.
      *
+     * Un numéro se cherche aussi sur le téléphone de la boutique, et sur ses
+     * seuls chiffres, zéros de tête retirés : « 07 07 97 04 37 » tapé comme on
+     * le dit doit trouver « +2250707970437 », et « 0707970437 » aussi
+     * « +223707970437 » d'un compte ouvert avec le mauvais pays.
+     *
      * @param  Builder<User>  $query
      */
     public function scopeRecherche(Builder $query, string $terme): void
     {
         $motif = '%'.mb_strtolower(trim($terme)).'%';
+        $chiffres = preg_match('/^[\d\s+().-]+$/', trim($terme)) ? ltrim((string) preg_replace('/\D/', '', $terme), '0') : '';
+        $numero = strlen($chiffres) >= 6 ? '%'.$chiffres.'%' : null;
+        $telephone = 'REPLACE(COALESCE(telephone, \'\'), \' \', \'\') LIKE ?';
 
         $query->where(fn (Builder $q) => $q
             ->whereRaw('LOWER(name) LIKE ?', [$motif])
             ->orWhereRaw('LOWER(phone) LIKE ?', [$motif])
             ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$motif])
             ->orWhereHas('boutiquesPossedees', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$motif]))
-            ->orWhereHas('boutique', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$motif])));
+            ->orWhereHas('boutique', fn ($b) => $b->whereRaw('LOWER(nom) LIKE ?', [$motif]))
+            ->when($numero !== null, fn (Builder $n) => $n
+                ->orWhereRaw('REPLACE(phone, \' \', \'\') LIKE ?', [$numero])
+                ->orWhereHas('boutiquesPossedees', fn ($b) => $b->whereRaw($telephone, [$numero]))
+                ->orWhereHas('boutique', fn ($b) => $b->whereRaw($telephone, [$numero]))));
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Plateforme\Comptes;
 use App\Models\Boutique;
 use App\Models\Produit;
 use App\Models\User;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -136,5 +138,37 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->withToken($this->awa->createToken('app')->plainTextToken)
             ->postJson("/api/plateforme/boutiques/{$this->boutiqueAwa->id}/reinitialiser", ['confirmation' => 'REINITIALISER'])
             ->assertForbidden();
+    }
+
+    public function test_depuis_la_console_web_apercu_puis_confirmation(): void
+    {
+        $exploitant = User::where('est_admin_plateforme', true)->first();
+
+        Livewire::actingAs($exploitant)->test(Comptes::class)
+            ->call('preparerReinitialisation', $this->boutiqueAwa->id)
+            ->assertSee('Réinitialiser Pressing Awa')
+            ->set('confirmation', 'oui')->call('reinitialiser')->assertHasErrors('confirmation')
+            ->set('confirmation', 'REINITIALISER')->call('reinitialiser')->assertHasNoErrors()
+            ->assertSet('aReinitialiser', null)->assertSee('remise à zéro');
+
+        $this->assertSame(0, $this->compter('ventes', $this->boutiqueAwa));
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueIbrahim));
+    }
+
+    public function test_la_recherche_trouve_un_numero_tape_avec_espaces_ou_sans_indicatif(): void
+    {
+        DB::table('boutiques')->where('id', $this->boutiqueIbrahim->id)->update(['telephone' => '+2250707970437']);
+        $this->awa->forceFill(['phone' => '+223707970437'])->save();
+
+        $chercher = fn (string $q) => collect($this->withToken($this->jeton)->getJson('/api/plateforme/comptes?recherche='.urlencode($q))
+            ->assertOk()->json('data'))->pluck('nom')->sort()->values()->all();
+
+        // Numéro du compte, enregistré sans son zéro (mauvais pays à l'inscription).
+        $this->assertContains('Awa', $chercher('0707970437'));
+        // Numéro de la boutique, tapé comme on le dit.
+        $this->assertContains('Ibrahim', $chercher('07 07 97 04 37'));
+        $this->assertSame(['Ibrahim'], $chercher('76 00 82 02'));
+        // Un nom ne passe pas par les chiffres.
+        $this->assertSame(['Awa'], $chercher('awa'));
     }
 }

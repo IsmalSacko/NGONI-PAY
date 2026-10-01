@@ -42,7 +42,17 @@ class ReinitialisationBoutique
     {
         $boutiques = Boutique::withoutGlobalScopes()->where('proprietaire_id', $compte->id)->orderBy('nom')->get(['id', 'nom']);
 
-        return ['boutiques' => $boutiques->map(fn (Boutique $b) => [
+        return ['boutiques' => $boutiques->map(fn (Boutique $b) => $this->apercuBoutique($b))->values()->all()];
+    }
+
+    /**
+     * Ce que la remise à zéro d'une boutique effacerait, sans rien toucher.
+     *
+     * @return array<string, mixed>
+     */
+    public function apercuBoutique(Boutique $b): array
+    {
+        return [
             'id' => $b->id,
             'nom' => $b->nom,
             'ventes' => DB::table('ventes')->where('boutique_id', $b->id)->count(),
@@ -53,7 +63,7 @@ class ReinitialisationBoutique
             'categories' => DB::table('categories_produits')->where('boutique_id', $b->id)->whereNull('deleted_at')->count(),
             'fournisseurs' => DB::table('fournisseurs')->where('boutique_id', $b->id)->whereNull('deleted_at')->count(),
             'blocage' => $this->blocage($b->id),
-        ])->values()->all()];
+        ];
     }
 
     /**
