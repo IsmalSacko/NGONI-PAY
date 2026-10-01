@@ -15,11 +15,11 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Retour en arrière après une remise à zéro (ReinitialisationBoutique) : les
- * lignes effacées sont remises en base depuis la sauvegarde, photos comprises,
- * et le stock des articles gardés reprend sa valeur d'avant.
+ * lignes effacées sont remises en base depuis la sauvegarde, photos comprises.
  *
- * - Refusée si la boutique a déjà vendu ou reçu un achat depuis : mêler
- *   les vraies données d'après aux essais d'avant fausserait les deux.
+ * - Jamais refusée pour ce qui a été fait depuis : les anciennes lignes
+ *   rejoignent les nouvelles, sans rien écraser (voir fusionner()). Le stock
+ *   retiré à la remise à zéro s'ajoute à celui d'aujourd'hui.
  * - Une sauvegarde ne sert qu'une fois. Après plusieurs remises à zéro, on
  *   restaure la plus récente d'abord, puis les précédentes.
  * - Les sauvegardes sont gardées 30 jours (purger(), chaque nuit) : elles
@@ -79,14 +79,6 @@ class RestaurationBoutique
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($donnees['boutique']['id']);
 
         $depuis = Carbon::parse($donnees['reinitialisee_le']);
-        // Une caisse ouverte depuis, sans vente, ne compte pas : elle reste telle quelle.
-        foreach (['ventes' => 'vendu', 'achats' => 'reçu de la marchandise'] as $table => $quoi) {
-            if (DB::table($table)->where('boutique_id', $boutique->id)->where('created_at', '>', $depuis)->exists()) {
-                throw ValidationException::withMessages(['sauvegarde' => [
-                    "Impossible : {$boutique->nom} a déjà {$quoi} depuis la remise à zéro. Restaurer mêlerait ces vraies données aux essais.",
-                ]]);
-            }
-        }
 
         // Une caisse ouverte aujourd'hui : celle qui l'était avant la remise à zéro
         // revient fermée à cette heure-là, plutôt que deux caisses ouvertes à la fois.
@@ -98,20 +90,22 @@ class RestaurationBoutique
 
         $lignes = 0;
         try {
-            DB::transaction(function () use ($donnees, &$lignes): void {
+            DB::transaction(function () use ($donnees, $boutique, &$lignes): void {
+                $tables = $this->fusionner($donnees['tables'], $boutique->id);
                 foreach (self::ORDRE as $table) {
-                    $rangs = $donnees['tables'][$table] ?? [];
+                    $rangs = $tables[$table] ?? [];
                     if ($rangs === []) {
                         continue;
                     }
                     $existants = collect(array_chunk(array_column($rangs, 'id'), 500))
                         ->flatMap(fn ($ids) => DB::table($table)->whereIn('id', $ids)->pluck('id'))->flip();
 
-                    // Articles gardés à la remise à zéro : ils reprennent leur stock d'avant.
+                    // Articles gardés à la remise à zéro : le stock retiré revient
+                    // en plus de ce qui a bougé depuis (ventes, achats, inventaire).
                     if ($table === 'produits') {
                         foreach ($rangs as $r) {
-                            if ($existants->has($r['id'])) {
-                                DB::table('produits')->where('id', $r['id'])->update(['stock' => $r['stock']]);
+                            if ($existants->has($r['id']) && (int) $r['stock'] !== 0) {
+                                DB::table('produits')->where('id', $r['id'])->increment('stock', (int) $r['stock']);
                             }
                         }
                     }
@@ -124,12 +118,12 @@ class RestaurationBoutique
                 }
             });
         } catch (QueryException $e) {
-            // Un article recréé depuis avec le même code-barres, un vendeur supprimé… :
+            // Ce que la fusion ne prévoit pas (un vendeur supprimé depuis…) :
             // rien n'a été écrit, la transaction est annulée.
             Log::error('Restauration impossible', ['sauvegarde' => $chemin, 'erreur' => $e->getMessage()]);
 
             throw ValidationException::withMessages(['sauvegarde' => [
-                'Restauration impossible : des données créées depuis entrent en conflit (un article recréé avec le même code-barres, par exemple). Rien n’a été modifié.',
+                'Restauration impossible : une donnée de la sauvegarde n’a plus sa place (un vendeur supprimé depuis, par exemple). Rien n’a été modifié.',
             ]]);
         }
 
@@ -149,6 +143,76 @@ class RestaurationBoutique
         Log::warning('Boutique restaurée par l’exploitant', ['boutique' => $boutique->id, 'sauvegarde' => $chemin, 'lignes' => $lignes, 'par' => $exploitant->id]);
 
         return ['boutique' => $boutique->nom, 'lignes' => $lignes];
+    }
+
+    /**
+     * Fait une place aux lignes de la sauvegarde parmi celles créées depuis :
+     * rien de ce qui existe aujourd'hui n'est modifié, sinon le stock.
+     *
+     * - Article au même code-barres qu'un article créé depuis : c'est le même,
+     *   les deux fusionnent (ventes, achats et stock vont à l'article actuel).
+     * - Numéro de ticket ou de clôture déjà pris : l'ancien reprend la suite.
+     * - Journée déjà clôturée depuis : la clôture d'essai de ce jour est laissée.
+     * - Vente hors ligne déjà renvoyée depuis par un téléphone : gardée une fois.
+     *
+     * @param  array<string, list<array<string, mixed>>>  $tables
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function fusionner(array $tables, string $boutiqueId): array
+    {
+        // Articles : par code-barres.
+        $codes = array_values(array_filter(array_column($tables['produits'] ?? [], 'code_barre')));
+        $actuels = DB::table('produits')->where('boutique_id', $boutiqueId)->whereIn('code_barre', $codes)->pluck('id', 'code_barre');
+        $remplace = [];
+        foreach ($tables['produits'] ?? [] as $i => $r) {
+            $actuel = $r['code_barre'] !== null ? ($actuels[$r['code_barre']] ?? null) : null;
+            if ($actuel !== null && $actuel !== $r['id']) {
+                $remplace[$r['id']] = $actuel;
+                if ((int) $r['stock'] !== 0) {
+                    DB::table('produits')->where('id', $actuel)->increment('stock', (int) $r['stock']);
+                }
+                unset($tables['produits'][$i]);
+            }
+        }
+        if ($remplace !== []) {
+            $tables['produits'] = array_values($tables['produits']);
+            foreach (['lignes_vente', 'mouvements_stock', 'lignes_achat'] as $t) {
+                $tables[$t] = array_map(fn ($r) => isset($r['produit_id'], $remplace[$r['produit_id']])
+                    ? [...$r, 'produit_id' => $remplace[$r['produit_id']]] : $r, $tables[$t] ?? []);
+            }
+        }
+
+        // Vente hors ligne renvoyée par un téléphone depuis la remise à zéro : c'est
+        // la même (même référence), déjà en base avec ses lignes. On ne la double pas.
+        $references = array_values(array_filter(array_column($tables['ventes'] ?? [], 'reference_locale')));
+        $dejaLa = DB::table('ventes')->where('boutique_id', $boutiqueId)->whereIn('reference_locale', $references)->pluck('reference_locale')->flip();
+        $doublons = collect($tables['ventes'] ?? [])->filter(fn ($r) => isset($r['reference_locale']) && $dejaLa->has($r['reference_locale']))->pluck('id')->flip();
+        if ($doublons->isNotEmpty()) {
+            $tables['ventes'] = array_values(array_filter($tables['ventes'], fn ($r) => ! $doublons->has($r['id'])));
+            foreach (['lignes_vente', 'mouvements_stock'] as $t) {
+                $tables[$t] = array_values(array_filter($tables[$t] ?? [], fn ($r) => ! isset($r['vente_id']) || ! $doublons->has($r['vente_id'])));
+            }
+        }
+
+        // Clôtures : une journée clôturée depuis garde sa clôture.
+        $jours = DB::table('clotures')->where('boutique_id', $boutiqueId)->pluck('jour_affaire')->map(fn ($j) => substr((string) $j, 0, 10))->flip();
+        $tables['clotures'] = array_values(array_filter($tables['clotures'] ?? [], fn ($r) => ! $jours->has(substr((string) $r['jour_affaire'], 0, 10))));
+
+        // Numéros de ticket et de clôture : ceux déjà pris reprennent la suite.
+        foreach (['ventes', 'clotures'] as $t) {
+            $pris = DB::table($t)->where('boutique_id', $boutiqueId)->pluck('numero')->map(fn ($n) => (int) $n)->flip();
+            $suivant = ($pris->keys()->max() ?? 0) + 1;
+            $rangs = $tables[$t] ?? [];
+            usort($rangs, fn ($a, $b) => (int) $a['numero'] <=> (int) $b['numero']);
+            foreach ($rangs as $i => $r) {
+                if ($pris->has((int) $r['numero'])) {
+                    $rangs[$i]['numero'] = $suivant++;
+                }
+            }
+            $tables[$t] = $rangs;
+        }
+
+        return $tables;
     }
 
     /** Efface les sauvegardes (et leurs photos) de plus de 30 jours. */

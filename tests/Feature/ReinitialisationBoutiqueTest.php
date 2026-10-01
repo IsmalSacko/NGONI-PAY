@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -226,19 +225,59 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
     }
 
-    public function test_refuse_si_la_boutique_a_vendu_depuis(): void
+    public function test_les_ventes_faites_depuis_restent_et_les_anciennes_reprennent_la_suite(): void
     {
+        $avant = (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock');
         $this->reinitialiser(garderCatalogue: true);
         $this->travel(1)->minutes();
-        $this->vendre($this->boutiqueAwa, $this->awa);
+        $this->vendre($this->boutiqueAwa, $this->awa);   // vraie vente : ticket n° 1, stock 10 → 9
+        $nouvelle = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->first();
+        $apres = (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock');
 
         $restauration = app(RestaurationBoutique::class);
-        $this->expectException(ValidationException::class);
-        try {
-            $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
-        } finally {
-            $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa), 'seule la nouvelle vente');
-        }
+        $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+
+        $numeros = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderBy('numero')->pluck('numero', 'id');
+        $this->assertCount(2, $numeros);
+        $this->assertSame(1, (int) $numeros[$nouvelle->id], 'la vraie vente garde son numéro');
+        $this->assertSame([1, 2], $numeros->map(fn ($n) => (int) $n)->values()->all());
+        // Le stock d'avant revient en plus de ce qui a bougé depuis.
+        $this->assertSame($avant + $apres, (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock'));
+    }
+
+    public function test_une_vente_hors_ligne_renvoyee_depuis_n_est_pas_doublee(): void
+    {
+        $vente = (array) DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->first();
+        $this->reinitialiser(garderCatalogue: true);
+
+        // Le téléphone renvoie la même vente (même référence) : le serveur la recrée.
+        DB::table('ventes')->insert([...$vente, 'id' => (string) Str::uuid()]);
+
+        $restauration = app(RestaurationBoutique::class);
+        $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+    }
+
+    public function test_un_article_recree_avec_le_meme_code_barres_fusionne(): void
+    {
+        $ancien = DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->first();
+        DB::table('produits')->where('id', $ancien->id)->update(['code_barre' => '6111111111111', 'stock' => 7]);
+        $this->reinitialiser(garderCatalogue: false);
+
+        // Recréé depuis par le commerçant, même code-barres, 3 en stock.
+        $actuel = (string) Str::uuid();
+        DB::table('produits')->insert([
+            'id' => $actuel, 'boutique_id' => $this->boutiqueAwa->id, 'nom' => 'Même article', 'code_barre' => '6111111111111',
+            'prix_vente' => 500, 'stock' => 3, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $restauration = app(RestaurationBoutique::class);
+        $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+
+        $this->assertNull(DB::table('produits')->find($ancien->id), 'pas de doublon');
+        $this->assertSame(10, (int) DB::table('produits')->where('id', $actuel)->value('stock'));
+        $this->assertTrue(DB::table('lignes_vente')->where('produit_id', $actuel)->exists(), 'l’ancienne vente pointe sur l’article actuel');
     }
 
     public function test_depuis_la_console_web_restaurer(): void

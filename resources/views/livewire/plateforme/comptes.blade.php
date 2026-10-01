@@ -60,7 +60,7 @@
             <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-lg max-h-[90vh] overflow-y-auto flex flex-col gap-3">
                 <h2 class="font-display font-extrabold text-xl">Restaurer {{ $aRestaurerNom }} ?</h2>
                 @if ($aRestaurerResume)
-                    <p class="text-sm">Les données effacées par la remise à zéro du <strong>{{ $aRestaurerResume['le']->format('d/m/Y à H:i') }}</strong> (par {{ $aRestaurerResume['par'] }}) sont remises en place, et le stock des articles reprend sa valeur d’avant.</p>
+                    <p class="text-sm">Les données effacées par la remise à zéro du <strong>{{ $aRestaurerResume['le']->format('d/m/Y à H:i') }}</strong> (par {{ $aRestaurerResume['par'] }}) sont remises en place, à côté de ce qui a été fait depuis : rien n’est écrasé. Le stock retiré revient en plus du stock actuel ; un article recréé avec le même code-barres fusionne avec l’ancien.</p>
                     <ul class="text-sm rounded-xl bg-accent-soft px-4 py-3 flex flex-col gap-1">
                         <li><strong>{{ $aRestaurerResume['ventes'] }}</strong> vente{{ $aRestaurerResume['ventes'] > 1 ? 's' : '' }}, <strong>{{ $aRestaurerResume['clients'] }}</strong> client{{ $aRestaurerResume['clients'] > 1 ? 's' : '' }}, <strong>{{ $aRestaurerResume['achats'] }}</strong> achat{{ $aRestaurerResume['achats'] > 1 ? 's' : '' }}</li>
                         <li><strong>{{ $aRestaurerResume['articles'] }}</strong> article{{ $aRestaurerResume['articles'] > 1 ? 's' : '' }}</li>
