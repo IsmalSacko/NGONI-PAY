@@ -9,6 +9,7 @@ use App\Models\Boutique;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\RestaurationBoutique;
 use App\Services\VenteService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -175,5 +177,92 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(['Ibrahim'], $chercher('76 00 82 02'));
         // Un nom ne passe pas par les chiffres.
         $this->assertSame(['Awa'], $chercher('awa'));
+    }
+
+    private function reinitialiser(bool $garderCatalogue): void
+    {
+        $this->withToken($this->jeton)->postJson("/api/plateforme/boutiques/{$this->boutiqueAwa->id}/reinitialiser", [
+            'confirmation' => 'REINITIALISER', 'garder_catalogue' => $garderCatalogue,
+        ])->assertOk();
+    }
+
+    public function test_la_restauration_remet_ventes_clients_stock_et_photos(): void
+    {
+        $avant = DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->pluck('stock', 'id')->all();
+        $photos = DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->pluck('photo')->filter()->all();
+        $this->assertNotEmpty($photos);
+
+        $this->reinitialiser(garderCatalogue: false);
+        foreach ($photos as $photo) {
+            Storage::disk('local')->assertMissing($photo);
+        }
+
+        $restauration = app(RestaurationBoutique::class);
+        [$chemin] = $restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id];
+        $restauration->restaurer($chemin, User::where('est_admin_plateforme', true)->first());
+
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+        $this->assertSame(1, $this->compter('clients', $this->boutiqueAwa));
+        $this->assertSame($avant, DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->pluck('stock', 'id')->all());
+        $this->assertGreaterThan(0, DB::table('lignes_vente')->whereIn('vente_id', DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->select('id'))->count());
+        foreach ($photos as $photo) {
+            Storage::disk('local')->assertExists($photo);
+        }
+
+        // Une sauvegarde ne sert qu'une fois.
+        $this->assertArrayNotHasKey($this->boutiqueAwa->id, $restauration->sauvegardesParBoutique());
+    }
+
+    public function test_les_articles_gardes_reprennent_leur_stock(): void
+    {
+        $avant = DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->pluck('stock', 'id')->all();
+        $this->reinitialiser(garderCatalogue: true);
+
+        $restauration = app(RestaurationBoutique::class);
+        $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+
+        $this->assertSame($avant, DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->pluck('stock', 'id')->all());
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+    }
+
+    public function test_refuse_si_la_boutique_a_vendu_depuis(): void
+    {
+        $this->reinitialiser(garderCatalogue: true);
+        $this->travel(1)->minutes();
+        $this->vendre($this->boutiqueAwa, $this->awa);
+
+        $restauration = app(RestaurationBoutique::class);
+        $this->expectException(ValidationException::class);
+        try {
+            $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+        } finally {
+            $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa), 'seule la nouvelle vente');
+        }
+    }
+
+    public function test_depuis_la_console_web_restaurer(): void
+    {
+        $this->reinitialiser(garderCatalogue: true);
+
+        Livewire::actingAs(User::where('est_admin_plateforme', true)->first())->test(Comptes::class)
+            ->assertSee('Restaurer')
+            ->call('preparerRestauration', $this->boutiqueAwa->id)
+            ->assertSee('Restaurer Pressing Awa')
+            ->set('confirmationRestauration', 'oui')->call('restaurer')->assertHasErrors('confirmationRestauration')
+            ->set('confirmationRestauration', 'RESTAURER')->call('restaurer')->assertHasNoErrors()
+            ->assertSet('aRestaurer', null)->assertSee('est restaurée');
+
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+    }
+
+    public function test_les_sauvegardes_de_plus_de_30_jours_sont_effacees(): void
+    {
+        $this->reinitialiser(garderCatalogue: false);
+        $restauration = app(RestaurationBoutique::class);
+        $this->assertSame(0, $restauration->purger(), 'récente : gardée');
+
+        $this->travel(31)->days();
+        $this->artisan('ecaisse:purger-reinitialisations')->assertSuccessful();
+        $this->assertSame([], Storage::disk('local')->allFiles('reinitialisations'));
     }
 }

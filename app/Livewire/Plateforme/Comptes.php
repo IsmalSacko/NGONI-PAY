@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\ReinitialisationBoutique;
+use App\Services\RestaurationBoutique;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ use Livewire\WithPagination;
 
 /**
  * Comptes propriétaires : leurs boutiques, leur abonnement, et les gestes de
- * l'exploitant (accorder, prolonger, révoquer, réinitialiser une boutique).
+ * l'exploitant (accorder, prolonger, révoquer, réinitialiser une boutique ou
+ * la restaurer).
  */
 #[Layout('layouts.plateforme', ['title' => 'Comptes'])]
 class Comptes extends Component
@@ -54,6 +56,13 @@ class Comptes extends Component
     public bool $garderFournisseurs = true;
 
     public string $confirmation = '';
+
+    /** Boutique dont on choisit la sauvegarde à restaurer, et la sauvegarde choisie. */
+    public ?string $aRestaurer = null;
+
+    public ?string $sauvegarde = null;
+
+    public string $confirmationRestauration = '';
 
     public function updatingRecherche(): void
     {
@@ -129,6 +138,46 @@ class Comptes extends Component
         $this->info = "{$r['boutique']} est remise à zéro.";
     }
 
+    public function preparerRestauration(string $boutiqueId, RestaurationBoutique $restauration): void
+    {
+        $this->reset(['info', 'confirmationRestauration']);
+        $this->resetValidation();
+        $this->aRestaurer = $boutiqueId;
+        $this->sauvegarde = $restauration->sauvegardesParBoutique()[$boutiqueId][0] ?? null;
+    }
+
+    public function annulerRestauration(): void
+    {
+        $this->reset(['aRestaurer', 'sauvegarde', 'confirmationRestauration']);
+    }
+
+    public function restaurer(RestaurationBoutique $restauration): void
+    {
+        $this->validate(['confirmationRestauration' => ['required', 'in:RESTAURER'], 'sauvegarde' => ['required', 'string']], [
+            'confirmationRestauration.in' => 'Tapez RESTAURER pour confirmer.', 'confirmationRestauration.required' => 'Tapez RESTAURER pour confirmer.',
+            'sauvegarde.required' => 'Choisissez une sauvegarde.',
+        ]);
+
+        // La plus récente de cette boutique seulement : en restaurer une plus
+        // ancienne d'abord remettrait le stock d'une étape intermédiaire.
+        if ($this->sauvegarde !== ($restauration->sauvegardesParBoutique()[(string) $this->aRestaurer][0] ?? null)) {
+            $this->addError('sauvegarde', 'Sauvegarde introuvable pour cette boutique.');
+
+            return;
+        }
+
+        try {
+            $r = $restauration->restaurer($this->sauvegarde, Auth::user());
+        } catch (ValidationException $e) {
+            $this->addError('confirmationRestauration', collect($e->errors())->flatten()->first());
+
+            return;
+        }
+
+        $this->annulerRestauration();
+        $this->info = "{$r['boutique']} est restaurée ({$r['lignes']} lignes remises en place).";
+    }
+
     public function revoquer(string $userId, AbonnementService $service): void
     {
         $proprietaire = User::findOrFail($userId);
@@ -136,7 +185,7 @@ class Comptes extends Component
         $this->info = "Abonnement de {$proprietaire->name} révoqué : ses boutiques passent en lecture seule.";
     }
 
-    public function render()
+    public function render(RestaurationBoutique $restauration)
     {
         $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
@@ -154,6 +203,9 @@ class Comptes extends Component
         return view('livewire.plateforme.comptes', [
             'abonnements' => $abonnements,
             'plans' => Plan::ordonnes()->get(),
+            'sauvegardes' => $restauration->sauvegardesParBoutique(),
+            'aRestaurerResume' => $this->aRestaurer ? ($restauration->sauvegardes($this->aRestaurer)[0] ?? null) : null,
+            'aRestaurerNom' => $this->aRestaurer ? Boutique::withoutGlobalScopes()->whereKey($this->aRestaurer)->value('nom') : null,
         ]);
     }
 }

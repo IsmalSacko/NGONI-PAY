@@ -5,6 +5,7 @@ use App\Services\BilanMensuel;
 use App\Services\DiffusionAnnonces;
 use App\Services\NettoyageOrphelins;
 use App\Services\RappelFinEssai;
+use App\Services\RestaurationBoutique;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -98,3 +99,14 @@ Artisan::command('ecaisse:nettoyer-orphelins {--confirmer : Efface vraiment, apr
     $r = $nettoyage->nettoyer(avecBoutiques: ! $this->option('comptes-seulement'));
     $this->info("Nettoyé : {$r['boutiques']} boutique(s), {$r['lignes']} ligne(s). Sauvegarde : storage/app/{$r['sauvegarde']}");
 })->purpose('Nettoie les restes de boutiques effacées sans leurs données');
+
+// Sauvegardes des remises à zéro de boutique : gardées 30 jours pour pouvoir
+// revenir en arrière, puis effacées (elles contiennent noms et téléphones des clients).
+Artisan::command('ecaisse:purger-reinitialisations', function () {
+    $n = app(RestaurationBoutique::class)->purger();
+    if ($n > 0) {
+        $this->info("{$n} sauvegarde(s) de remise à zéro effacée(s).");
+    }
+})->purpose('Efface les sauvegardes de remise à zéro de plus de 30 jours');
+
+Schedule::command('ecaisse:purger-reinitialisations')->dailyAt('03:30')->withoutOverlapping();

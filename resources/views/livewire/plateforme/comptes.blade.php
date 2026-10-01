@@ -54,6 +54,35 @@
         </div>
     @endif
 
+    {{-- Retour en arrière après une remise à zéro : la sauvegarde la plus récente, puis RESTAURER à taper. --}}
+    @if ($aRestaurer)
+        <div class="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center md:p-4" wire:click.self="annulerRestauration">
+            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-lg max-h-[90vh] overflow-y-auto flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl">Restaurer {{ $aRestaurerNom }} ?</h2>
+                @if ($aRestaurerResume)
+                    <p class="text-sm">Les données effacées par la remise à zéro du <strong>{{ $aRestaurerResume['le']->format('d/m/Y à H:i') }}</strong> (par {{ $aRestaurerResume['par'] }}) sont remises en place, et le stock des articles reprend sa valeur d’avant.</p>
+                    <ul class="text-sm rounded-xl bg-accent-soft px-4 py-3 flex flex-col gap-1">
+                        <li><strong>{{ $aRestaurerResume['ventes'] }}</strong> vente{{ $aRestaurerResume['ventes'] > 1 ? 's' : '' }}, <strong>{{ $aRestaurerResume['clients'] }}</strong> client{{ $aRestaurerResume['clients'] > 1 ? 's' : '' }}, <strong>{{ $aRestaurerResume['achats'] }}</strong> achat{{ $aRestaurerResume['achats'] > 1 ? 's' : '' }}</li>
+                        <li><strong>{{ $aRestaurerResume['articles'] }}</strong> article{{ $aRestaurerResume['articles'] > 1 ? 's' : '' }}</li>
+                    </ul>
+                    <p class="text-xs text-muted">Sauvegarde gardée jusqu’au {{ $aRestaurerResume['expire_le']->format('d/m/Y') }}. S’il y a eu plusieurs remises à zéro, la plus récente se restaure d’abord.</p>
+                    <label class="text-sm font-semibold">Tapez <span class="font-mono">RESTAURER</span> pour confirmer
+                        <input wire:model="confirmationRestauration" type="text" autocomplete="off" class="mt-1 w-full h-11 px-3 rounded-lg border border-border-strong font-mono">
+                    </label>
+                    @error('confirmationRestauration') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                    @error('sauvegarde') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                    <div class="flex gap-3">
+                        <button wire:click="annulerRestauration" class="flex-1 h-11 rounded-lg border border-border-strong font-bold">Annuler</button>
+                        <button wire:click="restaurer" wire:loading.attr="disabled" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold disabled:opacity-60">Restaurer</button>
+                    </div>
+                @else
+                    <p class="text-sm">Aucune sauvegarde restaurable pour cette boutique (elles sont gardées 30 jours).</p>
+                    <button wire:click="annulerRestauration" class="h-11 rounded-lg border border-border-strong font-bold">Fermer</button>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <div class="flex flex-col gap-3">
         @forelse ($abonnements as $abonnement)
             @php($proprietaire = $abonnement->proprietaire)
@@ -83,6 +112,10 @@
                                     </span>
                                     <button wire:click="preparerReinitialisation('{{ $b->id }}')"
                                             class="ml-1 text-xs font-bold text-danger-fg underline">Réinitialiser</button>
+                                    @isset($sauvegardes[$b->id])
+                                        <button wire:click="preparerRestauration('{{ $b->id }}')"
+                                                class="ml-1 text-xs font-bold text-accent underline">Restaurer</button>
+                                    @endisset
                                 </li>
                             @empty
                                 <li class="text-muted">aucune boutique</li>

@@ -24,7 +24,8 @@ use Illuminate\Support\Facades\Storage;
  *   bloquer — pour une boutique d'essai, c'est une séance d'essai de plus.
  *
  * Avant d'effacer, une copie des lignes supprimées est écrite dans
- * storage/app/reinitialisations/ : de quoi restaurer en cas d'erreur.
+ * storage/app/reinitialisations/, photos comprises : de quoi restaurer en cas
+ * d'erreur (voir RestaurationBoutique), pendant 30 jours.
  */
 class ReinitialisationBoutique
 {
@@ -94,7 +95,14 @@ class ReinitialisationBoutique
             }
         });
 
-        Storage::disk('local')->delete($photos);
+        // Les photos suivent la sauvegarde : une restauration les remet en place,
+        // le nettoyage des 30 jours les efface avec elle.
+        $dossier = RestaurationBoutique::dossierPhotos($sauvegarde);
+        foreach ($photos as $photo) {
+            if (Storage::disk('local')->exists($photo)) {
+                Storage::disk('local')->move($photo, $dossier.'/'.$photo);
+            }
+        }
 
         Log::warning('Boutique réinitialisée par l’exploitant', [
             'boutique' => $boutique->id, 'nom' => $boutique->nom, 'tables' => $tables, 'par' => $exploitant->id, 'sauvegarde' => $sauvegarde,
