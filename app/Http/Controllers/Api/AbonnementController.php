@@ -49,7 +49,11 @@ class AbonnementController extends Controller
 
         return response()->json([
             'data' => $plans,
-            'support' => ['whatsapp' => config('ecaisse.support_whatsapp'), 'paiement' => $this->numerosPaiement()],
+            'support' => [
+                'whatsapp' => config('ecaisse.support_whatsapp'),
+                'whatsapps' => array_values(array_filter(array_map('trim', explode(';', (string) config('ecaisse.supports_whatsapp'))))),
+                'paiement' => $this->numerosPaiement(),
+            ],
         ]);
     }
 

@@ -13,6 +13,13 @@ return [
      * mot de passe perdu sans e-mail) et adresse qui reçoit les alertes.
      */
     'support_whatsapp' => env('ECAISSE_SUPPORT_WHATSAPP', '+33605758494'),
+
+    /*
+     * Tous les WhatsApp du support, séparés par « ; » : l'application les
+     * propose l'un sous l'autre (abonnement à vie, demande d'abonnement). Le
+     * premier est aussi support_whatsapp pour les versions déjà installées.
+     */
+    'supports_whatsapp' => env('ECAISSE_SUPPORTS_WHATSAPP', '+33605758494;+22374988201'),
     /*
      * Numéros où le commerçant dépose le montant de son abonnement, montrés
      * dans la demande d'abonnement de l'application. Format de la variable :
