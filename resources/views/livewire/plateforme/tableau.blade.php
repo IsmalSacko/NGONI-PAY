@@ -2,9 +2,10 @@
     $fcfa = fn (int $v) => number_format($v, 0, ',', ' ').' F';
     $variation = function (?int $v) {
         if ($v === null) return '';
-        $classe = $v >= 0 ? 'text-succes' : 'text-danger-fg';
-        return '<span class="font-bold '.$classe.'">'.($v >= 0 ? '↑ +' : '↓ ').$v.' %</span>';
+        $classe = $v >= 0 ? 'bg-succes-doux text-succes' : 'bg-danger-bg text-danger-fg';
+        return '<span class="inline-flex rounded-full px-1.5 py-px font-bold whitespace-nowrap '.$classe.'">'.($v >= 0 ? '↑ +' : '↓ ').$v.' %</span>';
     };
+    $carte = 'bg-white rounded-2xl shadow-carte';
 @endphp
 
 <div class="flex flex-col gap-6">
@@ -14,10 +15,10 @@
             <p class="text-muted text-sm">Vue d’ensemble de la plateforme · {{ $periodeLibelle }}</p>
         </div>
         {{-- Téléphone : toute la largeur, quatre parts égales, chaque libellé sur une ligne. --}}
-        <div class="flex w-full sm:w-auto gap-1 rounded-xl bg-white border border-border p-1" role="group" aria-label="Période">
+        <div class="flex w-full sm:w-auto gap-1 rounded-xl bg-white shadow-carte p-1" role="group" aria-label="Période">
             @foreach ($choix as $code => $libelle)
                 <button type="button" wire:click="$set('periode', '{{ $code }}')"
-                        class="flex-1 sm:flex-none h-9 px-2 sm:px-3.5 rounded-lg text-[13px] sm:text-sm font-bold whitespace-nowrap {{ $periode === $code ? 'bg-accent text-white' : 'text-muted hover:text-ink' }}"
+                        class="flex-1 sm:flex-none h-9 px-2 sm:px-3.5 rounded-lg text-[13px] sm:text-sm font-bold whitespace-nowrap {{ $periode === $code ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-ink hover:bg-puce' }}"
                         aria-pressed="{{ $periode === $code ? 'true' : 'false' }}">{{ $libelle }}</button>
             @endforeach
         </div>
@@ -25,16 +26,20 @@
 
     {{-- Indicateurs : la variation compare à la période précédente de même durée. --}}
     <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4" wire:loading.class="opacity-60">
+        {{-- Un seul indicateur en relief : l'argent encaissé, sur fond nuit. --}}
         @foreach ([
-            ['Boutiques', number_format($indicateurs['boutiques']['valeur'], 0, ',', ' '), $indicateurs['boutiques']['detail'], $indicateurs['boutiques']['variation']],
-            ['Utilisateurs actifs', number_format($indicateurs['utilisateurs']['valeur'], 0, ',', ' '), $indicateurs['utilisateurs']['detail'], null],
-            ['Encaissements (FCFA)', $fcfa($indicateurs['encaissements']['valeur']), 'vs période précédente', $indicateurs['encaissements']['variation']],
-            ['Ventes enregistrées', number_format($indicateurs['ventes']['valeur'], 0, ',', ' '), 'vs période précédente', $indicateurs['ventes']['variation']],
-        ] as [$libelle, $valeur, $detail, $var])
-            <div class="bg-white border border-border rounded-2xl p-4 md:p-5 min-w-0">
-                <p class="text-sm text-muted">{{ $libelle }}</p>
-                <p class="mt-1 font-display font-extrabold text-xl md:text-3xl tabular-nums truncate">{{ $valeur }}</p>
-                <p class="mt-1 text-xs text-muted">{!! $variation($var) !!} {{ $detail }}</p>
+            ['Boutiques', number_format($indicateurs['boutiques']['valeur'], 0, ',', ' '), $indicateurs['boutiques']['detail'], $indicateurs['boutiques']['variation'], 'boutique', false],
+            ['Utilisateurs actifs', number_format($indicateurs['utilisateurs']['valeur'], 0, ',', ' '), $indicateurs['utilisateurs']['detail'], null, 'membres', false],
+            ['Encaissements (FCFA)', $fcfa($indicateurs['encaissements']['valeur']), 'vs période précédente', $indicateurs['encaissements']['variation'], 'graphique', true],
+            ['Ventes enregistrées', number_format($indicateurs['ventes']['valeur'], 0, ',', ' '), 'vs période précédente', $indicateurs['ventes']['variation'], 'etiquette', false],
+        ] as [$libelle, $valeur, $detail, $var, $picto, $fort])
+            <div class="{{ $fort ? 'bg-accent text-white rounded-2xl shadow-carte-haute' : $carte }} p-4 md:p-5 min-w-0">
+                <div class="flex items-start justify-between gap-2">
+                    <p class="text-sm {{ $fort ? 'text-rail' : 'text-muted' }}">{{ $libelle }}</p>
+                    <x-plateforme.icone-chip :nom="$picto" :ton="$fort ? 'jaune-fort' : 'info'" taille="w-8 h-8" class="hidden sm:inline-flex" />
+                </div>
+                <p class="mt-1 font-display font-extrabold text-xl md:text-3xl tabular-nums truncate {{ $fort ? 'text-jaune' : '' }}">{{ $valeur }}</p>
+                <p class="mt-1 text-xs {{ $fort ? 'text-rail' : 'text-muted' }}">{!! $variation($var) !!} {{ $detail }}</p>
             </div>
         @endforeach
     </div>
@@ -42,7 +47,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <livewire:plateforme.en-ligne />
 
-        <section class="lg:col-span-2 bg-white border border-border rounded-2xl p-5" wire:loading.class="opacity-60">
+        <section class="lg:col-span-2 {{ $carte }} p-4 md:p-5 min-w-0" wire:loading.class="opacity-60">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="font-display font-extrabold text-lg">Encaissements par boutique</h2>
                 <a href="{{ route('plateforme.comptes') }}" class="text-sm font-bold text-accent hover:underline">Toutes les boutiques →</a>
@@ -69,8 +74,8 @@
                     </thead>
                     <tbody>
                         @forelse ($parBoutique as $i => $b)
-                            <tr class="border-t border-separateur">
-                                <td class="py-2 pr-2 text-muted align-top">{{ $i + 1 }}</td>
+                            <tr class="border-t border-separateur hover:bg-fond-tableau/60">
+                                <td class="py-2 pr-2 align-top"><span class="inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold {{ $i === 0 ? 'bg-jaune text-accent' : 'bg-puce text-muted' }}">{{ $i + 1 }}</span></td>
                                 <td class="py-2 font-bold max-w-48 truncate" title="{{ $b->nom }}">{{ $b->nom }}<span class="block text-xs font-normal text-muted">{{ $b->ventes }} vente(s) · {{ \App\Services\Plateforme\Encaissements::libellePays($b->pays) }}</span></td>
                                 <td class="py-2 text-right tabular-nums whitespace-nowrap">
                                     {{ $b->fcfa !== null ? $fcfa($b->fcfa) : \App\Support\Money\Montant::format($b->montant, $b->devise).' '.$b->devise }}
@@ -79,7 +84,7 @@
                                     @if ($b->fcfa !== null && $total > 0)
                                         <div class="flex items-center gap-2">
                                             <span class="w-12 text-xs tabular-nums text-right">{{ number_format($b->fcfa / $total * 100, 1, ',', '') }} %</span>
-                                            <span class="hidden sm:block grow h-2 rounded bg-puce"><span class="block h-full rounded bg-[#2a78d6]" style="width: {{ $b->fcfa / $plusGrand * 100 }}%"></span></span>
+                                            <span class="hidden sm:block grow h-2 rounded-full bg-puce"><span class="block h-full rounded-full bg-[#2a78d6]" style="width: {{ $b->fcfa / $plusGrand * 100 }}%"></span></span>
                                         </div>
                                     @else
                                         <span class="text-xs text-muted">hors FCFA</span>
@@ -96,16 +101,16 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start" wire:loading.class="opacity-60">
-        <section class="bg-white border border-border rounded-2xl p-5">
+        <section class="{{ $carte }} p-5">
             <h2 class="font-display font-extrabold text-lg">Boutiques les plus actives</h2>
             <p class="text-xs text-muted">Au nombre de ventes, quelle que soit la devise</p>
             <ol class="mt-3 divide-y divide-separateur">
                 @forelse ($plusActives as $i => $b)
                     <li class="py-2.5 flex items-center gap-3 text-sm">
-                        <span class="w-5 text-muted">{{ $i + 1 }}</span>
+                        <span class="inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ $i === 0 ? 'bg-jaune text-accent' : 'bg-puce text-muted' }}">{{ $i + 1 }}</span>
                         <span class="grow min-w-0 truncate font-bold">{{ $b->nom }}</span>
                         <span class="tabular-nums text-muted">{{ $b->ventes }} ventes</span>
-                        <span class="w-14 text-right text-xs">{!! $variation($b->variation) ?: '<span class="text-muted">nouveau</span>' !!}</span>
+                        <span class="w-16 text-right text-xs">{!! $variation($b->variation) ?: '<span class="text-muted">nouveau</span>' !!}</span>
                     </li>
                 @empty
                     <li class="py-6 text-sm text-muted text-center">Aucune vente sur la période.</li>
@@ -113,13 +118,13 @@
             </ol>
         </section>
 
-        <section class="bg-white border border-border rounded-2xl p-5">
+        <section class="{{ $carte }} p-5">
             <h2 class="font-display font-extrabold text-lg">Encaissements par pays</h2>
             <p class="text-xs text-muted mb-4">Pays des boutiques, en francs CFA</p>
             <x-graphique.repartition :parts="$parPays" />
         </section>
 
-        <section class="bg-white border border-border rounded-2xl p-5">
+        <section class="{{ $carte }} p-5">
             <h2 class="font-display font-extrabold text-lg">Appareils utilisés</h2>
             <p class="text-xs text-muted mb-4">Utilisateurs vus sur la période</p>
             <x-graphique.repartition :parts="$parAppareil" />
@@ -127,7 +132,7 @@
                 @php($pays = $utilisateursParPays->keys()->first())
                 <div class="mt-5 pt-4 border-t border-separateur">
                     <p class="text-xs text-muted">Pays le plus actif</p>
-                    <p class="font-bold">{{ \App\Services\Plateforme\Encaissements::libellePays($pays) }}</p>
+                    <p class="font-bold flex items-center gap-1.5"><x-plateforme.picto nom="globe" class="w-4 h-4 text-muted" />{{ \App\Services\Plateforme\Encaissements::libellePays($pays) }}</p>
                     <p class="text-xs text-muted">{{ round($utilisateursParPays->first() / max(1, $utilisateursParPays->sum()) * 100) }} % des utilisateurs actifs</p>
                 </div>
             @endif
@@ -135,11 +140,11 @@
     </div>
 
     {{-- Abonnements : ce que le tableau montrait déjà, en bandeau. --}}
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 bg-white border border-border rounded-2xl px-5 py-4 text-sm">
-        <span><span class="font-bold text-accent">{{ $abonnements['actifs'] }}</span> abonnements actifs</span>
-        <span><span class="font-bold text-danger-fg">{{ $abonnements['expires'] }}</span> expirés (lecture seule)</span>
+    <div class="flex flex-wrap items-center gap-3 {{ $carte }} px-4 md:px-5 py-4 text-sm">
+        <span class="inline-flex items-center gap-2.5"><x-plateforme.icone-chip nom="ok" ton="succes" taille="w-9 h-9" /><span><span class="font-display font-extrabold text-lg text-succes tabular-nums">{{ $abonnements['actifs'] }}</span> abonnements actifs</span></span>
+        <span class="inline-flex items-center gap-2.5 sm:ml-4"><x-plateforme.icone-chip nom="horloge" ton="danger" taille="w-9 h-9" /><span><span class="font-display font-extrabold text-lg text-danger-fg tabular-nums">{{ $abonnements['expires'] }}</span> expirés (lecture seule)</span></span>
         @if ($abonnements['demandes'] > 0)
-            <a href="{{ route('plateforme.demandes') }}" class="ml-auto h-10 px-4 rounded-xl bg-accent text-white font-bold inline-flex items-center">
+            <a href="{{ route('plateforme.demandes') }}" class="w-full sm:w-auto sm:ml-auto h-10 px-4 rounded-xl bg-jaune text-accent font-extrabold inline-flex items-center justify-center hover:brightness-95">
                 Traiter les {{ $abonnements['demandes'] }} demande(s) en attente
             </a>
         @endif

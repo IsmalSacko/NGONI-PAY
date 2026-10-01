@@ -31,6 +31,11 @@
     --color-warn-fg: #7a3e06;
     --color-danger-bg: #fde7e4;
     --color-danger-fg: #9b1c12;
+
+    /* Ombres teintées de bleu nuit (console) : une carte se pose sur le papier
+       sans bordure ; « haute » pour ce qui flotte (menus, fenêtres). */
+    --shadow-carte: 0 1px 2px rgba(15, 42, 92, .06), 0 8px 24px rgba(15, 42, 92, .08);
+    --shadow-carte-haute: 0 2px 6px rgba(15, 42, 92, .08), 0 18px 48px rgba(15, 42, 92, .18);
 }
 
 /* Alpine : masqué jusqu’à son initialisation (liste des pays). */
