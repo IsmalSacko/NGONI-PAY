@@ -7,7 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\Fidelite;
+use App\Services\Images;
 use App\Services\ReglagesBoutique;
+use App\Services\ReinitialisationBoutique;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,7 +85,7 @@ class BoutiqueController extends Controller
     }
 
     /** Programme de fidélité : seuil d'achats et remise (seuil null : aucun). */
-    public function fidelite(Request $request, \App\Services\Fidelite $fidelite): JsonResponse
+    public function fidelite(Request $request, Fidelite $fidelite): JsonResponse
     {
         $request->validate(['seuil' => ['present', 'nullable', 'integer'], 'remise_pct' => ['nullable', 'integer']]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
@@ -94,16 +97,16 @@ class BoutiqueController extends Controller
     }
 
     /** Logo de la boutique active, imprimé sur les tickets. */
-    public function logo(Request $request, \App\Services\Images $images): JsonResponse
+    public function logo(Request $request, Images $images): JsonResponse
     {
-        $request->validate(['logo' => \App\Services\Images::REGLES]);
+        $request->validate(['logo' => Images::REGLES]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         $boutique->update(['logo' => $images->enregistrer($request->file('logo'), 'logos', $boutique->id, $boutique->logo)]);
 
         return response()->json(['data' => $boutique->fresh()]);
     }
 
-    public function supprimerLogo(\App\Services\Images $images): JsonResponse
+    public function supprimerLogo(Images $images): JsonResponse
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         $images->supprimer($boutique->logo);
@@ -121,5 +124,35 @@ class BoutiqueController extends Controller
         $user->update(['boutique_id' => $boutique]);
 
         return response()->json(['message' => 'Boutique par défaut mise à jour.']);
+    }
+
+    /** Ce que la remise à zéro de la boutique effacerait (rien n'est touché) : le propriétaire seul. */
+    public function apercuReinitialisation(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut la réinitialiser.');
+
+        return response()->json($reinitialisation->apercuBoutique($boutique));
+    }
+
+    /** Efface les données d'essai de la boutique : il faut taper REINITIALISER. */
+    public function reinitialiser(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut la réinitialiser.');
+        $request->validate([
+            'confirmation' => ['required', 'in:REINITIALISER'],
+            'garder_catalogue' => ['boolean'],
+            'garder_fournisseurs' => ['boolean'],
+        ], ['confirmation.in' => 'Tapez REINITIALISER pour confirmer.']);
+
+        $resultat = $reinitialisation->reinitialiser(
+            $boutique->id,
+            $request->user(),
+            $request->boolean('garder_catalogue', true),
+            $request->boolean('garder_fournisseurs', true),
+        );
+
+        return response()->json(['message' => "{$resultat['boutique']} est remise à zéro : elle est prête pour vos vraies ventes."]);
     }
 }

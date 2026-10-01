@@ -135,6 +135,7 @@
             {{ $slot }}
         </main>
     </div>
+    <x-toast />
     @livewireScripts
     <script>
         // Action refusée faute d'abonnement : on le dit tout de suite, au clic.

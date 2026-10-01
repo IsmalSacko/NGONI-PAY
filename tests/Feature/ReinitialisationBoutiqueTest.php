@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Boutiques\Index;
 use App\Livewire\Plateforme\Comptes;
 use App\Models\Boutique;
 use App\Models\Produit;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\RestaurationBoutique;
 use App\Services\VenteService;
+use App\Support\Tenancy\BoutiqueActive;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -327,5 +329,54 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
         $this->assertSame(1, DB::table('sessions_caisse')->where('boutique_id', $this->boutiqueAwa->id)->where('statut', 'ouverte')->count(), 'une seule caisse ouverte');
         $this->assertGreaterThan(0, DB::table('sessions_caisse')->where('boutique_id', $this->boutiqueAwa->id)->where('statut', 'fermee')->count());
+    }
+
+    public function test_le_proprietaire_reinitialise_sa_boutique_depuis_l_application(): void
+    {
+        $jeton = $this->awa->createToken('app')->plainTextToken;
+
+        $this->withToken($jeton)->getJson('/api/boutique/reinitialisation')->assertOk()->assertJsonPath('ventes', 1);
+        $this->withToken($jeton)->postJson('/api/boutique/reinitialiser', ['confirmation' => 'oui'])->assertUnprocessable();
+        $this->withToken($jeton)->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER'])->assertOk();
+
+        $this->assertSame(0, $this->compter('ventes', $this->boutiqueAwa));
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueIbrahim));
+        // La restauration reste à l'exploitant.
+        $this->withToken($jeton)->getJson("/api/plateforme/comptes/{$this->awa->id}/reinitialisation")->assertForbidden();
+    }
+
+    public function test_un_admin_qui_n_est_pas_proprietaire_ne_peut_pas(): void
+    {
+        app(TenantContext::class)->setBoutique($this->boutiqueAwa->id);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutiqueAwa->id);
+        $adjoint = User::create(['boutique_id' => $this->boutiqueAwa->id, 'name' => 'Adjoint', 'phone' => '+22370000009', 'password' => 'password123']);
+        $adjoint->assignRole('admin');
+        $jeton = $adjoint->createToken('app')->plainTextToken;
+
+        $this->withToken($jeton)->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER'])->assertForbidden();
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+    }
+
+    public function test_depuis_le_back_office_le_proprietaire_reinitialise(): void
+    {
+        session([BoutiqueActive::CLE_SESSION => $this->boutiqueAwa->id]);
+        Livewire::actingAs($this->awa)->test(Index::class)
+            ->assertSee('Réinitialiser la boutique')
+            ->assertDontSee('Restaurer')
+            ->call('preparerReinitialisation', $this->boutiqueAwa->id)
+            ->assertSee('Réinitialiser Pressing Awa')
+            ->set('confirmation', 'REINITIALISER')->call('reinitialiser')
+            ->assertHasNoErrors()
+            ->assertDispatched('toast', type: 'succes');
+
+        $this->assertSame(0, $this->compter('ventes', $this->boutiqueAwa));
+    }
+
+    public function test_le_back_office_refuse_une_autre_boutique_que_la_sienne(): void
+    {
+        session([BoutiqueActive::CLE_SESSION => $this->boutiqueAwa->id]);
+        Livewire::actingAs($this->awa)->test(Index::class)
+            ->call('preparerReinitialisation', $this->boutiqueIbrahim->id)
+            ->assertForbidden();
     }
 }

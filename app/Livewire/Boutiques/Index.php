@@ -6,10 +6,13 @@ namespace App\Livewire\Boutiques;
 
 use App\Enums\Country;
 use App\Livewire\Concerns\EstScopeParBoutique;
+use App\Livewire\Concerns\ReinitialiseUneBoutique;
 use App\Models\Boutique;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\Images;
 use App\Services\ReglagesBoutique;
+use App\Services\ReinitialisationBoutique;
 use App\Support\Money\Currencies;
 use App\Support\Tenancy\BoutiqueActive;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -27,22 +30,22 @@ use Livewire\WithFileUploads;
 #[Layout('layouts.app')]
 class Index extends Component
 {
-    use EstScopeParBoutique, WithFileUploads;
+    use EstScopeParBoutique, ReinitialiseUneBoutique, WithFileUploads;
 
     /** Nouveau logo choisi (fichier temporaire Livewire). */
     public $logo = null;
 
-    public function envoyerLogo(\App\Services\Images $images): void
+    public function envoyerLogo(Images $images): void
     {
         Auth::user()->can('boutique.update') || abort(403);
-        $this->validate(['logo' => \App\Services\Images::REGLES], [], ['logo' => 'logo']);
+        $this->validate(['logo' => Images::REGLES], [], ['logo' => 'logo']);
         $b = Boutique::findOrFail($this->boutiqueActiveId());
         $b->update(['logo' => $images->enregistrer($this->logo, 'logos', $b->id, $b->logo)]);
         $this->reset('logo');
         session()->flash('info', 'Logo enregistré : il apparaît sur les tickets.');
     }
 
-    public function supprimerLogo(\App\Services\Images $images): void
+    public function supprimerLogo(Images $images): void
     {
         Auth::user()->can('boutique.update') || abort(403);
         $b = Boutique::findOrFail($this->boutiqueActiveId());
@@ -120,6 +123,19 @@ class Index extends Component
 
         $this->reglagesOuverts = false;
         session()->flash('info', "Réglages de « {$b->nom} » enregistrés ({$b->devise}).");
+        $this->redirectRoute('boutiques.index', navigate: false);
+    }
+
+    /** La boutique de travail, et seulement par son propriétaire. */
+    protected function autoriserReinitialisation(string $boutiqueId): void
+    {
+        $b = Boutique::find($boutiqueId);
+        ($b !== null && $boutiqueId === $this->boutiqueActiveId() && ReinitialisationBoutique::autorise(Auth::user(), $b)) || abort(403);
+    }
+
+    protected function apresReinitialisation(string $boutique): void
+    {
+        session()->flash('info', "« {$boutique} » est remise à zéro : elle est prête pour vos vraies ventes.");
         $this->redirectRoute('boutiques.index', navigate: false);
     }
 

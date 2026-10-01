@@ -56,6 +56,14 @@
                 @if ($b->id === $active && $peutRegler)
                     <button wire:click="ouvrirReglages" class="mt-1 self-start h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Réglages (nom, pays, devise…)</button>
                 @endif
+                {{-- Repartir de zéro après les essais : le propriétaire seul. --}}
+                @if ($b->id === $active && \App\Services\ReinitialisationBoutique::autorise(auth()->user(), $b))
+                    <div class="mt-3 pt-3 border-t border-[--color-border] flex items-center justify-between gap-3 flex-wrap">
+                        <span class="text-xs text-[--color-muted]">Vos ventes jusqu’ici n’étaient que des essais ?</span>
+                        <button wire:click="preparerReinitialisation('{{ $b->id }}')"
+                                class="h-9 px-3 rounded-lg border border-danger-fg/40 text-danger-fg text-xs font-bold hover:bg-danger-bg">Réinitialiser la boutique</button>
+                    </div>
+                @endif
                 @if ($b->id !== $active && in_array($b->id, auth()->user()->boutiquesBackOffice(), true))
                     <form method="POST" action="{{ route('boutique-active') }}" class="mt-1">
                         @csrf
@@ -169,4 +177,5 @@
             </div>
         </div>
     @endif
+    @include('livewire.partials.reinitialisation')
 </div>

@@ -6,13 +6,15 @@ namespace App\Services;
 
 use App\Models\Boutique;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
  * Remise à zéro d'une boutique dont les données n'étaient que des essais, par
- * l'exploitant : le commerçant repart avec une boutique vierge.
+ * son propriétaire ou par l'exploitant : le commerçant repart avec une
+ * boutique vierge. La restauration, elle, reste à l'exploitant.
  *
  * - Effacés : ventes et tickets, séances de caisse, clôtures, mouvements de
  *   stock, achats et paiements fournisseurs, clients, crédits et règlements.
@@ -33,6 +35,12 @@ class ReinitialisationBoutique
     private const TOUJOURS = [
         'ventes', 'mouvements_stock', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur', 'achats', 'clotures', 'clients',
     ];
+
+    /** Le propriétaire de la boutique, ou l'exploitant de la plateforme : personne d'autre (ni admin employé, ni gérant). */
+    public static function autorise(?User $qui, Boutique $boutique): bool
+    {
+        return $qui !== null && ($qui->est_admin_plateforme || (string) $boutique->proprietaire_id === (string) $qui->id);
+    }
 
     /**
      * Boutiques du compte et ce que leur remise à zéro effacerait, sans rien toucher.
@@ -74,6 +82,9 @@ class ReinitialisationBoutique
     public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs): array
     {
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($boutiqueId);
+        if (! self::autorise($exploitant, $boutique)) {
+            throw new AuthorizationException('Seul le propriétaire de la boutique peut la réinitialiser.');
+        }
 
         $tables = [...self::TOUJOURS];
         if (! $garderFournisseurs) {

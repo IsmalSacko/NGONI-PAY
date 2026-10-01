@@ -105,6 +105,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
+    // Remise à zéro des essais : le propriétaire seul (vérifié par le service).
+    Route::get('boutique/reinitialisation', [BoutiqueController::class, 'apercuReinitialisation']);
+    Route::post('boutique/reinitialiser', [BoutiqueController::class, 'reinitialiser']);
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;
     // les demandes engagent le propriétaire, donc réservées à l'admin.

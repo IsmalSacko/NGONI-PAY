@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plateforme;
 
+use App\Livewire\Concerns\ReinitialiseUneBoutique;
 use App\Models\Abonnement;
 use App\Models\Boutique;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
-use App\Services\ReinitialisationBoutique;
 use App\Services\RestaurationBoutique;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +27,7 @@ use Livewire\WithPagination;
 #[Layout('layouts.plateforme', ['title' => 'Comptes'])]
 class Comptes extends Component
 {
-    use WithPagination;
+    use ReinitialiseUneBoutique, WithPagination;
 
     public string $recherche = '';
 
@@ -45,17 +45,6 @@ class Comptes extends Component
     public string $note = '';
 
     public ?string $info = null;
-
-    /** Boutique dont la remise à zéro est en cours de confirmation, et son aperçu. */
-    public ?string $aReinitialiser = null;
-
-    public array $apercu = [];
-
-    public bool $garderCatalogue = true;
-
-    public bool $garderFournisseurs = true;
-
-    public string $confirmation = '';
 
     /** Boutique dont on choisit la sauvegarde à restaurer, et la sauvegarde choisie. */
     public ?string $aRestaurer = null;
@@ -106,39 +95,15 @@ class Comptes extends Component
         $this->compteOuvert = null;
     }
 
-    /** Ouvre la confirmation : ce qui partira, avant d'effacer quoi que ce soit. */
-    public function preparerReinitialisation(string $boutiqueId, ReinitialisationBoutique $reinitialisation): void
+    /** L'exploitant réinitialise n'importe quelle boutique (route réservée à la console). */
+    protected function autoriserReinitialisation(string $boutiqueId): void
     {
-        $this->reset(['info', 'confirmation', 'garderCatalogue', 'garderFournisseurs']);
-        $this->resetValidation();
-        $this->aReinitialiser = $boutiqueId;
-        $this->apercu = $reinitialisation->apercuBoutique(Boutique::withoutGlobalScopes()->findOrFail($boutiqueId));
+        Auth::user()?->est_admin_plateforme || abort(403);
     }
 
-    public function annulerReinitialisation(): void
+    protected function apresReinitialisation(string $boutique): void
     {
-        $this->reset(['aReinitialiser', 'apercu', 'confirmation']);
-    }
-
-    public function reinitialiser(ReinitialisationBoutique $reinitialisation): void
-    {
-        $this->validate(['confirmation' => ['required', 'in:REINITIALISER']], [
-            'confirmation.in' => 'Tapez REINITIALISER pour confirmer.', 'confirmation.required' => 'Tapez REINITIALISER pour confirmer.',
-        ]);
-
-        try {
-            $r = $reinitialisation->reinitialiser($this->aReinitialiser, Auth::user(), $this->garderCatalogue, $this->garderFournisseurs);
-        } catch (ValidationException $e) {
-            $message = collect($e->errors())->flatten()->first();
-            $this->addError('confirmation', $message);
-            $this->dispatch('toast', type: 'erreur', message: $message);
-
-            return;
-        }
-
-        $this->annulerReinitialisation();
-        $this->info = "{$r['boutique']} est remise à zéro.";
-        $this->dispatch('toast', type: 'succes', message: "Les données d’essai de {$r['boutique']} sont effacées. Restauration possible pendant 30 jours.");
+        $this->info = "{$boutique} est remise à zéro.";
     }
 
     public function preparerRestauration(string $boutiqueId, RestaurationBoutique $restauration): void
