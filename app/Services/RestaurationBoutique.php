@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  * lignes effacées sont remises en base depuis la sauvegarde, photos comprises,
  * et le stock des articles gardés reprend sa valeur d'avant.
  *
- * - Refusée si la boutique a déjà vendu ou ouvert une caisse depuis : mêler
+ * - Refusée si la boutique a déjà vendu ou reçu un achat depuis : mêler
  *   les vraies données d'après aux essais d'avant fausserait les deux.
  * - Une sauvegarde ne sert qu'une fois. Après plusieurs remises à zéro, on
  *   restaure la plus récente d'abord, puis les précédentes.
@@ -79,12 +79,21 @@ class RestaurationBoutique
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($donnees['boutique']['id']);
 
         $depuis = Carbon::parse($donnees['reinitialisee_le']);
-        foreach (['ventes' => 'vendu', 'sessions_caisse' => 'ouvert une caisse'] as $table => $quoi) {
+        // Une caisse ouverte depuis, sans vente, ne compte pas : elle reste telle quelle.
+        foreach (['ventes' => 'vendu', 'achats' => 'reçu de la marchandise'] as $table => $quoi) {
             if (DB::table($table)->where('boutique_id', $boutique->id)->where('created_at', '>', $depuis)->exists()) {
                 throw ValidationException::withMessages(['sauvegarde' => [
                     "Impossible : {$boutique->nom} a déjà {$quoi} depuis la remise à zéro. Restaurer mêlerait ces vraies données aux essais.",
                 ]]);
             }
+        }
+
+        // Une caisse ouverte aujourd'hui : celle qui l'était avant la remise à zéro
+        // revient fermée à cette heure-là, plutôt que deux caisses ouvertes à la fois.
+        if (DB::table('sessions_caisse')->where('boutique_id', $boutique->id)->where('statut', 'ouverte')->exists()) {
+            $donnees['tables']['sessions_caisse'] = array_map(fn (array $r) => $r['statut'] === 'ouverte'
+                ? [...$r, 'statut' => 'fermee', 'fermee_le' => $depuis->toDateTimeString()]
+                : $r, $donnees['tables']['sessions_caisse'] ?? []);
         }
 
         $lignes = 0;

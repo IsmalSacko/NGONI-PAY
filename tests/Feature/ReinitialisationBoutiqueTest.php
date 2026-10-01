@@ -267,4 +267,26 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->artisan('ecaisse:purger-reinitialisations')->assertSuccessful();
         $this->assertSame([], Storage::disk('local')->allFiles('reinitialisations'));
     }
+
+    public function test_une_caisse_ouverte_depuis_sans_vente_ne_bloque_pas(): void
+    {
+        // Une caisse ouverte au moment de la remise à zéro, et une autre ouverte depuis.
+        DB::table('sessions_caisse')->insert([
+            'id' => (string) Str::uuid(), 'boutique_id' => $this->boutiqueAwa->id, 'user_id' => $this->awa->id,
+            'statut' => 'ouverte', 'ouverte_le' => now(), 'fond_initial' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->reinitialiser(garderCatalogue: true);
+        $this->travel(1)->minutes();
+        DB::table('sessions_caisse')->insert([
+            'id' => (string) Str::uuid(), 'boutique_id' => $this->boutiqueAwa->id, 'user_id' => $this->awa->id,
+            'statut' => 'ouverte', 'ouverte_le' => now(), 'fond_initial' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $restauration = app(RestaurationBoutique::class);
+        $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
+
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+        $this->assertSame(1, DB::table('sessions_caisse')->where('boutique_id', $this->boutiqueAwa->id)->where('statut', 'ouverte')->count(), 'une seule caisse ouverte');
+        $this->assertGreaterThan(0, DB::table('sessions_caisse')->where('boutique_id', $this->boutiqueAwa->id)->where('statut', 'fermee')->count());
+    }
 }
