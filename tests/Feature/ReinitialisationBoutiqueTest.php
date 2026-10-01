@@ -120,7 +120,7 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertGreaterThan(0, $this->compter('produits', $this->boutiqueIbrahim));
     }
 
-    public function test_refuse_si_une_caisse_est_ouverte(): void
+    public function test_une_caisse_ouverte_est_signalee_puis_effacee_aussi(): void
     {
         DB::table('sessions_caisse')->where('boutique_id', $this->boutiqueAwa->id)->delete();
         DB::table('sessions_caisse')->insert([
@@ -128,9 +128,14 @@ class ReinitialisationBoutiqueTest extends TestCase
             'statut' => 'ouverte', 'ouverte_le' => now(), 'fond_initial' => 0, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
+        $this->withToken($this->jeton)->getJson("/api/plateforme/comptes/{$this->awa->id}/reinitialisation")->assertOk()
+            ->assertJsonPath('boutiques.0.blocage', null)
+            ->assertJsonPath('boutiques.0.avertissement', fn ($a) => str_contains((string) $a, 'caisse est encore ouverte'));
+
         $this->withToken($this->jeton)->postJson("/api/plateforme/boutiques/{$this->boutiqueAwa->id}/reinitialiser", ['confirmation' => 'REINITIALISER'])
-            ->assertUnprocessable();
-        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
+            ->assertOk();
+        $this->assertSame(0, $this->compter('ventes', $this->boutiqueAwa));
+        $this->assertSame(0, $this->compter('sessions_caisse', $this->boutiqueAwa));
     }
 
     public function test_reserve_a_l_exploitant(): void

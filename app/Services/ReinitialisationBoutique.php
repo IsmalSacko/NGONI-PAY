@@ -9,7 +9,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Remise à zéro d'une boutique dont les données n'étaient que des essais, par
@@ -21,7 +20,8 @@ use Illuminate\Validation\ValidationException;
  *   à 0 ; sinon articles et catégories partent aussi).
  * - Gardés : la boutique (réglages, logo, programme fidélité), l'équipe et
  *   l'abonnement. La numérotation des tickets repart d'elle-même de 1.
- * - Refusée tant qu'une caisse est ouverte.
+ * - Une caisse restée ouverte est effacée aussi : l'aperçu le signale, sans
+ *   bloquer — pour une boutique d'essai, c'est une séance d'essai de plus.
  *
  * Avant d'effacer, une copie des lignes supprimées est écrite dans
  * storage/app/reinitialisations/ : de quoi restaurer en cas d'erreur.
@@ -62,7 +62,8 @@ class ReinitialisationBoutique
             'articles' => DB::table('produits')->where('boutique_id', $b->id)->whereNull('deleted_at')->count(),
             'categories' => DB::table('categories_produits')->where('boutique_id', $b->id)->whereNull('deleted_at')->count(),
             'fournisseurs' => DB::table('fournisseurs')->where('boutique_id', $b->id)->whereNull('deleted_at')->count(),
-            'blocage' => $this->blocage($b->id),
+            'blocage' => null,
+            'avertissement' => $this->avertissement($b->id),
         ];
     }
 
@@ -72,9 +73,6 @@ class ReinitialisationBoutique
     public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs): array
     {
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($boutiqueId);
-        if ($raison = $this->blocage($boutique->id)) {
-            throw ValidationException::withMessages(['boutique' => [$raison]]);
-        }
 
         $tables = [...self::TOUJOURS];
         if (! $garderFournisseurs) {
@@ -105,10 +103,10 @@ class ReinitialisationBoutique
         return ['boutique' => $boutique->nom, 'sauvegarde' => $sauvegarde];
     }
 
-    private function blocage(string $boutiqueId): ?string
+    private function avertissement(string $boutiqueId): ?string
     {
         return DB::table('sessions_caisse')->where('boutique_id', $boutiqueId)->where('statut', 'ouverte')->exists()
-            ? 'Une caisse est encore ouverte dans cette boutique : il faut la fermer avant de tout remettre à zéro.'
+            ? 'Une caisse est encore ouverte : elle sera effacée aussi. Si quelqu’un encaisse en ce moment, prévenez-le avant.'
             : null;
     }
 
