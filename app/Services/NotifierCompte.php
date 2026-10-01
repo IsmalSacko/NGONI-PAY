@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Mail\MessageCompteMail;
 use App\Models\NotificationApp;
 use App\Models\User;
+use App\Support\Apres;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -25,21 +26,31 @@ class NotifierCompte
             $notification = NotificationApp::create([
                 'user_id' => $user->id, 'type' => $type, 'titre' => $titre, 'message' => $message, 'lien' => $lien,
             ]);
-            $this->push->envoyerAuxComptes([$user->id], [
-                'notification_id' => (string) $notification->id, 'titre' => $titre, 'message' => $message, 'lien' => $lien, 'type' => $type,
-            ]);
         } catch (\Throwable $e) {
-            Log::error('Notification non envoyée', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
-        }
+            Log::error('Notification non enregistrée', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
 
-        if (! $email || blank($user->email)) {
             return;
         }
 
-        try {
-            Mail::to($user->email)->send(new MessageCompteMail($titre, $message, $user->name));
-        } catch (\Throwable $e) {
-            Log::error('E-mail non envoyé', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
-        }
+        // Push et e-mail une fois la réponse partie : l'écran n'attend pas Firebase ni le serveur de mails.
+        Apres::reponse(function () use ($user, $titre, $message, $lien, $type, $email, $notification): void {
+            try {
+                $this->push->envoyerAuxComptes([$user->id], [
+                    'notification_id' => (string) $notification->id, 'titre' => $titre, 'message' => $message, 'lien' => $lien, 'type' => $type,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Notification non envoyée', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
+            }
+
+            if (! $email || blank($user->email)) {
+                return;
+            }
+
+            try {
+                Mail::to($user->email)->send(new MessageCompteMail($titre, $message, $user->name));
+            } catch (\Throwable $e) {
+                Log::error('E-mail non envoyé', ['user_id' => $user->id, 'titre' => $titre, 'erreur' => $e->getMessage()]);
+            }
+        });
     }
 }

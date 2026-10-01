@@ -8,6 +8,7 @@ use App\Enums\Country;
 use App\Mail\InscriptionMail;
 use App\Models\Boutique;
 use App\Models\User;
+use App\Support\Apres;
 use App\Support\Authorization\Permissions;
 use App\Support\Phone\PhoneNumber;
 use App\Support\Tenancy\TenantContext;
@@ -109,11 +110,13 @@ class BoutiqueRegistrationService
      */
     private function prevenirExploitant(User $user, Boutique $boutique, bool $nouveauCompte): void
     {
-        try {
-            Mail::to(config('ecaisse.notification_email'))->send(new InscriptionMail($user, $boutique, $nouveauCompte));
-        } catch (\Throwable $e) {
-            Log::error('Mail d’inscription non envoyé', ['user' => $user->id, 'boutique' => $boutique->id, 'error' => $e->getMessage()]);
-        }
+        Apres::reponse(function () use ($user, $boutique, $nouveauCompte): void {
+            try {
+                Mail::to(config('ecaisse.notification_email'))->send(new InscriptionMail($user, $boutique, $nouveauCompte));
+            } catch (\Throwable $e) {
+                Log::error('Mail d’inscription non envoyé', ['user' => $user->id, 'boutique' => $boutique->id, 'error' => $e->getMessage()]);
+            }
+        });
         app(AlertesExploitant::class)->envoyer(
             $nouveauCompte ? 'Nouvelle inscription' : 'Nouvelle boutique',
             "{$user->name} · {$boutique->nom} · {$user->phone}",

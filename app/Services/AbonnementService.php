@@ -12,6 +12,7 @@ use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
+use App\Support\Apres;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -173,13 +174,15 @@ class AbonnementService
             'statut' => StatutDemande::EnAttente,
         ]);
 
-        try {
-            Mail::to(config('ecaisse.notification_email'))->send(new DemandeAbonnementMail($demande));
-        } catch (\Throwable $e) {
-            // La demande est enregistrée et visible dans la console : un mail
-            // perdu ne doit pas la faire échouer.
-            Log::error('Mail de demande d’abonnement non envoyé', ['demande' => $demande->id, 'error' => $e->getMessage()]);
-        }
+        Apres::reponse(function () use ($demande): void {
+            try {
+                Mail::to(config('ecaisse.notification_email'))->send(new DemandeAbonnementMail($demande));
+            } catch (\Throwable $e) {
+                // La demande est enregistrée et visible dans la console : un mail
+                // perdu ne doit pas la faire échouer.
+                Log::error('Mail de demande d’abonnement non envoyé', ['demande' => $demande->id, 'error' => $e->getMessage()]);
+            }
+        });
 
         $alerte = ($boutique->nom ?? 'Une boutique').' demande '.$plan->nom.' ('.mb_strtolower($cycle->libelle()).') · '
             .number_format($tarif->montant, 0, ',', ' ').' '.$tarif->devise;
