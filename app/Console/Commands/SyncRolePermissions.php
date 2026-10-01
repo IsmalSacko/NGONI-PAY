@@ -29,6 +29,9 @@ class SyncRolePermissions extends Command
 
     public function handle(): int
     {
+        // Des centaines de boutiques, trois rôles chacune : les 128 Mo par
+        // défaut ne suffisaient plus (la migration des droits s'arrêtait là).
+        ini_set('memory_limit', '1G');
         $registrar = app(PermissionRegistrar::class);
 
         foreach (Permissions::all() as $permission) {

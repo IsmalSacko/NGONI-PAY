@@ -8,6 +8,7 @@ use App\Support\Authorization\Permissions;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -21,8 +22,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Les permissions doivent exister avant d'être données.
-        Artisan::call('ecaisse:sync-role-permissions');
+        ini_set('memory_limit', '1G');
+        // Les permissions doivent exister avant d'être données — sans rejouer
+        // les rôles : cela retirerait aux gérants ce qu'ils n'ont pas encore
+        // reçu directement.
+        foreach (Permissions::all() as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $registrar = app(PermissionRegistrar::class);
         $roles = config('permission.table_names.roles');
