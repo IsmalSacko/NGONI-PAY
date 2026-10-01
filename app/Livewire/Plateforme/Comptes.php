@@ -129,13 +129,16 @@ class Comptes extends Component
         try {
             $r = $reinitialisation->reinitialiser($this->aReinitialiser, Auth::user(), $this->garderCatalogue, $this->garderFournisseurs);
         } catch (ValidationException $e) {
-            $this->addError('confirmation', collect($e->errors())->flatten()->first());
+            $message = collect($e->errors())->flatten()->first();
+            $this->addError('confirmation', $message);
+            $this->dispatch('toast', type: 'erreur', message: $message);
 
             return;
         }
 
         $this->annulerReinitialisation();
         $this->info = "{$r['boutique']} est remise à zéro.";
+        $this->dispatch('toast', type: 'succes', message: "Les données d’essai de {$r['boutique']} sont effacées. Restauration possible pendant 30 jours.");
     }
 
     public function preparerRestauration(string $boutiqueId, RestaurationBoutique $restauration): void
@@ -169,13 +172,16 @@ class Comptes extends Component
         try {
             $r = $restauration->restaurer($this->sauvegarde, Auth::user());
         } catch (ValidationException $e) {
-            $this->addError('confirmationRestauration', collect($e->errors())->flatten()->first());
+            $message = collect($e->errors())->flatten()->first();
+            $this->addError('confirmationRestauration', $message);
+            $this->dispatch('toast', type: 'erreur', message: $message);
 
             return;
         }
 
         $this->annulerRestauration();
         $this->info = "{$r['boutique']} est restaurée ({$r['lignes']} lignes remises en place).";
+        $this->dispatch('toast', type: 'succes', message: "{$r['boutique']} est restaurée : {$r['lignes']} lignes remises en place.");
     }
 
     public function revoquer(string $userId, AbonnementService $service): void

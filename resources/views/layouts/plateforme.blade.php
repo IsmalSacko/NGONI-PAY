@@ -65,6 +65,7 @@
     <main class="max-w-7xl mx-auto px-4 md:px-6 py-5 md:py-8">
         {{ $slot }}
     </main>
+    <x-toast />
     @livewireScripts
 </body>
 </html>

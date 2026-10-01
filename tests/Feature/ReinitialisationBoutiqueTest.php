@@ -156,7 +156,8 @@ class ReinitialisationBoutiqueTest extends TestCase
             ->assertSee('Réinitialiser Pressing Awa')
             ->set('confirmation', 'oui')->call('reinitialiser')->assertHasErrors('confirmation')
             ->set('confirmation', 'REINITIALISER')->call('reinitialiser')->assertHasNoErrors()
-            ->assertSet('aReinitialiser', null)->assertSee('remise à zéro');
+            ->assertSet('aReinitialiser', null)->assertSee('remise à zéro')
+            ->assertDispatched('toast', type: 'succes');
 
         $this->assertSame(0, $this->compter('ventes', $this->boutiqueAwa));
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueIbrahim));
@@ -250,7 +251,8 @@ class ReinitialisationBoutiqueTest extends TestCase
             ->assertSee('Restaurer Pressing Awa')
             ->set('confirmationRestauration', 'oui')->call('restaurer')->assertHasErrors('confirmationRestauration')
             ->set('confirmationRestauration', 'RESTAURER')->call('restaurer')->assertHasNoErrors()
-            ->assertSet('aRestaurer', null)->assertSee('est restaurée');
+            ->assertSet('aRestaurer', null)->assertSee('est restaurée')
+            ->assertDispatched('toast', type: 'succes');
 
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
     }

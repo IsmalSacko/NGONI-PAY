@@ -48,7 +48,7 @@
                 @error('confirmation') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
                 <div class="flex gap-3">
                     <button wire:click="annulerReinitialisation" class="flex-1 h-11 rounded-lg border border-border-strong font-bold">Annuler</button>
-                    <button wire:click="reinitialiser" wire:loading.attr="disabled" class="flex-1 h-11 rounded-lg bg-danger-fg text-white font-bold disabled:opacity-60">Réinitialiser</button>
+                    <button wire:click="reinitialiser" wire:loading.attr="disabled" wire:target="reinitialiser" class="flex-1 h-11 rounded-lg bg-danger-fg text-white font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"><svg wire:loading wire:target="reinitialiser" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span wire:loading.remove wire:target="reinitialiser">Réinitialiser</span><span wire:loading wire:target="reinitialiser">Effacement…</span></button>
                 </div>
             </div>
         </div>
@@ -73,7 +73,7 @@
                     @error('sauvegarde') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
                     <div class="flex gap-3">
                         <button wire:click="annulerRestauration" class="flex-1 h-11 rounded-lg border border-border-strong font-bold">Annuler</button>
-                        <button wire:click="restaurer" wire:loading.attr="disabled" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold disabled:opacity-60">Restaurer</button>
+                        <button wire:click="restaurer" wire:loading.attr="disabled" wire:target="restaurer" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2"><svg wire:loading wire:target="restaurer" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span wire:loading.remove wire:target="restaurer">Restaurer</span><span wire:loading wire:target="restaurer">Restauration…</span></button>
                     </div>
                 @else
                     <p class="text-sm">Aucune sauvegarde restaurable pour cette boutique (elles sont gardées 30 jours).</p>
