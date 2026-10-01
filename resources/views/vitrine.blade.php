@@ -121,6 +121,15 @@
         <a href="{{ route('connexion') }}" class="hidden sm:inline-flex h-10 px-4 items-center rounded-xl font-bold text-sm hover:bg-white">Se connecter</a>
         <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-10 px-4 items-center rounded-xl bg-accent text-white font-bold text-sm hover:bg-accent-dark">Télécharger</a>
     </div>
+    {{-- Téléphone : les mêmes liens, en rangée qui défile sous l'en-tête (la page n'a pas de JavaScript). --}}
+    <nav class="md:hidden border-t border-border/70" aria-label="Sections de la page">
+        <div class="max-w-6xl mx-auto px-4 flex gap-2 overflow-x-auto whitespace-nowrap py-2 text-sm font-bold [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            @foreach (['fonctions' => 'Fonctions', 'tarifs' => 'Tarifs', 'parrainage' => 'Parrainage', 'questions' => 'Questions', 'partager' => 'Partager'] as $ancre => $libelle)
+                <a href="#{{ $ancre }}" class="shrink-0 inline-flex items-center h-9 px-3.5 rounded-full bg-white border border-border text-accent-dark active:bg-accent-soft">{{ $libelle }}</a>
+            @endforeach
+            <a href="{{ route('connexion') }}" class="sm:hidden shrink-0 inline-flex items-center h-9 px-3.5 rounded-full bg-accent-soft text-accent-dark">Se connecter</a>
+        </div>
+    </nav>
 </header>
 
 <main>
@@ -294,9 +303,9 @@
         <div id="a-vie" class="mt-10 max-w-4xl mx-auto rounded-3xl border-2 border-jaune bg-white p-7 md:p-8">
             <div class="flex flex-wrap items-baseline justify-between gap-3">
                 <h3 class="font-display font-extrabold text-2xl">Abonnement à vie</h3>
-                <span class="rounded-full bg-jaune text-accent text-xs font-extrabold px-3 py-1">Payez une fois</span>
+                <span class="rounded-full bg-jaune text-accent text-xs font-extrabold px-3 py-1">Offre de lancement</span>
             </div>
-            <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance.</p>
+            <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance. <strong class="text-ink">Proposé seulement pendant les six premiers mois.</strong></p>
             <div class="mt-6 grid sm:grid-cols-2 gap-4">
                 @foreach ($aVie as [$nom, $montant, $texte])
                     <div class="rounded-2xl bg-paper border border-border p-5">
@@ -307,6 +316,7 @@
                 @endforeach
             </div>
             <ul class="mt-5 flex flex-col gap-1.5 text-xs text-muted">
+                <li>• Offre de lancement : proposée pendant les six premiers mois seulement, puis retirée.</li>
                 <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
                 <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
                 <li>• Remboursable dans les 14 jours suivant l’activation, pas au-delà.</li>
