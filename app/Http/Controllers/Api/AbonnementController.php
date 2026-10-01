@@ -49,7 +49,7 @@ class AbonnementController extends Controller
 
         return response()->json([
             'data' => $plans,
-            'support' => ['whatsapp' => config('ecaisse.support_whatsapp')],
+            'support' => ['whatsapp' => config('ecaisse.support_whatsapp'), 'paiement' => $this->numerosPaiement()],
         ]);
     }
 
@@ -155,5 +155,28 @@ class AbonnementController extends Controller
                 : $this->abonnements->finProjetee($d->user_id, $d->plan, $d->mois)?->toDateString(),
             'cree_le' => $d->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Numéros de dépôt de l'abonnement (config ecaisse.numeros_paiement).
+     *
+     * @return list<array{telephone: string, moyens: list<string>}>
+     */
+    private function numerosPaiement(): array
+    {
+        $libelles = ['orange_money' => 'Orange Money', 'wave' => 'Wave', 'moov' => 'Moov Money'];
+        $numeros = [];
+        foreach (array_filter(explode(';', (string) config('ecaisse.numeros_paiement'))) as $entree) {
+            [$telephone, $moyens] = array_pad(explode(':', trim($entree), 2), 2, '');
+            if (trim($telephone) === '') {
+                continue;
+            }
+            $numeros[] = [
+                'telephone' => trim($telephone),
+                'moyens' => array_values(array_map(fn ($m) => $libelles[trim($m)] ?? trim($m), array_filter(explode(',', $moyens), fn ($m) => trim($m) !== ''))),
+            ];
+        }
+
+        return $numeros;
     }
 }

@@ -13,5 +13,12 @@ return [
      * mot de passe perdu sans e-mail) et adresse qui reçoit les alertes.
      */
     'support_whatsapp' => env('ECAISSE_SUPPORT_WHATSAPP', '+33605758494'),
+    /*
+     * Numéros où le commerçant dépose le montant de son abonnement, montrés
+     * dans la demande d'abonnement de l'application. Format de la variable :
+     * « numéro:moyen,moyen;numéro:moyen » (moyens : orange_money, wave, moov).
+     */
+    'numeros_paiement' => env('ECAISSE_NUMEROS_PAIEMENT', '+22373136789:orange_money,wave;+22374988201:orange_money,wave'),
+
     'notification_email' => env('ECAISSE_NOTIFICATION_EMAIL', 'ismalsacko@yahoo.fr'),
 ];

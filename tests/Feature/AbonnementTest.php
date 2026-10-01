@@ -201,6 +201,8 @@ class AbonnementTest extends TestCase
     public function test_le_catalogue_des_plans_est_public(): void
     {
         $reponse = $this->getJson('/api/plans')->assertOk()->assertJsonPath('support.whatsapp', '+33605758494');
+        $reponse->assertJsonPath('support.paiement.0', ['telephone' => '+22373136789', 'moyens' => ['Orange Money', 'Wave']])
+            ->assertJsonPath('support.paiement.1.telephone', '+22374988201');
 
         $plans = collect($reponse->json('data'))->keyBy('code');
         $this->assertTrue($plans['essai']['est_essai']);
