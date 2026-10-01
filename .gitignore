@@ -28,3 +28,7 @@ Thumbs.db
 
 # Clés Firebase Admin : secrètes, jamais versionnées.
 *firebase-adminsdk*.json
+
+# Application web (Flutter), déposée par le workflow de publication de l’app.
+/public/app
+/public/app.ancien
