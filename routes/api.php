@@ -30,6 +30,7 @@ use App\Support\Tenancy\TenantContext;
 use App\Support\VersionApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use App\Services\ConditionsUtilisation;
 use Illuminate\Support\Facades\Route;
 
 Route::get('pays', [PaysController::class, 'index']);
@@ -40,7 +41,12 @@ Route::get('pays', [PaysController::class, 'index']);
 Route::get('app-version', fn () => response()->json([
     'latest_version' => VersionApplication::derniere(),
     'store_url' => config('mobile.store_url'),
-    'minimum_version' => config('mobile.minimum_version'),
+    // Dès que la 4.9.0 est sur le Play Store, elle devient obligatoire : les
+    // versions d'avant ne savent pas présenter les conditions d'utilisation.
+    'minimum_version' => version_compare(VersionApplication::derniere(), ConditionsUtilisation::VERSION_APPLICATION, '>=')
+        && version_compare((string) config('mobile.minimum_version'), ConditionsUtilisation::VERSION_APPLICATION, '<')
+        ? ConditionsUtilisation::VERSION_APPLICATION
+        : config('mobile.minimum_version'),
 ]));
 // Version publiée sur le Play Store, signalée par la CI (jeton secret) : annonce automatique.
 Route::post('publication-play', PublicationPlayController::class)->middleware('throttle:10,1');
@@ -55,7 +61,7 @@ Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiser
 
 // Console de l'exploitant dans l'application : hors du contexte d'une
 // boutique (pas de « tenant »), elle voit tous les comptes.
-Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->controller(PlateformeController::class)->group(function (): void {
+Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('plateforme')->controller(PlateformeController::class)->group(function (): void {
     Route::get('tableau', 'tableau');
     Route::get('plans', 'plans');
     Route::put('plans', 'enregistrerPlans');
@@ -83,7 +89,7 @@ Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->control
     Route::post('annonces/{annonce}/arreter', 'arreterAnnonce');
 });
 
-Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
     Route::post('conditions/accepter', [AuthController::class, 'accepterConditions']);

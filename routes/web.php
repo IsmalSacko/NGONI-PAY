@@ -21,6 +21,24 @@ Route::view('confidentialite', 'juridique.confidentialite')->name('confidentiali
 Route::view('privacy', 'juridique.confidentialite');
 Route::view('conditions', 'juridique.conditions')->name('conditions');
 Route::view('mentions-legales', 'juridique.mentions')->name('mentions-legales');
+// Texte exact d'une version déjà acceptée (preuve en cas de litige).
+Route::get('conditions/archives/{version}/{document}', function (string $version, string $document) {
+    abort_unless(in_array($document, ['conditions', 'confidentialite'], true), 404);
+    $texte = \Illuminate\Support\Facades\DB::table('versions_conditions')->where('version', $version)->value($document);
+    abort_if($texte === null, 404);
+
+    return response($texte)->header('X-Robots-Tag', 'noindex');
+})->where('version', '[0-9.\-]+')->name('conditions.archive');
+// Back-office : accepter la nouvelle version avant de continuer.
+Route::middleware('auth')->group(function (): void {
+    Route::get('conditions/accepter', fn () => view('juridique.accepter'))->name('conditions.accepter');
+    Route::post('conditions/accepter', function (\Illuminate\Http\Request $request) {
+        $request->validate(['conditions_acceptees' => ['accepted']], ['conditions_acceptees.accepted' => 'Cochez la case pour accepter les conditions et continuer.']);
+        app(\App\Services\ConditionsUtilisation::class)->accepter($request->user(), $request, 'web');
+
+        return redirect()->intended('/');
+    });
+});
 // Adresse déclarée à Google Play pour la suppression du compte.
 Route::redirect('suppression-compte', '/confidentialite#suppression-compte')->name('suppression-compte');
 
@@ -83,7 +101,7 @@ Route::post('boutique-active', function () {
     return redirect()->route('tableau-de-bord');
 })->middleware('auth')->name('boutique-active');
 
-Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
+Route::middleware(['auth', 'conditions', 'tenant', 'backoffice'])->group(function (): void {
     Route::get('boutiques', \App\Livewire\Boutiques\Index::class)->name('boutiques.index');
     Route::get('achats', \App\Livewire\Achats\Index::class)->name('achats.index')->middleware('permission:achats.view');
     Route::get('rapports', \App\Livewire\Rapports\Index::class)->name('rapports.index')->middleware('permission:rapports.view');
@@ -108,7 +126,7 @@ Route::middleware(['auth', 'tenant', 'backoffice'])->group(function (): void {
 Route::get('mon-compte', \App\Livewire\MonCompte::class)->middleware(['auth', 'tenant'])->name('mon-compte');
 
 // Console de l'exploitant : comptes, abonnements, demandes, plans, utilisateurs.
-Route::middleware(['auth', 'plateforme'])->prefix('plateforme')->name('plateforme.')->group(function (): void {
+Route::middleware(['auth', 'conditions', 'plateforme'])->prefix('plateforme')->name('plateforme.')->group(function (): void {
     Route::get('/', \App\Livewire\Plateforme\Tableau::class)->name('tableau');
     Route::get('comptes', \App\Livewire\Plateforme\Comptes::class)->name('comptes');
     Route::get('demandes', \App\Livewire\Plateforme\Demandes::class)->name('demandes');

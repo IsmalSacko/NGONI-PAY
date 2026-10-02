@@ -258,6 +258,8 @@ class PlateformeController extends Controller
             ->limit(100)
             ->get();
 
+        $conditions = app(\App\Services\ConditionsUtilisation::class)->dernieres($users->pluck('id')->map(fn ($id) => (string) $id)->all());
+
         return response()->json(['data' => $users->map(fn (User $u) => [
             'id' => $u->id,
             'nom' => $u->name,
@@ -269,6 +271,8 @@ class PlateformeController extends Controller
             'appareils' => (int) $u->nb_appareils,
             'ventes' => (int) $u->nb_ventes,
             'whatsapp' => WhatsApp::link($u->phone),
+            // Dernière acceptation des conditions (null : jamais acceptées).
+            'conditions' => $conditions[(string) $u->id] ?? null,
             'derniere_app' => $u->derniere_app ? Carbon::parse($u->derniere_app)->toIso8601String() : null,
             'inscrit_le' => $u->created_at?->toIso8601String(),
         ])]);

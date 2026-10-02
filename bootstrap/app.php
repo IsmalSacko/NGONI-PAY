@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'abonnement' => \App\Http\Middleware\ExigeAbonnementActif::class,
             'plateforme' => \App\Http\Middleware\EstAdminPlateforme::class,
             'backoffice' => \App\Http\Middleware\AccesBackOffice::class,
+            'conditions' => \App\Http\Middleware\ExigeConditions::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);

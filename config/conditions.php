@@ -14,6 +14,10 @@ return [
     // Date de publication, suivie d'un numéro si le texte change le même jour.
     'version' => '2026-10-02.2',
 
+    // Sans acceptation de cette version, le Service ne s'utilise pas (voir
+    // ExigeConditions). Coupé dans les tests des autres écrans seulement.
+    'exiger' => true,
+
     // Offre de lancement « abonnement à vie » : souscription possible entre ces deux dates.
     'a_vie' => [
         'debut' => '2026-09-01',

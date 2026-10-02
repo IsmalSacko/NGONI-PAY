@@ -130,6 +130,11 @@ class Utilisateurs extends Component
             ->when($this->tri === 'recents', fn ($q) => $q->latest('users.created_at'), fn ($q) => $q->orderBy('name'))
             ->paginate(25);
 
-        return view('livewire.plateforme.utilisateurs', ['users' => $users]);
+        return view('livewire.plateforme.utilisateurs', [
+            'users' => $users,
+            // Dernière acceptation des conditions de chacun, et la version en vigueur.
+            'conditions' => app(\App\Services\ConditionsUtilisation::class)->dernieres($users->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all()),
+            'versionConditions' => \App\Services\ConditionsUtilisation::version(),
+        ]);
     }
 }

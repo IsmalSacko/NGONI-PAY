@@ -104,6 +104,18 @@
                             <span class="rounded-md px-1.5 py-px {{ $user->nb_appareils > 0 ? 'bg-succes-doux text-succes' : 'bg-puce text-muted' }}">push {{ $user->nb_appareils > 0 ? '✓' : '✗' }}</span>
                             <span class="rounded-md px-1.5 py-px {{ $user->email ? 'bg-succes-doux text-succes' : 'bg-puce text-muted' }}">e-mail {{ $user->email ? '✓' : '✗' }}</span>
                         </span>
+                        {{-- Conditions d'utilisation : version acceptée, quand, d'où ; texte exact archivé. --}}
+                        @php($c = $conditions[(string) $user->id] ?? null)
+                        <span class="mt-1 text-xs {{ $c && $c['a_jour'] ? 'text-succes' : 'text-danger-fg' }}">
+                            @if ($c)
+                                Conditions {{ $c['a_jour'] ? 'acceptées' : 'à accepter (dernière acceptée' }}
+                                <a href="{{ route('conditions.archive', [$c['version'], 'conditions']) }}" target="_blank" class="underline font-semibold">v{{ $c['version'] }}</a>{{ $c['a_jour'] ? '' : ')' }}
+                                le {{ \Illuminate\Support\Carbon::parse($c['acceptee_le'])->timezone(config('app.timezone'))->format('d/m/Y à H:i') }}
+                                @if ($c['appareil'])<span class="text-muted">· {{ \Illuminate\Support\Str::before($c['appareil'], ' — ') ?: \Illuminate\Support\Str::limit($c['appareil'], 60) }}</span>@endif
+                            @else
+                                Conditions jamais acceptées
+                            @endif
+                        </span>
                         {{-- Téléphone : coordonnées et statut sous le nom. --}}
                         <div class="lg:hidden mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                             <x-telephone :numero="$user->phone" />
