@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Sauvegarde de Ngoni Caisse : base « ecaisse » et fichiers envoyés (preuves
-# de paiement). Lancée par cron deux fois par jour ; garde 30 jours.
-#     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh
+# Sauvegarde de Ngoni Caisse : base « ecaisse » et fichiers envoyés (photos,
+# logos, preuves de paiement). Garde 30 jours sur le serveur, et copie chaque
+# sauvegarde hors du serveur, sur Google Drive (rclone, distant « gdrive: »),
+# où elle est gardée 60 jours : une panne du serveur n'emporte pas tout.
+#     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh        # base + fichiers (2 fois par jour)
+#     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh base   # la base seule (toutes les heures)
 #
 # Restauration d'une base :
 #     gunzip -c FICHIER.sql.gz | docker exec -i backend-mysql-1 mysql -u… -p… ecaisse
@@ -32,9 +35,25 @@ mv "$BASE.part" "$BASE"
 
 # Fichiers envoyés (preuves, logos…), sans la clé Firebase.
 FICHIERS="$DEST/fichiers-$DATE.tar.gz"
-docker run --rm -v "$APP/storage/app:/src:ro" -v "$DEST:/dest" alpine \
-  tar -czf "/dest/$(basename "$FICHIERS")" --exclude=./firebase -C /src . 2>/dev/null || true
+if [ "${1:-}" != "base" ]; then
+  docker run --rm -v "$APP/storage/app:/src:ro" -v "$DEST:/dest" alpine \
+    tar -czf "/dest/$(basename "$FICHIERS")" --exclude=./firebase -C /src . 2>/dev/null || true
+fi
 
 find "$DEST" -type f -mtime +"$GARDER_JOURS" -delete
 
-journal "OK base $(du -h "$BASE" | cut -f1), fichiers $(du -h "$FICHIERS" 2>/dev/null | cut -f1 || echo 0)"
+# Copie hors du serveur. Un échec ne fait pas échouer la sauvegarde locale,
+# mais se lit en clair dans le journal.
+RCLONE=/home/ismael/bin/rclone
+DRIVE="gdrive:Sauvegardes Ngoni Caisse"
+DISTANT="non configuré"
+if [ -x "$RCLONE" ]; then
+  if "$RCLONE" copy "$DEST" "$DRIVE" --max-age 2d --log-level ERROR 2>>"$JOURNAL" \
+     && "$RCLONE" delete "$DRIVE" --min-age 60d --log-level ERROR 2>>"$JOURNAL"; then
+    DISTANT="copié sur Google Drive"
+  else
+    DISTANT="ÉCHEC de la copie sur Google Drive"
+  fi
+fi
+
+journal "OK base $(du -h "$BASE" | cut -f1)$( [ "${1:-}" = "base" ] || echo ", fichiers $(du -h "$FICHIERS" 2>/dev/null | cut -f1 || echo 0)") · $DISTANT"
