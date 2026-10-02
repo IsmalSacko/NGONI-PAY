@@ -86,6 +86,7 @@ Route::middleware(['auth:sanctum', 'plateforme'])->prefix('plateforme')->control
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
+    Route::post('conditions/accepter', [AuthController::class, 'accepterConditions']);
     // Son propre compte, pour tout membre : profil et mot de passe (jamais le rôle).
     Route::put('moi', [ProfilController::class, 'update']);
     Route::put('moi/preferences', [ProfilController::class, 'preferences']);

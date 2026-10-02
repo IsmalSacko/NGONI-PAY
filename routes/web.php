@@ -15,9 +15,14 @@ use Illuminate\Support\Facades\Route;
 
 // Pages publiques reprises de Ngoni Pay : la politique de confidentialité est
 // celle que cite la fiche Play Store, et les annonces pointent sur /telecharger.
-Route::view('privacy', 'privacy')->name('confidentialite');
+// Pages juridiques (resources/views/juridique) : la version est dans config/conditions.php.
+// /privacy reste l'adresse donnée au Play Store ; elle montre la même page.
+Route::view('confidentialite', 'juridique.confidentialite')->name('confidentialite');
+Route::view('privacy', 'juridique.confidentialite');
+Route::view('conditions', 'juridique.conditions')->name('conditions');
+Route::view('mentions-legales', 'juridique.mentions')->name('mentions-legales');
 // Adresse déclarée à Google Play pour la suppression du compte.
-Route::redirect('suppression-compte', '/privacy#suppression-compte')->name('suppression-compte');
+Route::redirect('suppression-compte', '/confidentialite#suppression-compte')->name('suppression-compte');
 
 Route::get('telecharger', fn () => view('telecharger', [
     'titre' => 'Ngoni Caisse — La caisse de votre commerce',

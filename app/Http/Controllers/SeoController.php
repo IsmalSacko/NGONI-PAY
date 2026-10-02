@@ -20,6 +20,8 @@ class SeoController extends Controller
         ['vitrine', '1.0', 'weekly'],
         ['telecharger', '0.8', 'monthly'],
         ['confidentialite', '0.3', 'yearly'],
+        ['conditions', '0.3', 'yearly'],
+        ['mentions-legales', '0.2', 'yearly'],
     ];
 
     public function sitemap(): Response
@@ -56,7 +58,7 @@ class SeoController extends Controller
 
     private function dateVue(string $route): string
     {
-        $vue = ['telecharger' => 'telecharger', 'confidentialite' => 'privacy'][$route] ?? 'vitrine';
+        $vue = ['telecharger' => 'telecharger', 'confidentialite' => 'juridique/confidentialite', 'conditions' => 'juridique/conditions', 'mentions-legales' => 'juridique/mentions'][$route] ?? 'vitrine';
         $fichier = resource_path("views/{$vue}.blade.php");
 
         return date('Y-m-d', is_file($fichier) ? filemtime($fichier) : time());

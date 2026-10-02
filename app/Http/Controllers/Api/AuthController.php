@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ConditionsUtilisation;
 use App\Services\ReinitialisationMotDePasse;
 use App\Support\Auth\Identification;
 use App\Support\Tenancy\TenantContext;
@@ -28,6 +29,9 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8'],
             'nom_utilisateur' => ['required', 'string', 'max:255'],
             'code_parrainage' => ['nullable', 'string', 'max:20'],
+            // Case « J'accepte les conditions » : refusée si décochée. Absente, une
+            // application d'avant la case : les conditions sont demandées à la connexion.
+            'conditions_acceptees' => ['sometimes', 'accepted'],
         ]);
 
         $result = $this->registration->register([
@@ -39,6 +43,10 @@ class AuthController extends Controller
             'nom_utilisateur' => $data['nom_utilisateur'],
             'code_parrainage' => $data['code_parrainage'] ?? null,
         ]);
+
+        if ($request->boolean('conditions_acceptees')) {
+            app(ConditionsUtilisation::class)->accepter($result['user'], $request, 'inscription');
+        }
 
         $token = $result['user']->createToken('e-caisse')->plainTextToken;
 
@@ -95,7 +103,23 @@ class AuthController extends Controller
             'user' => $user,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            // Conditions à (re)accepter : l'application l'exige avant d'ouvrir la caisse.
+            'conditions' => app(ConditionsUtilisation::class)->etat($user),
         ]);
+    }
+
+    /** « J'accepte » sur l'écran des nouvelles conditions, à la connexion. */
+    public function accepterConditions(Request $request): JsonResponse
+    {
+        $request->validate(['version' => ['required', 'string'], 'conditions_acceptees' => ['accepted']]);
+        $conditions = app(ConditionsUtilisation::class);
+        // Une version dépassée (texte lu avant une mise à jour) ne vaut pas acceptation.
+        if ($request->input('version') !== ConditionsUtilisation::version()) {
+            return response()->json(['message' => 'Les conditions ont changé entre-temps : relisez la dernière version.', 'conditions' => $conditions->etat($request->user())], 409);
+        }
+        $conditions->accepter($request->user(), $request, 'connexion');
+
+        return response()->json(['conditions' => $conditions->etat($request->user()->fresh())]);
     }
 
     /**

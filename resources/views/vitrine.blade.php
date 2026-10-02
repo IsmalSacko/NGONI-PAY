@@ -320,6 +320,7 @@
                 <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
                 <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
                 <li>• Remboursable dans les 14 jours suivant l’activation, pas au-delà.</li>
+                <li>• Offre valable pour toute souscription du 1er septembre 2026 au 28 février 2027. <a href="{{ route('conditions') }}#a-vie" class="font-bold text-accent underline">Conditions complètes</a></li>
             </ul>
             @if ($waMessage)
                 <a href="{{ $wa }}?text={{ rawurlencode('Bonjour, je suis intéressé(e) par l’abonnement à vie de Ngoni Caisse.') }}" target="_blank" rel="noopener"
@@ -442,7 +443,9 @@
             <a href="#tarifs" class="hover:text-ink">Tarifs</a>
             <a href="#parrainage" class="hover:text-ink">Parrainage</a>
             <a href="{{ route('connexion') }}" class="hover:text-ink">Back-office</a>
-            <a href="{{ url('/privacy') }}" class="hover:text-ink">Confidentialité</a>
+            <a href="{{ route('conditions') }}" class="hover:text-ink">Conditions d’utilisation</a>
+            <a href="{{ route('confidentialite') }}" class="hover:text-ink">Confidentialité</a>
+            <a href="{{ route('mentions-legales') }}" class="hover:text-ink">Mentions légales</a>
             @if ($waMessage)<a href="{{ $waMessage }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 hover:text-ink"><x-icone nom="whatsapp" class="w-4 h-4 text-whatsapp" /> Contact WhatsApp</a>@endif
         </nav>
         <span>© {{ now()->year }} Ngoni Caisse</span>
