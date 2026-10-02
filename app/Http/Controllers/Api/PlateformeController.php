@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CycleFacturation;
 use App\Enums\StatutDemande;
 use App\Http\Controllers\Controller;
 use App\Models\Abonnement;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
+use App\Services\GestionPlans;
 use App\Services\GestionAnnonces;
 use App\Services\Parrainage;
 use App\Services\Plateforme\Activite;
@@ -36,6 +38,59 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class PlateformeController extends Controller
 {
+    /** Plans et tarifs, pour la page « Plans » de la console de l'application. */
+    public function plans(GestionPlans $gestion): JsonResponse
+    {
+        ['plans' => $plans, 'tarifs' => $tarifs] = $gestion->etat();
+
+        return response()->json([
+            'plans' => collect($plans)->map(fn (array $p, int $id) => [
+                'id' => $id,
+                'code' => $p['code'],
+                'nom' => $p['nom'],
+                'description' => $p['description'],
+                'jours_essai' => $p['jours_essai'],
+                'max_boutiques' => $p['max_boutiques'],
+                'max_membres' => $p['max_membres'],
+                'est_actif' => (bool) $p['est_actif'],
+                'essai' => $p['essai'],
+                'fonctionnalites' => array_keys(array_filter($p['fonctionnalites'])),
+                'tarifs' => collect($tarifs[$id] ?? [])->map(fn (array $t, string $cycle) => [
+                    'cycle' => $cycle,
+                    'libelle' => CycleFacturation::from($cycle)->libelle(),
+                    'montant' => $t['montant'],
+                    'actif' => (bool) $t['actif'],
+                ])->values(),
+            ])->values(),
+            'fonctionnalites' => collect(Plan::FONCTIONNALITES)->map(fn (string $l, string $c) => ['code' => $c, 'libelle' => $l])->values(),
+        ]);
+    }
+
+    /** Enregistre plans et tarifs : les mêmes règles que la console web (GestionPlans). */
+    public function enregistrerPlans(Request $request, GestionPlans $gestion): JsonResponse
+    {
+        $request->validate(['plans' => ['required', 'array'], 'plans.*.id' => ['required', 'integer']]);
+        $plans = [];
+        $tarifs = [];
+        foreach ($request->input('plans') as $p) {
+            $plans[(int) $p['id']] = [
+                'nom' => $p['nom'] ?? null,
+                'description' => $p['description'] ?? null,
+                'jours_essai' => $p['jours_essai'] ?? null,
+                'max_boutiques' => $p['max_boutiques'] ?? null,
+                'max_membres' => $p['max_membres'] ?? null,
+                'est_actif' => (bool) ($p['est_actif'] ?? false),
+                'fonctionnalites' => array_fill_keys(array_map('strval', (array) ($p['fonctionnalites'] ?? [])), true),
+            ];
+            foreach ((array) ($p['tarifs'] ?? []) as $t) {
+                $tarifs[(int) $p['id']][(string) ($t['cycle'] ?? '')] = ['montant' => $t['montant'] ?? null, 'actif' => (bool) ($t['actif'] ?? false)];
+            }
+        }
+        $gestion->enregistrer($plans, $tarifs);
+
+        return $this->plans($gestion);
+    }
+
     public function tableau(): JsonResponse
     {
         $actifs = Abonnement::avecCompte()->where('est_actif', true)
@@ -126,9 +181,13 @@ class PlateformeController extends Controller
         $filtre = (string) $request->query('filtre', '');
 
         $abonnements = Abonnement::query()->avecCompte()
+            // Mêmes détails que la console web : ventes, dernière vente et chiffre sur 30 jours par boutique.
             ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-            ]), 'proprietaire.boutiquesPossedees'])
+            ]), 'proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
+                ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
+                ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
+                ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
             ->when($request->filled('recherche'), fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u->recherche((string) $request->query('recherche'))))
             ->when($filtre === 'actifs', fn ($q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today())))
             ->when($filtre === 'expires', fn ($q) => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
@@ -145,6 +204,16 @@ class PlateformeController extends Controller
                 'email' => $a->proprietaire?->email,
                 'whatsapp' => WhatsApp::link($a->proprietaire?->phone),
                 'boutiques' => $a->proprietaire?->boutiquesPossedees->pluck('nom')->values() ?? [],
+                'boutiques_detail' => $a->proprietaire?->boutiquesPossedees->map(fn (Boutique $b) => [
+                    'id' => $b->id,
+                    'nom' => $b->nom,
+                    'devise' => $b->devise,
+                    'cree_le' => $b->created_at?->toIso8601String(),
+                    'ventes' => (int) $b->nb_ventes,
+                    'derniere_vente' => $b->derniere_vente ? Carbon::parse($b->derniere_vente)->toIso8601String() : null,
+                    'total_30j' => (int) $b->total_30j,
+                ])->values() ?? [],
+                'parrain' => $a->proprietaire?->parrain?->name,
                 'derniere_app' => $a->proprietaire?->derniere_app ? Carbon::parse($a->proprietaire->derniere_app)->toIso8601String() : null,
                 'inscrit_le' => $a->proprietaire?->created_at?->toIso8601String(),
                 'abonnement' => $this->abonnement($a),
@@ -180,10 +249,12 @@ class PlateformeController extends Controller
             ->addSelect([
                 'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
                 'nb_appareils' => DB::table('appareils')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id'),
+                'nb_ventes' => DB::table('ventes')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id')->where('statut', 'validee'),
             ])
             ->with('boutique')
             ->when($request->filled('recherche'), fn ($q) => $q->recherche((string) $request->query('recherche')))
-            ->latest('users.created_at')
+            // Comme la console web : derniers inscrits (par défaut) ou par nom.
+            ->when($request->query('tri') === 'nom', fn ($q) => $q->orderBy('name'), fn ($q) => $q->latest('users.created_at'))
             ->limit(100)
             ->get();
 
@@ -196,6 +267,8 @@ class PlateformeController extends Controller
             'actif' => (bool) $u->is_active,
             'exploitant' => (bool) $u->est_admin_plateforme,
             'appareils' => (int) $u->nb_appareils,
+            'ventes' => (int) $u->nb_ventes,
+            'whatsapp' => WhatsApp::link($u->phone),
             'derniere_app' => $u->derniere_app ? Carbon::parse($u->derniere_app)->toIso8601String() : null,
             'inscrit_le' => $u->created_at?->toIso8601String(),
         ])]);
@@ -342,6 +415,9 @@ class PlateformeController extends Controller
             'essai' => $a->estEssai(),
             'en_cours' => $a->estEnCours(),
             'fin' => $a->fin?->toDateString(),
+            // Comme la console web : accordé à la main, et jours de parrainage en attente.
+            'manuel' => (bool) $a->est_manuel,
+            'jours_offerts' => (int) $a->jours_offerts,
         ];
     }
 }

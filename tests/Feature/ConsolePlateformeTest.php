@@ -149,6 +149,65 @@ class ConsolePlateformeTest extends TestCase
         $this->assertTrue(Plan::parCode('essai')->inclut(Plan::SEANCES_CAISSE));
     }
 
+    public function test_l_application_lit_et_enregistre_les_plans_comme_la_console_web(): void
+    {
+        $basic = Plan::parCode('basic');
+        $essai = Plan::parCode('essai');
+        $jeton = $this->exploitant->createToken('app')->plainTextToken;
+
+        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->assertOk()->json('plans');
+        $this->assertSame(['essai', 'basic', 'pro'], array_column($plans, 'code'));
+        $this->assertSame([], $plans[0]['tarifs'], 'l’essai n’a pas de tarif');
+        $this->assertCount(4, $plans[1]['tarifs']);
+
+        $plans[1]['tarifs'][0]['montant'] = '5000';
+        $plans[1]['max_membres'] = '';
+        $plans[1]['fonctionnalites'] = [Plan::SEANCES_CAISSE];
+        $plans[0]['jours_essai'] = '14';
+        // L'essai reste proposé, même si l'on envoie le contraire.
+        $plans[0]['est_actif'] = false;
+
+        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertOk()
+            ->assertJsonPath('plans.1.tarifs.0.montant', '5000');
+
+        $basic = Plan::parCode('basic');
+        $this->assertSame(5000, $basic->tarif(CycleFacturation::Mensuel)->montant);
+        $this->assertNull($basic->max_membres);
+        $this->assertTrue($basic->inclut(Plan::SEANCES_CAISSE));
+        $this->assertSame(14, Plan::parCode('essai')->jours_essai);
+        $this->assertTrue((bool) Plan::parCode('essai')->est_actif);
+    }
+
+    public function test_les_plans_de_l_api_refusent_un_montant_negatif_et_un_non_exploitant(): void
+    {
+        $jeton = $this->exploitant->createToken('app')->plainTextToken;
+        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->json('plans');
+        $plans[1]['tarifs'][0]['montant'] = '-10';
+        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertStatus(422);
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+        $this->withToken($this->awa->createToken('t')->plainTextToken)->getJson('/api/plateforme/plans')->assertForbidden();
+    }
+
+    public function test_l_api_donne_aux_comptes_et_utilisateurs_les_details_de_la_console_web(): void
+    {
+        $jeton = $this->exploitant->createToken('app')->plainTextToken;
+
+        $compte = collect($this->withToken($jeton)->getJson('/api/plateforme/comptes')->assertOk()->json('data'))
+            ->firstWhere('user_id', $this->awa->id);
+        $this->assertSame($this->boutique->nom, $compte['boutiques_detail'][0]['nom']);
+        $this->assertSame(0, $compte['boutiques_detail'][0]['ventes']);
+        $this->assertSame(0, $compte['boutiques_detail'][0]['total_30j']);
+        $this->assertArrayHasKey('parrain', $compte);
+        $this->assertSame([$this->boutique->nom], $compte['boutiques'], 'l’ancien champ reste, pour les applications déjà installées');
+
+        $utilisateur = collect($this->withToken($jeton)->getJson('/api/plateforme/utilisateurs?tri=nom')->assertOk()->json('data'))
+            ->firstWhere('id', $this->awa->id);
+        $this->assertSame(0, $utilisateur['ventes']);
+        $this->assertStringContainsString('wa.me/', (string) $utilisateur['whatsapp']);
+    }
+
     public function test_mot_de_passe_provisoire_pour_un_commercant_sans_email(): void
     {
         $this->awa->createToken('tablette');
