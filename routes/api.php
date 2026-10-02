@@ -92,6 +92,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('appareils', [AppareilController::class, 'store']);
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/tout-lu', [NotificationController::class, 'toutLu']);
+    Route::post('notifications/supprimer', [NotificationController::class, 'supprimerPlusieurs']);
     Route::post('notifications/{notification}/lue', [NotificationController::class, 'lue'])->whereNumber('notification');
     Route::delete('notifications/{notification}', [NotificationController::class, 'supprimer'])->whereNumber('notification');
 

@@ -37,6 +37,23 @@ class NotificationController extends Controller
         return response()->json(['message' => 'ok']);
     }
 
+    /**
+     * Suppression en masse : les notifications cochées (`ids`), ou toutes
+     * celles déjà lues (`lues`). Seulement les siennes, comme une par une.
+     */
+    public function supprimerPlusieurs(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required_without:lues', 'array', 'max:500'],
+            'ids.*' => ['integer'],
+            'lues' => ['sometimes', 'boolean'],
+        ]);
+        $requete = NotificationApp::where('user_id', $request->user()->id);
+        $requete = ($data['lues'] ?? false) ? $requete->whereNotNull('lue_le') : $requete->whereKey($data['ids']);
+
+        return response()->json(['supprimees' => $requete->delete()]);
+    }
+
     public function toutLu(Request $request): JsonResponse
     {
         NotificationApp::where('user_id', $request->user()->id)->whereNull('lue_le')->update(['lue_le' => now()]);
