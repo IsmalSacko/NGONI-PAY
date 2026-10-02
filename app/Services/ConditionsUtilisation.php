@@ -32,6 +32,9 @@ class ConditionsUtilisation
         DB::transaction(function () use ($user, $request, $source): void {
             DB::table('acceptations_conditions')->insert([
                 'user_id' => $user->id,
+                // Gardés dans la preuve : elle survit à la suppression du compte.
+                'nom' => $user->name,
+                'telephone' => $user->phone,
                 'version' => self::version(),
                 'source' => $source,
                 'ip' => $request->ip(),

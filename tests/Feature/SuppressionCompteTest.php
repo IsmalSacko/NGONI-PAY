@@ -9,7 +9,9 @@ use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ConditionsUtilisation;
 use App\Services\SuppressionCompte;
+use Illuminate\Http\Request;
 use App\Services\VenteService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,6 +145,23 @@ class SuppressionCompteTest extends TestCase
         $this->assertCount(1, $sauvegarde['tables']['ventes']);
         $this->assertCount(1, $sauvegarde['tables']['lignes_vente']);
         $this->assertCount(2, $sauvegarde['tables']['users']);
+    }
+
+    public function test_un_compte_qui_a_accepte_les_conditions_se_supprime_et_la_preuve_reste(): void
+    {
+        foreach ([$this->awa, $this->moussa] as $u) {
+            app(ConditionsUtilisation::class)->accepter($u, Request::create('/', 'POST', server: ['REMOTE_ADDR' => '41.73.1.2']), 'inscription');
+        }
+
+        app(SuppressionCompte::class)->supprimer($this->awa, $this->exploitant);
+
+        $this->assertNull(User::find($this->awa->id));
+        // La preuve d'acceptation survit au compte : sans lien, mais avec le nom et le numéro.
+        $preuve = DB::table('acceptations_conditions')->where('telephone', $this->awa->phone)->first();
+        $this->assertNotNull($preuve);
+        $this->assertNull($preuve->user_id);
+        $this->assertSame($this->awa->name, $preuve->nom);
+        $this->assertSame(2, DB::table('acceptations_conditions')->whereNull('user_id')->count());
     }
 
     public function test_refuse_si_le_compte_a_vendu_dans_la_boutique_d_un_autre(): void
