@@ -21,6 +21,7 @@ class ReglementCredit extends Model
     /** @return BelongsTo<User, $this> */
     public function caissier(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        // Un compte supprimé garde son nom sur les tickets, factures et historiques.
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 }

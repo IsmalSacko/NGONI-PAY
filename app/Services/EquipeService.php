@@ -141,6 +141,52 @@ class EquipeService
         return $user;
     }
 
+    /**
+     * Supprime le compte d'un équipier, par le propriétaire seul. Plus fort que
+     * retirer() (qui le laisse libre de travailler ailleurs) : il ne peut plus
+     * se connecter et son numéro redevient libre.
+     *
+     * Le compte n'est pas effacé de la base (suppression douce) : ses ventes,
+     * séances de caisse et mouvements de stock le citent, et un ticket ou une
+     * facture ne doit jamais perdre son caissier. Refusé s'il travaille aussi
+     * dans une autre boutique, s'il en possède une, ou si sa caisse est ouverte.
+     */
+    public function supprimer(Boutique $boutique, User $acteur, string $userId): void
+    {
+        if ((string) $boutique->proprietaire_id !== (string) $acteur->id) {
+            throw ValidationException::withMessages(['membre' => ['Seul le propriétaire de la boutique peut supprimer un compte.']]);
+        }
+        $user = $this->membre($boutique, $userId);
+
+        if ($user->id === $acteur->id) {
+            throw ValidationException::withMessages(['membre' => ['Vous ne pouvez pas supprimer votre propre compte.']]);
+        }
+        if (count($user->boutiqueIds()) > 1) {
+            throw ValidationException::withMessages(['membre' => [
+                "{$user->name} travaille aussi dans une autre boutique : retirez-le de l’équipe, son compte reste à l’autre boutique.",
+            ]]);
+        }
+        if (Boutique::withoutGlobalScopes()->where('proprietaire_id', $user->id)->exists()) {
+            throw ValidationException::withMessages(['membre' => ["{$user->name} possède sa propre boutique : retirez-le de l’équipe."]]);
+        }
+        if (DB::table('sessions_caisse')->where('user_id', $user->id)->where('statut', 'ouverte')->exists()) {
+            throw ValidationException::withMessages(['membre' => [
+                "{$user->name} a une caisse ouverte : fermez-la d’abord, pour que son fond soit compté.",
+            ]]);
+        }
+
+        DB::transaction(function () use ($boutique, $user): void {
+            $this->equipe($boutique);
+            $user->syncRoles([]);
+            $user->syncPermissions([]);
+            $user->tokens()->delete();
+            // Numéro libéré : le même téléphone peut créer un nouveau compte.
+            // Le nom reste, pour les tickets et l'historique.
+            $user->forceFill(['phone' => 'supprime:'.$user->id, 'is_active' => false])->save();
+            $user->delete();
+        });
+    }
+
     /** Désactive ou réactive un compte qui n'appartient qu'à cette boutique. */
     public function basculerActivation(Boutique $boutique, User $acteur, string $userId): User
     {

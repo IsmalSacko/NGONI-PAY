@@ -79,6 +79,14 @@ class EquipeController extends Controller
         return response()->json(status: 204);
     }
 
+    /** Supprime le compte de l'équipier (propriétaire seul) ; destroy() le retire seulement. */
+    public function supprimerCompte(Request $request, string $membre): JsonResponse
+    {
+        $this->equipe->supprimer($this->boutique(), $request->user(), $membre);
+
+        return response()->json(status: 204);
+    }
+
     private function boutique(): Boutique
     {
         return Boutique::findOrFail(app(TenantContext::class)->boutiqueId());

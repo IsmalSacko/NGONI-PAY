@@ -164,6 +164,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('equipe', [EquipeController::class, 'store'])->middleware(['permission:utilisateurs.create', 'abonnement']);
     Route::put('equipe/{membre}', [EquipeController::class, 'update'])->middleware(['permission:utilisateurs.update', 'abonnement']);
     Route::delete('equipe/{membre}', [EquipeController::class, 'destroy'])->middleware('permission:utilisateurs.delete');
+    Route::delete('equipe/{membre}/compte', [EquipeController::class, 'supprimerCompte'])->middleware('permission:utilisateurs.delete');
 
     Route::get('fournisseurs', [AchatController::class, 'fournisseurs'])->middleware('permission:achats.view');
     Route::post('fournisseurs', [AchatController::class, 'creerFournisseur'])->middleware(['permission:achats.create', 'abonnement']);
