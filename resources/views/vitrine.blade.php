@@ -319,7 +319,7 @@
                 <li>• Offre de lancement : proposée pendant les six premiers mois seulement, puis retirée.</li>
                 <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
                 <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
-                <li>• Remboursable dans les 14 jours suivant l’activation, pas au-delà.</li>
+                <li>• Remboursable sous certaines conditions.</li>
                 <li>• Offre valable pour toute souscription du 1er septembre 2026 au 28 février 2027. <a href="{{ route('conditions') }}#a-vie" class="font-bold text-accent underline">Conditions complètes</a></li>
             </ul>
             @if ($waMessage)

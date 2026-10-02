@@ -6,7 +6,8 @@
 @props(['titre', 'actif', 'canonique'])
 @php
     $version = \App\Services\ConditionsUtilisation::version();
-    $miseAJour = \Illuminate\Support\Carbon::parse($version)->locale('fr')->isoFormat('D MMMM YYYY');
+    // « 2026-10-02.2 » : la date est le début, le numéro distingue deux textes du même jour.
+    $miseAJour = \Illuminate\Support\Carbon::parse(substr($version, 0, 10))->locale('fr')->isoFormat('D MMMM YYYY');
     $pages = ['conditions' => 'Conditions d’utilisation', 'mentions' => 'Mentions légales', 'confidentialite' => 'Confidentialité'];
     $liens = ['conditions' => route('conditions'), 'mentions' => route('mentions-legales'), 'confidentialite' => route('confidentialite')];
 @endphp

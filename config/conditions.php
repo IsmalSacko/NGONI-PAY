@@ -11,7 +11,8 @@ declare(strict_types=1);
  * resources/views/juridique/.
  */
 return [
-    'version' => '2026-10-02',
+    // Date de publication, suivie d'un numéro si le texte change le même jour.
+    'version' => '2026-10-02.2',
 
     // Offre de lancement « abonnement à vie » : souscription possible entre ces deux dates.
     'a_vie' => [

@@ -58,7 +58,7 @@
 <ul>
     <li><strong>« À vie »</strong> signifie : pour toute la durée d’existence du Service Ngoni Caisse, sans nouveau paiement. Le prix payé n’est jamais augmenté.</li>
     <li>L’abonnement est attaché à <strong>un seul compte</strong>, n’est ni transférable ni cessible, et s’exerce dans les limites du plan choisi (nombre de boutiques, de membres, fonctions incluses à la souscription).</li>
-    <li>Il est <strong>remboursable dans les 14 jours</strong> suivant son activation, sur simple demande ; au-delà, il n’est plus remboursable.</li>
+    <li>Il est <strong>remboursable sous certaines conditions</strong> seulement : en cas d’impossibilité durable d’utiliser le Service du fait de l’Éditeur, non corrigée dans un délai raisonnable après signalement ; ou sur demande motivée, avec l’accord de l’Éditeur. En dehors de ces cas, il n’est pas remboursable.</li>
     <li>En cas d’<strong>arrêt définitif du Service</strong>, l’Éditeur prévient les titulaires au moins <strong>3 mois à l’avance</strong> et leur permet d’exporter leurs données pendant ce délai.</li>
     <li>Il peut être suspendu ou retiré en cas de fraude, d’usage contraire à l’article 5, ou de non-paiement (paiement annulé ou contesté).</li>
 </ul>
