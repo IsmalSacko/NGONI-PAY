@@ -21,7 +21,9 @@ use Illuminate\Support\Facades\Storage;
  * - Au choix : les fournisseurs ; le catalogue (gardé, il repart d'un stock
  *   à 0 ; sinon articles et catégories partent aussi).
  * - Gardés : la boutique (réglages, logo, programme fidélité), l'équipe et
- *   l'abonnement. La numérotation des tickets repart d'elle-même de 1.
+ *   l'abonnement, et la numérotation des factures : elle CONTINUE (compteur
+ *   boutiques.dernier_numero_vente) — un numéro déjà remis à un client ne
+ *   doit jamais servir deux fois.
  * - Une caisse restée ouverte est effacée aussi : l'aperçu le signale, sans
  *   bloquer — pour une boutique d'essai, c'est une séance d'essai de plus.
  *

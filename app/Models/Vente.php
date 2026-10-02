@@ -13,13 +13,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
-    'jour_affaire', 'numero_jour', 'remise_fidelite',
+    'jour_affaire', 'numero_jour', 'remise_fidelite', 'numero_facture',
 ])]
 class Vente extends Model
 {
@@ -32,6 +33,17 @@ class Vente extends Model
         // jour de sa création.
         static::creating(function (Vente $vente): void {
             $vente->jour_affaire ??= ($vente->created_at ?? now())->toDateString();
+            // Numéro de facture figé à la création : renommer la boutique
+            // ensuite ne change plus celui des factures déjà remises.
+            $vente->attributes['numero_facture'] ??= self::formater($vente->boutique_id, (int) $vente->numero, $vente->created_at);
+        });
+
+        // Le compteur de la boutique ne recule jamais (voir dernier_numero_vente) :
+        // aussi pour une vente créée hors du service de caisse (import).
+        static::created(function (Vente $vente): void {
+            Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)
+                ->where('dernier_numero_vente', '<', (int) $vente->numero)
+                ->update(['dernier_numero_vente' => (int) $vente->numero]);
         });
     }
 
@@ -58,7 +70,8 @@ class Vente extends Model
      */
     public function caissier(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        // Un compte supprimé garde son nom sur les tickets, factures et historiques.
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     /**
@@ -103,17 +116,25 @@ class Vente extends Model
 
     /**
      * « PLC-2026-0003 » : initiales de la boutique, année de la vente, rang de
-     * la vente dans la boutique. Unique et continu par boutique.
+     * la vente dans la boutique. Unique et continu par boutique, et figé : le
+     * numéro enregistré à la création, jamais recalculé.
      */
     public function numeroFormate(): string
     {
-        return self::prefixe($this->boutique_id).'-'.($this->created_at ?? now())->format('Y')
-            .'-'.str_pad((string) $this->numero, 4, '0', STR_PAD_LEFT);
+        return $this->attributes['numero_facture'] ?? self::formater($this->boutique_id, (int) $this->numero, $this->created_at);
     }
 
     public function getNumeroFactureAttribute(): string
     {
         return $this->numeroFormate();
+    }
+
+    /** Le numéro tel qu'il est calculé une seule fois, à la création de la vente. */
+    public static function formater(?string $boutiqueId, int $numero, mixed $creeLe): string
+    {
+        $annee = ($creeLe === null ? now() : Carbon::parse($creeLe))->format('Y');
+
+        return self::prefixe($boutiqueId).'-'.$annee.'-'.str_pad((string) $numero, 4, '0', STR_PAD_LEFT);
     }
 
     /** « PHARMACIE "LES CASTORS" » → PLC ; « OIL » → OIL ; « @wisdomofficiel » → WIS. */

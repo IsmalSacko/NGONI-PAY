@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Boutique;
 use App\Models\User;
+use App\Models\Vente;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -211,6 +212,13 @@ class RestaurationBoutique
             }
             $tables[$t] = $rangs;
         }
+
+        // Numéro de facture figé : celui de la sauvegarde s'il y est ; une
+        // sauvegarde d'avant le figeage n'en a pas, il est calculé une fois ici.
+        $tables['ventes'] = array_map(fn ($r) => [
+            ...$r,
+            'numero_facture' => $r['numero_facture'] ?? Vente::formater($boutiqueId, (int) $r['numero'], $r['created_at'] ?? null),
+        ], $tables['ventes'] ?? []);
 
         return $tables;
     }

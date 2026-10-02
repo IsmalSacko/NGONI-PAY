@@ -71,7 +71,7 @@ class VenteService
             // Verrouille la ligne de la boutique : sérialise l'attribution du
             // numéro de ticket entre caisses concurrentes de la même
             // boutique, sans bloquer les autres boutiques.
-            Boutique::whereKey($boutiqueId)->lockForUpdate()->first();
+            $boutique = Boutique::whereKey($boutiqueId)->lockForUpdate()->first();
 
             $produits = Produit::whereIn('id', array_filter(array_column($data['lignes'], 'produit_id')))
                 ->lockForUpdate()
@@ -150,7 +150,9 @@ class VenteService
             }
             unset($l);
 
-            $numero = (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->max('numero') + 1;
+            // Le compteur de la boutique ne recule jamais : après « Repartir de
+            // zéro », les ventes effacées gardent leur numéro, la suite continue.
+            $numero = max((int) $boutique?->dernier_numero_vente, (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->max('numero')) + 1;
             // Journée d'affaires et numéro du jour (repart à 1 après la clôture).
             $jour = app(Journee::class)->courante()->toDateString();
             $numeroJour = (int) Vente::withoutBoutiqueScope()->where('boutique_id', $boutiqueId)->whereDate('jour_affaire', $jour)->max('numero_jour') + 1;

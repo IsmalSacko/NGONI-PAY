@@ -9,6 +9,7 @@ use App\Livewire\Plateforme\Comptes;
 use App\Models\Boutique;
 use App\Models\Produit;
 use App\Models\User;
+use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\RestaurationBoutique;
 use App\Services\VenteService;
@@ -227,24 +228,62 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
     }
 
-    public function test_les_ventes_faites_depuis_restent_et_les_anciennes_reprennent_la_suite(): void
+    public function test_les_ventes_faites_depuis_restent_et_les_anciennes_gardent_leur_numero(): void
     {
+        $ancienne = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->first();
         $avant = (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock');
         $this->reinitialiser(garderCatalogue: true);
         $this->travel(1)->minutes();
-        $this->vendre($this->boutiqueAwa, $this->awa);   // vraie vente : ticket n° 1, stock 10 → 9
+        $this->vendre($this->boutiqueAwa, $this->awa);   // vraie vente : la numérotation continue, n° 2
         $nouvelle = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->first();
         $apres = (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock');
 
         $restauration = app(RestaurationBoutique::class);
         $restauration->restaurer($restauration->sauvegardesParBoutique()[$this->boutiqueAwa->id][0], User::where('est_admin_plateforme', true)->first());
 
-        $numeros = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderBy('numero')->pluck('numero', 'id');
-        $this->assertCount(2, $numeros);
-        $this->assertSame(1, (int) $numeros[$nouvelle->id], 'la vraie vente garde son numéro');
-        $this->assertSame([1, 2], $numeros->map(fn ($n) => (int) $n)->values()->all());
+        $ventes = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderBy('numero')->get()->keyBy('id');
+        $this->assertCount(2, $ventes);
+        $this->assertSame(2, (int) $ventes[$nouvelle->id]->numero, 'la vraie vente continue la numérotation');
+        $this->assertSame(1, (int) $ventes[$ancienne->id]->numero, 'l’ancienne revient avec son numéro');
+        $this->assertSame($ancienne->numero_facture, $ventes[$ancienne->id]->numero_facture, 'et sa facture garde le même numéro');
+        $this->assertNotSame($ventes[$ancienne->id]->numero_facture, $ventes[$nouvelle->id]->numero_facture);
         // Le stock d'avant revient en plus de ce qui a bougé depuis.
         $this->assertSame($avant + $apres, (int) DB::table('produits')->where('boutique_id', $this->boutiqueAwa->id)->sum('stock'));
+    }
+
+    public function test_apres_repartir_de_zero_aucun_numero_de_facture_ne_resert(): void
+    {
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $remis = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->pluck('numero_facture')->all();
+        $this->assertCount(2, $remis);
+
+        $this->reinitialiser(garderCatalogue: true);
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $this->vendre($this->boutiqueAwa, $this->awa);
+
+        $nouveaux = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderBy('numero')->pluck('numero')->map(fn ($n) => (int) $n)->all();
+        $this->assertSame([3, 4], $nouveaux, 'la suite des numéros déjà remis');
+        $this->assertEmpty(array_intersect($remis, DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->pluck('numero_facture')->all()));
+        // L'autre boutique garde sa propre numérotation.
+        $this->assertSame(1, (int) DB::table('ventes')->where('boutique_id', $this->boutiqueIbrahim->id)->value('numero'));
+    }
+
+    public function test_renommer_la_boutique_ne_change_pas_le_numero_des_factures_remises(): void
+    {
+        $vente = Vente::withoutGlobalScopes()->where('boutique_id', $this->boutiqueAwa->id)->first();
+        $remis = $vente->numero_facture;
+        $this->assertStringStartsWith('PA-', $remis);
+
+        $this->boutiqueAwa->forceFill(['nom' => 'Teinturerie Moderne'])->save();
+        // Le préfixe est gardé le temps d'une requête : on repart d'un cache vide, comme une vraie requête.
+        (fn () => self::$prefixes = [])->call(new Vente);
+
+        $this->assertSame($remis, Vente::withoutGlobalScopes()->find($vente->id)->numero_facture, 'la facture déjà remise garde son numéro');
+        $this->assertSame($remis, Vente::withoutGlobalScopes()->find($vente->id)->toArray()['numero_facture'], 'aussi dans ce que reçoit l’application');
+
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $nouvelle = Vente::withoutGlobalScopes()->where('boutique_id', $this->boutiqueAwa->id)->where('numero', 2)->first();
+        $this->assertStringStartsWith('TM-', $nouvelle->numero_facture, 'les nouvelles prennent le nouveau nom');
     }
 
     public function test_une_vente_hors_ligne_renvoyee_depuis_n_est_pas_doublee(): void
