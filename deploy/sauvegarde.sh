@@ -43,7 +43,7 @@ if [ "${1:-}" != "base" ]; then
 fi
 
 # La copie des fichiers envoyés (voir plus bas) est refaite à chaque fois : hors du ménage.
-find "$DEST" -path "$DEST/miroir-fichiers" -prune -o -type f -mtime +"$GARDER_JOURS" -delete
+find "$DEST" -type f -not -path "$DEST/miroir-fichiers/*" -mtime +"$GARDER_JOURS" -delete
 
 # Copie hors du serveur. Un échec ne fait pas échouer la sauvegarde locale,
 # mais se lit en clair dans le journal.
