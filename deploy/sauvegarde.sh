@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # Sauvegarde de Ngoni Caisse : base « ecaisse » et fichiers envoyés (photos,
-# logos, preuves de paiement). Garde 30 jours sur le serveur (la base toutes
-# les heures). Hors du serveur, sur Google Drive (rclone, distant « gdrive: ») :
-# UNE base par jour (celle de 3 h), gardée 30 jours, dans « base/ », et les
-# fichiers envoyés copiés un par un dans « fichiers/ » — seuls les nouveaux
-# partent. Une copie par heure remplissait le Drive de fichiers presque pareils.
+# logos, preuves de paiement). Garde 30 jours sur le serveur, et copie chaque
+# sauvegarde hors du serveur, sur Google Drive (rclone, distant « gdrive: »),
+# où elle est gardée 60 jours : une panne du serveur n'emporte pas tout.
 #     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh        # base + fichiers (2 fois par jour)
 #     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh base   # la base seule (toutes les heures)
 #
@@ -42,27 +40,16 @@ if [ "${1:-}" != "base" ]; then
     tar -czf "/dest/$(basename "$FICHIERS")" --exclude=./firebase -C /src . 2>/dev/null || true
 fi
 
-# La copie des fichiers envoyés (voir plus bas) est refaite à chaque fois : hors du ménage.
-find "$DEST" -type f -not -path "$DEST/miroir-fichiers/*" -mtime +"$GARDER_JOURS" -delete
+find "$DEST" -type f -mtime +"$GARDER_JOURS" -delete
 
 # Copie hors du serveur. Un échec ne fait pas échouer la sauvegarde locale,
 # mais se lit en clair dans le journal.
 RCLONE=/home/ismael/bin/rclone
 DRIVE="gdrive:Sauvegardes Ngoni Caisse"
 DISTANT="non configuré"
-if [ -x "$RCLONE" ] && [ "${1:-}" = "base" ]; then
-  DISTANT="gardé sur le serveur seulement (Drive : une fois par jour)"
-elif [ -x "$RCLONE" ] && [ "$(date +%H)" != "03" ]; then
-  DISTANT="gardé sur le serveur seulement (Drive : la sauvegarde de 3 h)"
-elif [ -x "$RCLONE" ]; then
-  # Fichiers envoyés : une copie lisible (ils appartiennent à www-data), sans
-  # la clé Firebase ni les envois temporaires, puis seuls les nouveaux partent.
-  MIROIR="$DEST/miroir-fichiers"
-  docker run --rm -v "$APP/storage/app:/src:ro" -v "$DEST:/dest" alpine sh -c \
-    "rm -rf /dest/miroir-fichiers && cp -rp /src /dest/miroir-fichiers && rm -rf /dest/miroir-fichiers/firebase /dest/miroir-fichiers/private/livewire-tmp && chmod -R a+rX /dest/miroir-fichiers"
-  if "$RCLONE" copyto "$BASE" "$DRIVE/base/$(basename "$BASE")" --log-level ERROR 2>>"$JOURNAL" \
-     && "$RCLONE" copy "$MIROIR" "$DRIVE/fichiers" --log-level ERROR 2>>"$JOURNAL" \
-     && "$RCLONE" delete "$DRIVE/base" --min-age 30d --log-level ERROR 2>>"$JOURNAL"; then
+if [ -x "$RCLONE" ]; then
+  if "$RCLONE" copy "$DEST" "$DRIVE" --max-age 2d --log-level ERROR 2>>"$JOURNAL" \
+     && "$RCLONE" delete "$DRIVE" --min-age 60d --log-level ERROR 2>>"$JOURNAL"; then
     DISTANT="copié sur Google Drive"
   else
     DISTANT="ÉCHEC de la copie sur Google Drive"
