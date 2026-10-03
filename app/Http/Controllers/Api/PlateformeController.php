@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\CycleFacturation;
-use App\Enums\StatutDemande;
 use App\Http\Controllers\Controller;
 use App\Models\Abonnement;
 use App\Models\Annonce;
@@ -123,14 +122,12 @@ class PlateformeController extends Controller
 
     public function demandes(Request $request): JsonResponse
     {
-        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'proprietaire.parrain:id,name', 'parrainRecompense:id,name', 'boutique', 'demandeur'])
-            ->when($request->query('filtre', 'en_attente') === 'en_attente', fn ($q) => $q->enAttente())
-            ->orderByRaw('CASE WHEN statut = ? THEN 0 ELSE 1 END', [StatutDemande::EnAttente->value])
-            ->latest('id')
-            ->limit(100)
-            ->get();
+        // Mêmes onglets et même recherche que la console web (RechercheDemandes).
+        $recherche = app(\App\Services\RechercheDemandes::class);
+        $q = (string) $request->query('q', '');
+        $demandes = $recherche->requete((string) $request->query('filtre', 'en_attente'), $q)->limit(100)->get();
 
-        return response()->json(['data' => $demandes->map(fn (DemandeAbonnement $d) => [
+        return response()->json(['comptes' => $recherche->comptes($q), 'data' => $demandes->map(fn (DemandeAbonnement $d) => [
             'id' => $d->id,
             'statut' => $d->statut->value,
             'plan' => $d->plan,
@@ -143,6 +140,7 @@ class PlateformeController extends Controller
             'preuve' => $d->preuveExiste(),
             'preuve_note' => $d->preuve_note,
             'cree_le' => $d->created_at?->toIso8601String(),
+            'decide_le' => $d->decide_le?->toIso8601String(),
             'boutique' => $d->boutique?->nom,
             'proprietaire' => $d->proprietaire?->name,
             'telephone' => $d->telephone_contact ?: $d->proprietaire?->phone,

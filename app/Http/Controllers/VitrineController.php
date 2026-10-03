@@ -24,6 +24,13 @@ class VitrineController extends Controller
         }
 
         $plans = Plan::with('tarifs')->actifs()->ordonnes()->get();
+        // Les fonctions les plus partagées entre plans payants d'abord : sur
+        // chaque carte, les ✓ se suivent puis viennent les —, et une fonction
+        // décochée dans la console descend d'elle-même.
+        $payants = $plans->reject(fn (Plan $p) => $p->estEssai());
+        $ordre = collect(array_keys(Plan::FONCTIONNALITES))
+            ->sortBy([fn ($a, $b) => $payants->filter->inclut($b)->count() <=> $payants->filter->inclut($a)->count()])
+            ->values();
         $essai = $plans->first(fn (Plan $p) => $p->estEssai());
 
         return view('vitrine', [
@@ -36,10 +43,10 @@ class VitrineController extends Controller
                 'max_membres' => $p->max_membres,
                 // Chaque fonction cochée ou non dans la console : la vitrine
                 // suit les plans sans qu'on la retouche.
-                'fonctions' => collect(Plan::FONCTIONNALITES)->map(fn (string $libelle, string $code) => [
-                    'libelle' => $libelle,
+                'fonctions' => $ordre->map(fn (string $code) => [
+                    'libelle' => Plan::FONCTIONNALITES[$code],
                     'inclus' => $p->inclut($code),
-                ])->values()->all(),
+                ])->all(),
                 'mensuel' => $p->tarif(CycleFacturation::Mensuel)?->montant,
                 'annuel' => $p->tarif(CycleFacturation::Annuel)?->montant,
             ])->values(),

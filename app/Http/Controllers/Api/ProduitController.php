@@ -113,7 +113,14 @@ class ProduitController extends Controller
             'nom' => [$requis, 'string', 'max:255'],
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
-            'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', $boutiqueId)->ignore($produit?->id)],
+            // Déjà pris : on dit par quel article, pour que le commerçant le retrouve.
+            'code_barre' => ['nullable', 'string', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec) use ($boutiqueId, $produit): void {
+                $existant = Produit::withoutGlobalScopes()->where('boutique_id', $boutiqueId)->where('code_barre', $valeur)
+                    ->when($produit, fn ($q) => $q->whereKeyNot($produit->id))->first(['nom', 'format']);
+                if ($existant) {
+                    $echec('Ce code-barres est déjà celui de « '.trim($existant->nom.($existant->format ? ' – '.$existant->format : '')).' ».');
+                }
+            }],
             'prix_achat' => ['nullable', 'integer', 'min:0'],
             'prix_vente' => [$requis, 'integer', 'min:0'],
             'taux_tva' => ['nullable', 'numeric', 'min:0', 'max:100'],

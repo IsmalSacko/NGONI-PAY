@@ -11,6 +11,7 @@ use App\Livewire\Plateforme\Demandes;
 use App\Livewire\Plateforme\Plans;
 use App\Livewire\Plateforme\Utilisateurs;
 use App\Models\Boutique;
+use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
@@ -109,6 +110,36 @@ class ConsolePlateformeTest extends TestCase
             ->call('demanderRefus', $autre->id)->call('refuser')->assertHasErrors('motif')
             ->set('motif', 'Paiement introuvable')->call('refuser')->assertHasNoErrors();
         $this->assertSame(StatutDemande::Refusee, $autre->fresh()->statut);
+    }
+
+    public function test_les_demandes_se_rangent_par_onglet_et_se_retrouvent_par_recherche(): void
+    {
+        $service = app(AbonnementService::class);
+        $approuvee = $service->soumettre($this->boutique, $this->awa, 'basic', CycleFacturation::Mensuel);
+        $service->approuver($approuvee, $this->exploitant);
+        $this->awa->abonnement()->update(['plan' => 'essai', 'fin' => now()->subDay()->toDateString()]);
+        $enAttente = $service->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel);
+        DemandeAbonnement::whereKey($enAttente->id)->update(['created_at' => now()->subDays(3)]);
+        $this->actingAs($this->exploitant);
+
+        // À traiter par défaut : seule la demande en attente, et son ancienneté.
+        Livewire::test(Demandes::class)
+            ->assertSee('1 demande')
+            ->assertSee('Approuver')
+            ->assertSee('Depuis 3 jours')
+            ->assertViewHas('demandes', fn ($p) => $p->pluck('id')->all() === [$enAttente->id]);
+
+        Livewire::test(Demandes::class)->set('filtre', 'approuvee')
+            ->assertViewHas('demandes', fn ($p) => $p->pluck('id')->all() === [$approuvee->id]);
+
+        // Recherche par boutique, par numéro (chiffres seuls) ou par nom.
+        foreach (['pressing', '76 00 82 01', 'awa'] as $terme) {
+            Livewire::test(Demandes::class)->set('filtre', 'toutes')->set('recherche', $terme)
+                ->assertViewHas('demandes', fn ($p) => $p->count() === 2);
+        }
+        Livewire::test(Demandes::class)->set('filtre', 'toutes')->set('recherche', 'Boutique inconnue')
+            ->assertViewHas('demandes', fn ($p) => $p->count() === 0)
+            ->assertSee('Aucune demande ne correspond');
     }
 
     public function test_les_plans_se_reglent_depuis_la_console(): void

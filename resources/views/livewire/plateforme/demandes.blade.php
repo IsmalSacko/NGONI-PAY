@@ -3,15 +3,50 @@
     $tons = ['en_attente' => 'attente', 'approuvee' => 'succes', 'refusee' => 'danger', 'annulee' => 'neutre'];
 @endphp
 <div class="flex flex-col gap-5">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Demandes d’abonnement</h1>
-            <p class="text-sm text-muted">Approuvez une fois le paiement constaté. Le plan ne s’active qu’à ce moment.</p>
+    @php
+        $onglets = [
+            'en_attente' => ['À traiter', 'horloge'],
+            'approuvee' => ['Approuvées', 'ok'],
+            'refusee' => ['Refusées', 'stop'],
+            'annulee' => ['Annulées', 'gomme'],
+            'toutes' => ['Toutes', 'etiquette'],
+        ];
+        $aTraiter = (int) ($comptes['en_attente'] ?? 0);
+    @endphp
+    <div>
+        <h1 class="font-display font-extrabold text-2xl md:text-3xl">Demandes d’abonnement</h1>
+        <p class="text-sm text-muted">Approuvez une fois le paiement constaté. Le plan ne s’active qu’à ce moment.</p>
+    </div>
+
+    {{-- La carte forte de la marque : ce qui attend une décision. --}}
+    <div class="rounded-2xl p-5 text-white shadow-carte flex items-center gap-4" style="background: linear-gradient(135deg, var(--color-nuit-clair), var(--color-accent));">
+        <span class="w-12 h-12 shrink-0 rounded-xl bg-jaune text-accent inline-flex items-center justify-center"><x-plateforme.picto nom="horloge" class="w-6 h-6" /></span>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-white/70">À traiter</p>
+            <p class="font-display font-extrabold text-2xl md:text-3xl">{{ $aTraiter }} demande{{ $aTraiter > 1 ? 's' : '' }}</p>
+            <p class="text-sm font-bold text-jaune">{{ $aTraiter ? 'La plus ancienne en premier : traitez dans l’ordre d’arrivée.' : 'Tout est traité.' }}</p>
         </div>
-        <select wire:model.live="filtre" class="{{ $champ }} pr-8">
-            <option value="en_attente">En attente</option>
-            <option value="toutes">Toutes</option>
-        </select>
+    </div>
+
+    {{-- Recherche, puis les onglets avec leur nombre (recherche comprise). --}}
+    <div class="flex flex-col gap-3">
+        <label class="relative block">
+            <x-plateforme.picto nom="recherche" class="w-5 h-5 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input wire:model.live.debounce.300ms="recherche" type="search" placeholder="Boutique, téléphone, nom, prénom ou e-mail…"
+                   class="{{ $champ }} w-full pl-11 h-12 text-base">
+        </label>
+        <div class="flex flex-wrap gap-2" role="tablist">
+            @foreach ($onglets as $cle => [$libelle, $picto])
+                @php($n = $cle === 'toutes' ? $comptes->sum() : (int) ($comptes[$cle] ?? 0))
+                <button wire:click="$set('filtre', '{{ $cle }}')" role="tab" aria-selected="{{ $filtre === $cle ? 'true' : 'false' }}"
+                        class="h-10 pl-3 pr-2 rounded-xl inline-flex items-center gap-2 text-sm font-bold transition
+                               {{ $filtre === $cle ? 'bg-jaune text-accent shadow-sm' : 'bg-white text-ink ring-1 ring-border-strong hover:bg-puce' }}">
+                    <x-plateforme.picto :nom="$picto" class="w-4 h-4" />{{ $libelle }}
+                    <span class="min-w-6 h-6 px-1.5 rounded-lg inline-flex items-center justify-center text-xs tabular-nums
+                                 {{ $filtre === $cle ? 'bg-accent text-white' : ($cle === 'en_attente' && $n ? 'bg-danger-fg text-white' : 'bg-puce text-muted') }}">{{ $n }}</span>
+                </button>
+            @endforeach
+        </div>
     </div>
 
     @if ($info)<p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>@endif
@@ -19,7 +54,24 @@
 
     @forelse ($demandes as $demande)
         @php($tranchee = $demande->statut->estTranchee())
-        <div class="bg-white rounded-2xl shadow-carte p-4 md:p-5 {{ $tranchee ? '' : 'ring-1 ring-jaune/50' }}" wire:key="demande-{{ $demande->id }}">
+        @if ($tranchee)
+            {{-- Déjà traitée : une ligne compacte, le détail au toucher. --}}
+            <div x-data="{ ouvert: false }" class="bg-white rounded-2xl shadow-carte" wire:key="demande-{{ $demande->id }}">
+                <button type="button" @click="ouvert = !ouvert" class="w-full p-3.5 md:px-5 flex items-center gap-3 text-left text-sm">
+                    <x-plateforme.icone-chip nom="boutique" ton="neutre" taille="w-9 h-9" />
+                    <span class="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span class="font-bold truncate">{{ $demande->boutique?->nom ?? '—' }}</span>
+                        <span class="text-muted">· {{ ucfirst($demande->plan) }} {{ strtolower($demande->cycle->libelle()) }}</span>
+                        <span class="font-bold text-accent tabular-nums">{{ number_format($demande->montant, 0, ',', ' ') }} {{ $demande->devise }}</span>
+                    </span>
+                    <x-plateforme.pastille :ton="$tons[$demande->statut->value] ?? 'neutre'">{{ $demande->statut->libelle() }}</x-plateforme.pastille>
+                    <span class="hidden sm:inline text-xs text-muted tabular-nums w-24 text-right">{{ $demande->decide_le?->format('d/m/Y') }}</span>
+                    <svg class="w-4 h-4 text-muted transition" :class="ouvert && 'rotate-180'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div x-show="ouvert" x-cloak class="px-4 md:px-5 pb-4 pt-1 border-t border-separateur">
+        @else
+        <div class="bg-white rounded-2xl shadow-carte p-4 md:p-5 ring-1 ring-jaune/50" wire:key="demande-{{ $demande->id }}">
+        @endif
             <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div class="flex items-start gap-3 min-w-0 text-sm">
                     <x-plateforme.icone-chip nom="boutique" :ton="$tranchee ? 'neutre' : 'jaune'" />
@@ -27,6 +79,12 @@
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <p class="font-bold text-base">{{ $demande->boutique?->nom ?? '—' }}</p>
                             <x-plateforme.pastille :ton="$tons[$demande->statut->value] ?? 'neutre'">{{ $demande->statut->libelle() }}</x-plateforme.pastille>
+                            {{-- En attente depuis plus d'un jour : à ne pas oublier. --}}
+                            @if (! $tranchee && $demande->created_at->lt(now()->subDay()))
+                                <span class="inline-flex items-center gap-1 rounded-full bg-danger-fg text-white px-2.5 py-0.5 text-xs font-bold">
+                                    <x-plateforme.picto nom="alerte" class="w-3.5 h-3.5" />Depuis {{ $demande->created_at->diffForHumans(null, true) }}
+                                </span>
+                            @endif
                         </div>
                         <p class="mt-0.5 flex flex-wrap items-baseline gap-x-2">
                             <span class="font-semibold">{{ ucfirst($demande->plan) }} {{ strtolower($demande->cycle->libelle()) }}</span>
@@ -92,10 +150,13 @@
                 </form>
             @endif
         </div>
+        @if ($tranchee)
+            </div>
+        @endif
     @empty
         <div class="rounded-2xl bg-white shadow-carte p-8 flex flex-col items-center gap-3 text-center">
             <x-plateforme.icone-chip nom="ok" ton="succes" taille="w-12 h-12" />
-            <p class="text-muted">Aucune demande.</p>
+            <p class="text-muted">{{ trim($recherche) !== '' ? 'Aucune demande ne correspond à « '.trim($recherche).' ».' : ($filtre === 'en_attente' ? 'Aucune demande à traiter.' : 'Aucune demande.') }}</p>
         </div>
     @endforelse
 

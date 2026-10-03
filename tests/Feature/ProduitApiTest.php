@@ -162,7 +162,7 @@ class ProduitApiTest extends TestCase
         $this->withToken($this->jeton($this->admin))
             ->postJson('/api/produits', ['nom' => 'Autre riz', 'prix_vente' => 100, 'code_barre' => '6130000200021'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('code_barre');
+            ->assertJsonPath('errors.code_barre.0', 'Ce code-barres est déjà celui de « Riz ».');
     }
 
     public function test_supprimer_un_produit_libere_son_code_barres(): void

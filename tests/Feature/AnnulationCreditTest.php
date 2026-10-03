@@ -98,6 +98,7 @@ class AnnulationCreditTest extends TestCase
         $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated();
 
         $this->api($this->caissier)->getJson('/api/clients')->assertJsonPath('data.0.solde_du', 20000);
+        $this->api($this->caissier)->getJson('/api/clients/resume')->assertExactJson(['clients' => 1, 'debiteurs' => 1, 'encours' => 20000]);
 
         $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 25000, 'moyen_paiement' => 'especes'])
             ->assertUnprocessable();

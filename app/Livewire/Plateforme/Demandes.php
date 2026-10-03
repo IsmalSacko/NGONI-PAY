@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plateforme;
 
-use App\Enums\StatutDemande;
 use App\Models\DemandeAbonnement;
 use App\Services\AbonnementService;
+use App\Services\RechercheDemandes;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,8 +22,13 @@ class Demandes extends Component
 {
     use WithPagination;
 
-    /** en_attente | toutes */
+    /** Onglet : en_attente | approuvee | refusee | annulee | toutes. */
+    #[Url(as: 'onglet')]
     public string $filtre = 'en_attente';
+
+    /** Boutique, téléphone, nom ou e-mail du demandeur. */
+    #[Url(as: 'q')]
+    public string $recherche = '';
 
     public ?int $refusEnCours = null;
 
@@ -33,6 +39,11 @@ class Demandes extends Component
     public ?string $alerte = null;
 
     public function updatingFiltre(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingRecherche(): void
     {
         $this->resetPage();
     }
@@ -81,12 +92,10 @@ class Demandes extends Component
 
     public function render()
     {
-        $demandes = DemandeAbonnement::with(['proprietaire.abonnement', 'proprietaire.parrain:id,name', 'parrainRecompense:id,name', 'boutique', 'demandeur'])
-            ->when($this->filtre === 'en_attente', fn ($q) => $q->enAttente())
-            ->orderByRaw('CASE WHEN statut = ? THEN 0 ELSE 1 END', [StatutDemande::EnAttente->value])
-            ->latest('id')
-            ->paginate(20);
+        $recherche = app(RechercheDemandes::class);
+        $demandes = $recherche->requete($this->filtre, $this->recherche)->paginate(20);
+        $comptes = $recherche->comptes($this->recherche);
 
-        return view('livewire.plateforme.demandes', ['demandes' => $demandes]);
+        return view('livewire.plateforme.demandes', ['demandes' => $demandes, 'comptes' => $comptes]);
     }
 }

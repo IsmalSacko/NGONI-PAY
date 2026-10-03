@@ -17,6 +17,22 @@ use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
 {
+    /**
+     * En tête de l'écran Clients : combien de clients, et ce que tous vous
+     * doivent — la liste, paginée, ne permet pas de l'additionner.
+     */
+    public function resume(): JsonResponse
+    {
+        $soldes = Client::query()->avecSoldeDu()->get(['id'])
+            ->map(fn (Client $c) => max(0, (int) $c->credit_total - (int) $c->reglements_total));
+
+        return response()->json([
+            'clients' => $soldes->count(),
+            'debiteurs' => $soldes->filter()->count(),
+            'encours' => (int) $soldes->sum(),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         // Achats validés : combien, et pour combien.
