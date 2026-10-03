@@ -149,13 +149,22 @@ class BackofficeTest extends TestCase
     public function test_categories_index_permet_de_creer_une_categorie(): void
     {
         $this->actingAs($this->admin);
+        $page = Livewire::test(CategoriesIndex::class);
+        $libre = $page->get('couleur');
+        $this->assertArrayHasKey($libre, CategorieProduit::COULEURS, 'une couleur de la palette, déjà cochée');
+        $this->assertNotContains($libre, CategorieProduit::withoutGlobalScopes()->where('boutique_id', $this->admin->boutique_id)->pluck('couleur')->all(), 'pas déjà prise');
+        $page->set('nom', 'Épicerie fine')->call('enregistrer');
 
-        Livewire::test(CategoriesIndex::class)
-            ->set('nom', 'Alimentation')
-            ->call('enregistrer');
-
-        $categorie = CategorieProduit::where('nom', 'Alimentation')->firstOrFail();
+        $categorie = CategorieProduit::where('nom', 'Épicerie fine')->firstOrFail();
         $this->assertSame($this->admin->boutique_id, $categorie->boutique_id);
+        $this->assertSame($libre, $categorie->couleur, 'la première couleur libre, déjà cochée');
+
+        // On coche une autre couleur ; la suivante proposée n'est plus la même.
+        Livewire::test(CategoriesIndex::class)
+            ->assertNotSet('couleur', $libre)
+            ->assertSee('Turquoise')
+            ->set('nom', 'Téléphonie')->call('$set', 'couleur', '#D61F69')->call('enregistrer');
+        $this->assertSame('#D61F69', CategorieProduit::where('nom', 'Téléphonie')->value('couleur'));
     }
 
     public function test_clients_index_permet_de_creer_un_client(): void

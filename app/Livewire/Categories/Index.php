@@ -17,7 +17,12 @@ class Index extends Component
 
     public string $nom = '';
 
-    public string $couleur = '#0B6E4F';
+    public string $couleur = '';
+
+    public function mount(): void
+    {
+        $this->couleur = CategorieProduit::couleurLibre();
+    }
 
     public ?string $categorieId = null;
 
@@ -26,13 +31,13 @@ class Index extends Component
         $categorie = CategorieProduit::findOrFail($categorieId);
         $this->categorieId = $categorie->id;
         $this->nom = $categorie->nom;
-        $this->couleur = (string) ($categorie->couleur ?: '#0B6E4F');
+        $this->couleur = strtoupper((string) ($categorie->couleur ?: CategorieProduit::couleurLibre()));
     }
 
     public function annuler(): void
     {
         $this->reset(['categorieId', 'nom']);
-        $this->couleur = '#0B6E4F';
+        $this->couleur = CategorieProduit::couleurLibre();
     }
 
     public function enregistrer(): void
@@ -45,7 +50,7 @@ class Index extends Component
 
         $data = $this->validate([
             'nom' => ['required', 'string', 'max:255'],
-            'couleur' => ['nullable', 'string', 'size:7'],
+            'couleur' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         if ($this->categorieId) {

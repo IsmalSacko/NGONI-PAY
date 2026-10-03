@@ -22,9 +22,11 @@ class CategorieProduitController extends Controller
     {
         $data = $request->validate([
             'nom' => ['required', 'string', 'max:255'],
-            'couleur' => ['nullable', 'string', 'size:7'],
+            'couleur' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'ordre' => ['nullable', 'integer', 'min:0'],
         ]);
+        // Sans couleur cochée : la première de la palette encore libre.
+        $data['couleur'] ??= CategorieProduit::couleurLibre();
 
         return response()->json(CategorieProduit::create($data), 201);
     }
@@ -33,7 +35,7 @@ class CategorieProduitController extends Controller
     {
         $data = $request->validate([
             'nom' => ['sometimes', 'required', 'string', 'max:255'],
-            'couleur' => ['nullable', 'string', 'size:7'],
+            'couleur' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'ordre' => ['nullable', 'integer', 'min:0'],
         ]);
 

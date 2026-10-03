@@ -31,8 +31,23 @@
                     @error('nom') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold mb-1">Couleur</label>
-                    <input wire:model="couleur" type="color" class="w-full h-11 rounded-lg border border-[--color-border-strong]">
+                    <span class="block text-sm font-semibold mb-2">Couleur</span>
+                    {{-- On coche une couleur : celle de la catégorie à la caisse. --}}
+                    @php($palette = \App\Models\CategorieProduit::COULEURS + (array_key_exists(strtoupper($couleur), \App\Models\CategorieProduit::COULEURS) || $couleur === '' ? [] : [strtoupper($couleur) => 'Couleur actuelle']))
+                    <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Couleur">
+                        @foreach ($palette as $hex => $libelle)
+                            @php($choisie = strtoupper($couleur) === $hex)
+                            <button type="button" wire:click="$set('couleur', '{{ $hex }}')" role="radio" aria-checked="{{ $choisie ? 'true' : 'false' }}" title="{{ $libelle }}"
+                                    class="w-10 h-10 rounded-full inline-flex items-center justify-center transition {{ $choisie ? 'ring-4 ring-jaune ring-offset-2' : 'hover:scale-110' }}"
+                                    style="background: {{ $hex }}">
+                                @if ($choisie)
+                                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+                                @endif
+                                <span class="sr-only">{{ $libelle }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    @error('couleur') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex gap-3">
                     @if ($categorieId)
