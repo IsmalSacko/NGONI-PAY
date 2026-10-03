@@ -85,7 +85,9 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        // Jeton encore valide : on le révoque. Déjà invalide (révoqué, compte
+        // supprimé) : rien à faire, la déconnexion réussit quand même.
+        auth('sanctum')->user()?->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Déconnecté.']);
     }

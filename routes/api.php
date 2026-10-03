@@ -89,8 +89,12 @@ Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('platefo
     Route::post('annonces/{annonce}/arreter', 'arreterAnnonce');
 });
 
+// Hors du groupe authentifié : se déconnecter avec un jeton déjà invalide
+// doit réussir. Refusé (401), l'application relançait la déconnexion en boucle
+// — des milliers de requêtes par minute et par téléphone.
+Route::post('deconnexion', [AuthController::class, 'logout']);
+
 Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): void {
-    Route::post('deconnexion', [AuthController::class, 'logout']);
     Route::get('moi', [AuthController::class, 'me']);
     Route::post('conditions/accepter', [AuthController::class, 'accepterConditions']);
     // Son propre compte, pour tout membre : profil et mot de passe (jamais le rôle).

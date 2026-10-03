@@ -16,6 +16,23 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_se_deconnecter_revoque_le_jeton_et_reussit_meme_avec_un_jeton_deja_invalide(): void
+    {
+        ['user' => $user] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Boutique', 'pays' => 'ML', 'telephone' => '76008299', 'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Awa',
+        ]);
+        $jeton = $user->createToken('t')->plainTextToken;
+
+        $this->withToken($jeton)->postJson('/api/deconnexion')->assertOk();
+        $this->assertSame(0, $user->tokens()->count(), 'jeton révoqué');
+
+        // Le même jeton, désormais invalide : 200, et non 401 — l'application
+        // relançait la déconnexion à chaque 401, en boucle.
+        $this->app['auth']->forgetGuards();
+        $this->withToken($jeton)->postJson('/api/deconnexion')->assertOk();
+        $this->postJson('/api/deconnexion')->assertOk();
+    }
+
     public function test_un_numero_deja_inscrit_est_refuse_clairement_et_non_par_une_erreur_serveur(): void
     {
         $inscription = [
