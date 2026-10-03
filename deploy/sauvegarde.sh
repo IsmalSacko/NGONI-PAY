@@ -3,7 +3,7 @@
 # logos, preuves de paiement). Garde 30 jours sur le serveur, et copie chaque
 # sauvegarde hors du serveur, sur Google Drive (rclone, distant « gdrive: »),
 # où elle est gardée 60 jours : une panne du serveur n'emporte pas tout.
-#     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh        # base + fichiers (2 fois par jour)
+#     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh        # base + fichiers (une fois par jour, 3 h 15)
 #     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh base   # la base seule (toutes les heures)
 #
 # Restauration d'une base :
@@ -48,7 +48,7 @@ RCLONE=/home/ismael/bin/rclone
 DRIVE="gdrive:Sauvegardes Ngoni Caisse"
 DISTANT="non configuré"
 if [ -x "$RCLONE" ]; then
-  if "$RCLONE" copy "$DEST" "$DRIVE" --max-age 2d --log-level ERROR 2>>"$JOURNAL" \
+  if "$RCLONE" copy "$DEST" "$DRIVE" --max-age 20h --log-level ERROR 2>>"$JOURNAL" \
      && "$RCLONE" delete "$DRIVE" --min-age 60d --log-level ERROR 2>>"$JOURNAL"; then
     DISTANT="copié sur Google Drive"
   else
