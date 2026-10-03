@@ -14,7 +14,7 @@
             ['route' => 'tableau-de-bord', 'label' => 'Pilotage', 'permission' => 'dashboard.view'],
             ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
             ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
-            ['route' => 'achats.index', 'label' => 'Achats', 'permission' => 'achats.view'],
+            ['route' => 'achats.index', 'label' => 'Achats', 'permission' => 'achats.view', 'fonctionnalite' => \App\Models\Plan::ACHATS_FOURNISSEURS],
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
             ['route' => 'statistiques.index', 'label' => 'Statistiques', 'permission' => 'rapports.view'],
             ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
@@ -23,6 +23,9 @@
             ['route' => 'boutiques.index', 'label' => 'Boutiques', 'permission' => 'backoffice.access'],
         ];
         $boutiqueActiveId = app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+        // Une page hors de l'offre (Plan::FONCTIONNALITES) n'apparaît pas au menu.
+        $liens = array_filter($liens, fn (array $l) => ! isset($l['fonctionnalite'])
+            || app(\App\Services\AbonnementService::class)->permet(\App\Models\Boutique::find($boutiqueActiveId), $l['fonctionnalite']));
         $mesBoutiques = \App\Models\Boutique::whereIn('id', auth()->user()->boutiquesBackOffice())->orderBy('nom')->get(['id', 'nom']);
         $boutiqueActive = $mesBoutiques->firstWhere('id', $boutiqueActiveId);
     @endphp

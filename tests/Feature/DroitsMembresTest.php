@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Livewire\Dashboard;
+use App\Livewire\Stocks\Index as StocksIndex;
 use App\Models\Boutique;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
@@ -139,6 +140,107 @@ class DroitsMembresTest extends TestCase
         session([BoutiqueActive::CLE_SESSION => $this->boutique->id]);
 
         Livewire::actingAs($gerant)->test(Dashboard::class)->assertRedirect(route('produits.index'));
+    }
+
+    public function test_un_gerant_voit_les_ventes_sans_le_chiffre_d_affaires(): void
+    {
+        $riz = $this->api($this->awa)->postJson('/api/produits', ['nom' => 'Riz', 'prix_vente' => 5000, 'taux_tva' => 0, 'stock' => 10])->assertCreated()->json('id');
+        $this->api($this->awa)->postJson('/api/ventes', ['lignes' => [['produit_id' => $riz, 'quantite' => 1]], 'moyen_paiement' => 'especes'])->assertCreated();
+        $avecVentes = $this->ajouter('70000001', 'gerant', ['ventes']);
+        $sansRien = $this->ajouter('70000002', 'gerant', []);
+
+        $this->api($avecVentes)->getJson('/api/ventes')->assertOk()->assertJsonCount(1, 'data');
+        $this->api($avecVentes)->getJson('/api/dashboard')->assertForbidden();
+        $this->api($sansRien)->getJson('/api/ventes')->assertOk()->assertJsonCount(0, 'data');
+
+        // Le back-office web applique la même règle.
+        foreach ([[$avecVentes, 1], [$sansRien, 0]] as [$membre, $nombre]) {
+            $this->app['auth']->forgetGuards();
+            app(TenantContext::class)->forget();
+            app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+            session([BoutiqueActive::CLE_SESSION => $this->boutique->id]);
+            $this->assertCount($nombre, Livewire::actingAs($membre)->test(\App\Livewire\Ventes\Index::class)->viewData('ventes')->items());
+        }
+    }
+
+    public function test_un_employe_n_ouvre_pas_de_boutique_et_ne_connait_que_la_sienne(): void
+    {
+        $gerant = $this->ajouter('70000001', 'gerant');
+
+        $this->api($gerant)->getJson('/api/moi')->assertJsonPath('proprietaire', false);
+        $this->api($gerant)->postJson('/api/boutiques', ['nom' => 'Boutique du gérant', 'pays' => 'ML'])->assertForbidden();
+        $this->api($this->awa)->getJson('/api/moi')->assertJsonPath('proprietaire', true);
+    }
+
+    public function test_on_peut_confier_les_prix_sans_la_correction_du_stock(): void
+    {
+        $id = $this->api($this->awa)->postJson('/api/produits', ['nom' => 'Riz', 'prix_vente' => 5000, 'taux_tva' => 0, 'stock' => 10])->assertCreated()->json('id');
+        $prix = $this->ajouter('70000001', 'gerant', ['articles']);
+        $stock = $this->ajouter('70000002', 'gerant', ['articles', 'stock']);
+
+        $this->api($prix)->putJson("/api/produits/{$id}", ['prix_vente' => 5500])->assertOk();
+        $this->api($prix)->postJson("/api/produits/{$id}/ajuster-stock", ['stock' => 2])->assertForbidden();
+        $this->api($stock)->postJson("/api/produits/{$id}/ajuster-stock", ['stock' => 2])->assertOk();
+    }
+
+    public function test_seul_le_titulaire_supprime_un_client(): void
+    {
+        $gerant = $this->ajouter('70000001', 'gerant');
+        $id = $this->api($this->awa)->postJson('/api/clients', ['nom' => 'Fatou'])->assertCreated()->json('id');
+
+        $this->api($gerant)->deleteJson("/api/clients/{$id}")->assertForbidden();
+        $this->api($this->awa)->deleteJson("/api/clients/{$id}")->assertSuccessful();
+    }
+
+    public function test_un_gerant_par_defaut_garde_la_correction_du_stock(): void
+    {
+        $gerant = $this->ajouter('70000001', 'gerant');
+
+        $this->assertContains('stocks.update', $this->api($gerant)->getJson('/api/moi')->json('permissions'));
+    }
+
+    public function test_remise_credit_et_montant_libre_suivent_les_droits(): void
+    {
+        $riz = $this->api($this->awa)->postJson('/api/produits', ['nom' => 'Riz', 'prix_vente' => 5000, 'taux_tva' => 0, 'stock' => 50])->assertCreated()->json('id');
+        $fatou = $this->api($this->awa)->postJson('/api/clients', ['nom' => 'Fatou'])->assertCreated()->json('id');
+        $caissier = $this->ajouter('70000001', 'caissier');
+        $gerant = $this->ajouter('70000002', 'gerant');
+        $vendre = fn (User $u, array $extra) => $this->api($u)->postJson('/api/ventes', $extra + [
+            'lignes' => [['produit_id' => $riz, 'quantite' => 2]],
+            'moyen_paiement' => 'especes',
+        ]);
+
+        // Un caissier, par défaut : ni remise ni crédit, le montant libre oui.
+        $vendre($caissier, ['remise' => 2000])->assertForbidden()->assertJsonPath('message', 'Vous n’avez pas le droit de faire des remises.');
+        $vendre($caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou])->assertForbidden();
+        $vendre($caissier, ['lignes' => [['libelle' => 'Livraison', 'prix_unitaire' => 500, 'quantite' => 1]]])->assertCreated();
+        // « Remise fidélité » sans programme : la remise saisie ne passe pas.
+        $vendre($caissier, ['remise' => 2000, 'remise_fidelite' => true, 'client_id' => $fatou])->assertCreated()->assertJsonPath('remise', 0);
+
+        // Un gérant, par défaut : tout.
+        $vendre($gerant, ['remise' => 2000])->assertCreated()->assertJsonPath('remise', 2000);
+        $vendre($gerant, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou])->assertCreated();
+
+        // Le propriétaire retire le montant libre au caissier.
+        $this->api($this->awa)->putJson("/api/equipe/{$caissier->id}", ['role' => 'caissier', 'droits' => []])->assertOk();
+        $vendre($caissier, ['lignes' => [['libelle' => 'Livraison', 'prix_unitaire' => 500, 'quantite' => 1]]])->assertForbidden();
+    }
+
+    public function test_la_valeur_du_stock_suit_le_droit_au_chiffre_d_affaires(): void
+    {
+        $this->api($this->awa)->postJson('/api/produits', ['nom' => 'Riz', 'prix_vente' => 5000, 'prix_achat' => 4000, 'taux_tva' => 0, 'stock' => 10])->assertCreated();
+        $sansCa = $this->ajouter('70000001', 'gerant', ['articles', 'backoffice']);
+        $avecCa = $this->ajouter('70000002', 'gerant', ['chiffre_affaires', 'articles', 'backoffice']);
+
+        foreach ([[$sansCa, false], [$avecCa, true], [$this->awa, true]] as [$membre, $voit]) {
+            $this->app['auth']->forgetGuards();
+            app(TenantContext::class)->forget();
+            app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+            session([BoutiqueActive::CLE_SESSION => $this->boutique->id]);
+
+            $page = Livewire::actingAs($membre)->test(StocksIndex::class);
+            $voit ? $page->assertSee('Votre stock')->assertSee('Bénéfice prévu') : $page->assertDontSee('Votre stock')->assertDontSee('Bénéfice prévu');
+        }
     }
 
     public function test_la_migration_garde_aux_gerants_existants_ce_qu_ils_avaient(): void

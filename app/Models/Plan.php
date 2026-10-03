@@ -22,13 +22,50 @@ class Plan extends Model
     /** Affluence, marge par article, stock dormant, clients, équipe : réservées au Pro. */
     public const STATISTIQUES_AVANCEES = 'statistiques_avancees';
 
+    /** Vendre contre une dette du client (moyen « crédit client »). */
+    public const VENTE_CREDIT = 'vente_credit';
+
+    /** Gérer la boutique depuis un ordinateur. */
+    public const BACKOFFICE_WEB = 'backoffice_web';
+
+    /** Réceptions de marchandise, fournisseurs et ce qu'on leur doit. */
+    public const ACHATS_FOURNISSEURS = 'achats_fournisseurs';
+
+    /** Programme de fidélité : points et remise automatique. */
+    public const FIDELITE = 'fidelite';
+
+    /** Interrupteurs par membre (chiffre d'affaires, remises, crédit…). Sans eux : ceux du rôle. */
+    public const DROITS_MEMBRES = 'droits_membres';
+
+    /** Factures A4, exports Excel et bilan mensuel en PDF. */
+    public const FACTURES_EXPORTS = 'factures_exports';
+
+    /** Objectif de chiffre du mois et sa jauge. */
+    public const OBJECTIF_MOIS = 'objectif_mois';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
      */
     public const FONCTIONNALITES = [
-        self::SEANCES_CAISSE => 'Séances de caisse et suivi des écarts',
-        self::STATISTIQUES_AVANCEES => 'Statistiques avancées (affluence, marges, stock, clients, équipe)',
+        // Libellés courts : la vitrine et le comparatif de l'application les
+        // affichent tels quels, à côté d'une coche.
+        self::VENTE_CREDIT => 'Vente à crédit',
+        self::BACKOFFICE_WEB => 'Back-office web',
+        self::SEANCES_CAISSE => 'Séances de caisse et écarts',
+        self::STATISTIQUES_AVANCEES => 'Statistiques avancées',
+        self::ACHATS_FOURNISSEURS => 'Achats et fournisseurs',
+        self::FIDELITE => 'Programme de fidélité',
+        self::DROITS_MEMBRES => 'Droits par membre de l’équipe',
+        self::FACTURES_EXPORTS => 'Factures A4, exports, bilan mensuel',
+        self::OBJECTIF_MOIS => 'Objectif du mois',
+    ];
+
+    /** Dans tous les plans, sans case dans la console : la base de la caisse. */
+    public const COMMUNES = [
+        'Caisse, tickets et reçus PDF',
+        'Catalogue, stocks et clients',
+        'Ventes hors ligne',
     ];
 
     protected $fillable = [

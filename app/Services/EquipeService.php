@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\Country;
 use App\Models\Boutique;
+use App\Models\Plan;
 use App\Models\User;
 use App\Support\Authorization\Permissions;
 use App\Support\Phone\PhoneNumber;
@@ -52,7 +53,7 @@ class EquipeService
     public function ajouter(Boutique $boutique, string $nom, string $telephone, string $role, ?string $motDePasse = null, ?array $droits = null): array
     {
         $this->roleValide($role);
-        $this->droitsValides($droits);
+        $this->droitsValides($droits, $boutique, $role);
 
         if (! $this->abonnements->peutAjouterMembre($boutique, count($this->membreIds($boutique)))) {
             throw ValidationException::withMessages(['telephone' => [
@@ -100,7 +101,7 @@ class EquipeService
     public function changerRole(Boutique $boutique, User $acteur, string $userId, string $role, ?array $droits = null): User
     {
         $this->roleValide($role);
-        $this->droitsValides($droits);
+        $this->droitsValides($droits, $boutique, $role);
         $user = $this->membre($boutique, $userId);
 
         if ($user->id === $acteur->id) {
@@ -272,10 +273,17 @@ class EquipeService
     }
 
     /** @param  list<string>|null  $droits */
-    private function droitsValides(?array $droits): void
+    private function droitsValides(?array $droits, Boutique $boutique, string $role): void
     {
         if ($droits !== null && array_diff($droits, array_keys(Permissions::DROITS)) !== []) {
             throw ValidationException::withMessages(['droits' => ['Droit inconnu.']]);
+        }
+
+        // Hors du plan (Plan::DROITS_MEMBRES) : chacun a ceux de son rôle.
+        $defaut = $role === 'admin' ? [] : Permissions::DROITS_PAR_DEFAUT[$role] ?? [];
+        if ($droits !== null && collect($droits)->sort()->values()->all() !== collect($defaut)->sort()->values()->all()
+            && ! app(AbonnementService::class)->permet($boutique, Plan::DROITS_MEMBRES)) {
+            throw ValidationException::withMessages(['droits' => ['Régler les droits de chaque membre n’est pas inclus dans votre offre. Passez à une offre supérieure.']]);
         }
     }
 

@@ -86,8 +86,8 @@
             <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
                 <li>✓ Vos heures et jours d’affluence : quand renforcer la caisse</li>
                 <li>✓ La marge de chaque article et de chaque catégorie</li>
-                <li>✓ Le stock qui dort, et l’argent qu’il immobilise</li>
-                <li>✓ Les articles à racheter avant la rupture</li>
+                <li>✓ Les moins vendus, et l’argent qu’ils bloquent</li>
+                <li>✓ Ce qui sera bientôt fini, avant la rupture</li>
                 <li>✓ Vos clients fidèles, les nouveaux, et qui vous doit quoi</li>
                 <li>✓ Le chiffre et les écarts de caisse de chaque vendeur</li>
             </ul>
@@ -177,8 +177,8 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" wire:loading.class="opacity-60">
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">À racheter</h2>
-                <p class="text-xs text-muted">Moins de {{ \App\Services\Statistiques::JOURS_COUVERTURE_MIN }} jours de stock au rythme des {{ \App\Services\Statistiques::JOURS_VITESSE }} derniers jours</p>
+                <h2 class="font-display font-extrabold text-lg">Bientôt fini</h2>
+                <p class="text-xs text-muted">Il en reste pour moins de {{ \App\Services\Statistiques::JOURS_COUVERTURE_MIN }} jours</p>
                 <ul class="mt-3 divide-y divide-separateur text-sm">
                     @forelse ($a['stock']['a_racheter'] as $p)
                         <li class="py-2 flex items-center justify-between gap-3">
@@ -194,21 +194,27 @@
             </section>
 
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Stock qui dort</h2>
-                <p class="text-xs text-muted">En stock, pas vendu depuis {{ \App\Services\Statistiques::JOURS_DORMANT }} jours</p>
-                <p class="mt-3 text-sm">Argent immobilisé : <span class="font-display font-extrabold text-xl tabular-nums">{{ $m($a['stock']['valeur_dormante']) }}</span></p>
+                <h2 class="font-display font-extrabold text-lg">Moins vendus</h2>
+                <p class="text-xs text-muted">Aucune vente depuis {{ \App\Services\Statistiques::JOURS_DORMANT }} jours</p>
+                <p class="mt-3 text-sm">Argent bloqué : <span class="font-display font-extrabold text-xl tabular-nums">{{ $m($a['stock']['valeur_dormante']) }}</span></p>
                 <ul class="mt-2 divide-y divide-separateur text-sm">
                     @forelse ($a['stock']['dormants'] as $p)
                         <li class="py-2 flex items-center justify-between gap-3">
                             <span class="min-w-0"><span class="font-bold truncate block">{{ $p['nom'] }}</span><span class="text-xs text-muted">{{ $p['stock'] }} en stock</span></span>
-                            <span class="shrink-0 tabular-nums" title="{{ $p['valeur_estimee'] ? 'Au prix de vente : prix d’achat non renseigné' : 'Au prix d’achat' }}">{{ $m($p['valeur']) }}{{ $p['valeur_estimee'] ? '*' : '' }}</span>
+                            <span class="shrink-0 tabular-nums" title="{{ $p['valeur_estimee'] ? 'Compté au prix de vente : prix d’achat non renseigné' : 'Au prix d’achat' }}">{{ $m($p['valeur']) }}{{ $p['valeur_estimee'] ? '*' : '' }}</span>
                         </li>
                     @empty
-                        <li class="py-6 text-center text-muted">Tout votre stock tourne.</li>
+                        <li class="py-6 text-center text-muted">
+                            @if (($a['stock']['moins_vendus_dans'] ?? 0) > 0)
+                                Revenez dans {{ $a['stock']['moins_vendus_dans'] }} jour{{ $a['stock']['moins_vendus_dans'] > 1 ? 's' : '' }} : il faut un mois de ventes pour repérer les articles qui ne partent pas.
+                            @else
+                                Tous vos articles se vendent.
+                            @endif
+                        </li>
                     @endforelse
                 </ul>
                 @if (collect($a['stock']['dormants'])->contains('valeur_estimee', true))
-                    <p class="mt-2 text-xs text-muted">* Au prix de vente : le prix d’achat n’est pas renseigné.</p>
+                    <p class="mt-2 text-xs text-muted">* Compté au prix de vente : le prix d’achat n’est pas renseigné.</p>
                 @endif
             </section>
         </div>

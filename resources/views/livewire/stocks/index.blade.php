@@ -4,11 +4,30 @@
         <span class="text-[--color-muted] text-sm">Ajustez le stock à la suite d'un inventaire ou d'un réassort.</span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
-            <span class="text-sm font-semibold text-[--color-muted]">Valeur du stock</span>
-            <span class="font-display font-extrabold text-2xl">{{ \App\Support\Money\Montant::format($valeurStock) }}</span>
-        </div>
+    @if ($valeur)
+        <section class="bg-white border border-[--color-border] rounded-2xl p-5">
+            <h2 class="font-display font-extrabold">Votre stock</h2>
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1">
+                    <span class="text-sm font-semibold text-[--color-muted]">Prix d’achat</span>
+                    <span class="font-display font-extrabold text-2xl tabular-nums">{{ \App\Support\Money\Montant::format($valeur['achat']) }}</span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-sm font-semibold text-[--color-muted]">Prix de vente</span>
+                    <span class="font-display font-extrabold text-2xl tabular-nums">{{ \App\Support\Money\Montant::format($valeur['vente']) }}</span>
+                </div>
+                <div class="flex flex-col gap-1 {{ $valeur['benefice'] < 0 ? 'text-danger-fg' : 'text-succes-fonce' }}">
+                    <span class="text-sm font-semibold text-[--color-muted]">Bénéfice prévu</span>
+                    <span class="font-display font-extrabold text-2xl tabular-nums">{{ \App\Support\Money\Montant::format($valeur['benefice']) }}@if ($valeur['taux'] !== null) <span class="text-sm font-bold">{{ $valeur['taux'] }} %</span>@endif</span>
+                </div>
+            </div>
+            @if ($valeur['sans_prix_achat'] > 0)
+                <p class="mt-3 text-xs text-[--color-muted]">* {{ $valeur['sans_prix_achat'] }} article{{ $valeur['sans_prix_achat'] > 1 ? 's' : '' }} sans prix d’achat : compté{{ $valeur['sans_prix_achat'] > 1 ? 's' : '' }} au prix de vente, sans bénéfice.</p>
+            @endif
+        </section>
+    @endif
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="bg-white border border-[--color-border] rounded-2xl p-5 flex flex-col gap-1">
             <span class="text-sm font-semibold text-warn-fg">Stock bas</span>
             <span class="font-display font-extrabold text-2xl">{{ $nBas }} <span class="text-sm font-normal text-[--color-muted]">article(s)</span></span>

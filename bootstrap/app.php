@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant' => SetTenantContext::class,
             'abonnement' => \App\Http\Middleware\ExigeAbonnementActif::class,
+            'fonctionnalite' => \App\Http\Middleware\ExigeFonctionnalite::class,
             'plateforme' => \App\Http\Middleware\EstAdminPlateforme::class,
             'backoffice' => \App\Http\Middleware\AccesBackOffice::class,
             'conditions' => \App\Http\Middleware\ExigeConditions::class,

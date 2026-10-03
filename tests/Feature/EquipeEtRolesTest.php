@@ -50,6 +50,8 @@ class EquipeEtRolesTest extends TestCase
         EquipeService::droitsParDefaut($this->gerant, 'gerant');
         $this->caissier = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Caissier', 'phone' => '+22370000002', 'password' => 'password123']);
         $this->caissier->assignRole('caissier');
+        // Le crédit, le propriétaire l'accorde (Permissions::DROITS) : un caissier ne l'a pas d'office.
+        $this->caissier->givePermissionTo(['ventes.credit', 'ventes.montant_libre']);
     }
 
     private function dansLaBoutique(): void

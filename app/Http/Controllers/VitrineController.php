@@ -34,11 +34,16 @@ class VitrineController extends Controller
                 'description' => $p->description,
                 'max_boutiques' => $p->max_boutiques,
                 'max_membres' => $p->max_membres,
-                'seances' => $p->inclut(Plan::SEANCES_CAISSE),
-                'statistiques' => $p->inclut(Plan::STATISTIQUES_AVANCEES),
+                // Chaque fonction cochée ou non dans la console : la vitrine
+                // suit les plans sans qu'on la retouche.
+                'fonctions' => collect(Plan::FONCTIONNALITES)->map(fn (string $libelle, string $code) => [
+                    'libelle' => $libelle,
+                    'inclus' => $p->inclut($code),
+                ])->values()->all(),
                 'mensuel' => $p->tarif(CycleFacturation::Mensuel)?->montant,
                 'annuel' => $p->tarif(CycleFacturation::Annuel)?->montant,
             ])->values(),
+            'communes' => Plan::COMMUNES,
             'storeUrl' => (string) config('mobile.store_url'),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
             'version' => \App\Support\VersionApplication::derniere(),

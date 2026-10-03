@@ -6,7 +6,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
+use App\Models\Boutique;
+use App\Models\Plan;
 use App\Models\Vente;
+use App\Services\AbonnementService;
 use App\Services\VenteService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -73,7 +76,26 @@ class VenteController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(['client_id' => ['Choisissez le client qui paiera plus tard.']]);
         }
 
-        $vente = $this->ventes->encaisser($data, $request->user());
+        // Ce que le vendeur n'a pas le droit de faire (Permissions::DROITS).
+        // Une vente rejouée après une coupure est refusée de même : l'application
+        // la met de côté avec ce motif, sans bloquer les suivantes.
+        $user = $request->user();
+        if (($data['remise_fidelite'] ?? false) && ! $user->can('ventes.remise')) {
+            // La remise fidélité, le serveur la calcule : sans programme, celle
+            // saisie resterait (VenteService) — pas pour qui n'a pas ce droit.
+            $data['remise'] = 0;
+        }
+        $refus = match (true) {
+            ($data['remise'] ?? 0) > 0 && ! ($data['remise_fidelite'] ?? false) && ! $user->can('ventes.remise') => 'Vous n’avez pas le droit de faire des remises.',
+            $data['moyen_paiement'] === MoyenPaiement::CreditClient->value && ! $user->can('ventes.credit') => 'Vous n’avez pas le droit de vendre à crédit.',
+            $data['moyen_paiement'] === MoyenPaiement::CreditClient->value
+                && ! app(AbonnementService::class)->permet(Boutique::find(app(TenantContext::class)->boutiqueId()), Plan::VENTE_CREDIT) => 'La vente à crédit n’est pas incluse dans votre offre.',
+            collect($data['lignes'])->contains(fn ($l) => empty($l['produit_id'])) && ! $user->can('ventes.montant_libre') => 'Vous n’avez pas le droit de vendre au montant libre.',
+            default => null,
+        };
+        abort_if($refus !== null, 403, $refus);
+
+        $vente = $this->ventes->encaisser($data, $user);
 
         return response()->json($vente->load(['client', 'caissier']), 201);
     }

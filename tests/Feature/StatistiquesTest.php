@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\StockService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -116,6 +117,10 @@ class StatistiquesTest extends TestCase
     public function test_le_stock_qui_dort_et_celui_qui_va_manquer(): void
     {
         $savon = Produit::create(['nom' => 'Savon', 'prix_vente' => 500, 'prix_achat' => 300, 'taux_tva' => 0, 'stock' => 40]);
+        Produit::whereKey([$savon->id, $this->riz->id, $this->huile->id])->update(['created_at' => now()->subDays(45)]);
+        // Jamais vendu, mais arrivé il y a 10 jours : pas encore « moins vendu ».
+        $javel = Produit::create(['nom' => 'Javel', 'prix_vente' => 500, 'taux_tva' => 0, 'stock' => 20]);
+        Produit::whereKey($javel->id)->update(['created_at' => now()->subDays(10)]);
         $this->vendre([[$this->huile, 1]]);                     // 1 huile en 30 jours, 2 en stock : 60 j
         foreach (range(1, 10) as $_) {
             $this->vendre([[$this->riz, 3]]);                   // 30 riz en 30 jours, 70 en stock : 70 j
@@ -128,8 +133,42 @@ class StatistiquesTest extends TestCase
 
         $this->assertSame(['Savon'], collect($stock['dormants'])->pluck('nom')->all());
         $this->assertSame(40 * 300, $stock['valeur_dormante'], 'au prix d’achat');
+        $this->assertSame(30, $stock['moins_vendus_dans'], 'boutique créée aujourd’hui');
         $this->assertSame([['Riz', 5]], collect($stock['a_racheter'])->map(fn ($p) => [$p['nom'], $p['jours_restants']])->all());
         $this->assertNotNull($savon);
+    }
+
+    public function test_un_article_revenu_en_rayon_apres_rupture_ne_compte_pas_comme_moins_vendu(): void
+    {
+        $this->dans();
+        $the = Produit::create(['nom' => 'Thé', 'prix_vente' => 500, 'prix_achat' => 300, 'taux_tva' => 0, 'stock' => 0]);
+        $cafe = Produit::create(['nom' => 'Café', 'prix_vente' => 500, 'prix_achat' => 300, 'taux_tva' => 0, 'stock' => 0]);
+        Produit::whereKey([$the->id, $cafe->id, $this->riz->id, $this->huile->id])->update(['created_at' => now()->subDays(90)]);
+
+        $this->travelTo(now()->subDays(40));
+        app(StockService::class)->ajuster($the->refresh(), 12, $this->admin, 'Réception');   // en rayon depuis 40 jours
+        $this->travelBack();
+        $this->travelTo(now()->subDays(2));
+        app(StockService::class)->ajuster($cafe->refresh(), 12, $this->admin, 'Réception');  // rupture, puis réassort il y a 2 jours
+        $this->travelBack();
+
+        $dormants = collect($this->statistiques()['analyse']['stock']['dormants'])->pluck('nom')->all();
+
+        $this->assertContains('Thé', $dormants);
+        $this->assertNotContains('Café', $dormants);
+    }
+
+    public function test_un_article_recent_se_mesure_sur_son_age_reel(): void
+    {
+        $this->dans();
+        $mangue = Produit::create(['nom' => 'Mangue', 'prix_vente' => 100, 'taux_tva' => 0, 'stock' => 100]);
+        Produit::whereKey($mangue->id)->update(['created_at' => now()->subDays(4)]);
+        $this->vendre([[$mangue, 50]]);   // 50 en 5 jours : 10 par jour, 50 restants → 5 jours
+
+        $mangue = collect($this->statistiques()['analyse']['stock']['a_racheter'])->firstWhere('nom', 'Mangue');
+
+        $this->assertSame(10.0, (float) $mangue['vendus_par_jour']);
+        $this->assertSame(5, $mangue['jours_restants']);
     }
 
     public function test_clients_fideles_nouveaux_et_credit(): void
@@ -206,7 +245,7 @@ class StatistiquesTest extends TestCase
 
         $this->actingAs($this->admin)->get('/statistiques?periode=7j')->assertOk()
             ->assertSee('Allez plus loin dans vos chiffres')
-            ->assertDontSee('Stock qui dort');
+            ->assertDontSee('Moins vendus');
     }
 
     // --- Aides ---------------------------------------------------------------

@@ -31,7 +31,7 @@
         ['Votre équipe', "Ajoutez caissiers et gérants. Chacun voit ce qu'il doit voir : le caissier encaisse, le gérant pilote, vous gardez la main.", 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'],
         ['Plusieurs boutiques', "Une pharmacie, une annexe, un dépôt : passez de l'une à l'autre en un geste, chacune avec son stock et son équipe.", 'M3 9l1-5h16l1 5M3 9h18v11H3zM3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 20v-6h6v6'],
         ['Pilotage du jour', "Chiffre d'affaires, panier moyen, meilleures ventes, moyens de paiement — comparés à la période précédente : ça va mieux ou pas, d'un coup d'œil.", 'M3 3v18h18M7 15l4-4 3 3 5-6'],
-        ['Statistiques avancées', "Avec le plan Pro : heures d'affluence, marge par article, stock qui dort, articles à racheter, meilleurs clients, ventes de chaque membre de l'équipe.", 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+        ['Statistiques avancées', "Avec le plan Pro : heures d'affluence, marge par article, moins vendus, articles bientôt finis, meilleurs clients, ventes de chaque membre de l'équipe.", 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
         ['Back-office web', "Sur ordinateur, gérez tout le catalogue, les stocks, les ventes et l'équipe confortablement — et installez-le comme une application.", 'M3 4h18v12H3zM8 20h8M12 16v4'],
         ['Parrainage', "Recommandez Ngoni Caisse à un commerçant : il a {$parrainage['filleul']} jours d'essai, et vous gagnez un mois offert dès qu'il s'abonne.", 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z'],
     ];
@@ -281,11 +281,12 @@
                     <ul class="mt-6 flex flex-col gap-2.5 text-sm">
                         <li>✓ {{ $plan['max_boutiques'] === null ? 'Boutiques illimitées' : ($plan['max_boutiques'] === 1 ? '1 boutique' : "Jusqu’à {$plan['max_boutiques']} boutiques") }}</li>
                         <li>✓ {{ $plan['max_membres'] === null ? 'Équipe illimitée' : "{$plan['max_membres']} membres par boutique" }}</li>
-                        <li>✓ Caisse, tickets, reçus PDF</li>
-                        <li>✓ Stocks, marges, clients</li>
-                        <li>✓ Hors ligne et back-office web</li>
-                        <li class="{{ $plan['seances'] ? '' : 'opacity-50' }}">{{ $plan['seances'] ? '✓' : '—' }} Séances de caisse et écarts{{ $plan['seances'] ? '' : ' (Pro)' }}</li>
-                        <li class="{{ $plan['statistiques'] ? '' : 'opacity-50' }}">{{ $plan['statistiques'] ? '✓' : '—' }} Statistiques avancées{{ $plan['statistiques'] ? '' : ' (Pro)' }}</li>
+                        @foreach ($communes as $commune)
+                            <li>✓ {{ $commune }}</li>
+                        @endforeach
+                        @foreach ($plan['fonctions'] as $fonction)
+                            <li class="{{ $fonction['inclus'] ? '' : 'opacity-50' }}">{{ $fonction['inclus'] ? '✓' : '—' }} {{ $fonction['libelle'] }}</li>
+                        @endforeach
                     </ul>
                     <a href="{{ $storeUrl }}" rel="noopener"
                        class="mt-8 flex h-12 items-center justify-center rounded-xl font-bold {{ $pro ? 'bg-white text-accent-dark hover:bg-accent-soft' : 'bg-ink text-white hover:bg-black' }}">

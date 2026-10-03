@@ -37,13 +37,44 @@ class Permissions
     public const DROITS = [
         'chiffre_affaires' => [
             'libelle' => 'Voir le chiffre d’affaires',
-            'explication' => 'Pilotage, rapports, statistiques, clôture de la journée et les ventes de toute la boutique.',
-            'permissions' => ['dashboard.view', 'rapports.view', 'ventes.view_all'],
+            'explication' => 'Pilotage, rapports, statistiques, clôture de la journée et la valeur du stock.',
+            'permissions' => ['dashboard.view', 'rapports.view'],
+        ],
+        // À part du chiffre d'affaires : retrouver un ticket, contrôler une
+        // caisse, sans voir les totaux de la boutique.
+        'ventes' => [
+            'libelle' => 'Voir toutes les ventes',
+            'explication' => 'Les tickets de toute la boutique, pas seulement les siens.',
+            'permissions' => ['ventes.view_all'],
         ],
         'articles' => [
             'libelle' => 'Modifier les articles et les prix',
-            'explication' => 'Créer, modifier ou supprimer des articles et des catégories, corriger le stock.',
-            'permissions' => ['produits.create', 'produits.update', 'produits.delete', 'categories.create', 'categories.update', 'categories.delete', 'stocks.update'],
+            'explication' => 'Créer, modifier ou supprimer des articles et des catégories.',
+            'permissions' => ['produits.create', 'produits.update', 'produits.delete', 'categories.create', 'categories.update', 'categories.delete'],
+        ],
+        // À part des articles : une correction à la baisse peut masquer une
+        // disparition de marchandise. On peut confier les prix sans le stock.
+        'stock' => [
+            'libelle' => 'Corriger le stock',
+            'explication' => 'Changer à la main la quantité en stock d’un article (inventaire, casse, perte).',
+            'permissions' => ['stocks.update'],
+        ],
+        // Les trois façons d'encaisser moins que le prix affiché : réglables
+        // pour chacun, caissier compris.
+        'remises' => [
+            'libelle' => 'Faire des remises',
+            'explication' => 'Baisser le total d’un ticket. La remise fidélité reste permise à tous.',
+            'permissions' => ['ventes.remise'],
+        ],
+        'credit' => [
+            'libelle' => 'Vendre à crédit',
+            'explication' => 'Laisser partir la marchandise contre une dette du client.',
+            'permissions' => ['ventes.credit'],
+        ],
+        'montant_libre' => [
+            'libelle' => 'Vendre au montant libre',
+            'explication' => 'Encaisser un montant saisi à la main, hors des articles du catalogue.',
+            'permissions' => ['ventes.montant_libre'],
         ],
         'annuler_ventes' => [
             'libelle' => 'Annuler des ventes',
@@ -64,8 +95,8 @@ class Permissions
 
     /** Ce que chaque rôle reçoit si l'on ne précise rien (à la création, au changement de rôle). */
     public const DROITS_PAR_DEFAUT = [
-        'gerant' => ['chiffre_affaires', 'articles', 'annuler_ventes', 'achats', 'backoffice'],
-        'caissier' => [],
+        'gerant' => ['chiffre_affaires', 'ventes', 'articles', 'stock', 'remises', 'credit', 'montant_libre', 'annuler_ventes', 'achats', 'backoffice'],
+        'caissier' => ['montant_libre'],
     ];
 
     /**
@@ -97,7 +128,8 @@ class Permissions
             'stocks' => ['view', 'update'],
             // view_all : l'historique de toute la boutique. Sans elle, chacun
             // ne voit que ses propres ventes.
-            'ventes' => ['view', 'view_all', 'create', 'delete'],
+            // remise, credit, montant_libre : encaisser moins que le prix affiché.
+            'ventes' => ['view', 'view_all', 'create', 'delete', 'remise', 'credit', 'montant_libre'],
             'sessions_caisse' => ['view', 'create', 'update'],
             'clients' => ['view', 'create', 'update', 'delete'],
             // Réceptions de marchandise, fournisseurs et ce qu'on leur doit.
@@ -139,6 +171,8 @@ class Permissions
             'boutique.update',
             'utilisateurs.create', 'utilisateurs.update', 'utilisateurs.delete',
             'abonnement.manage',
+            // Supprimer un client efface aussi ce qu'il doit encore.
+            'clients.delete',
         ], self::permissionsReglables()));
         // Le reste (chiffre d'affaires, articles, annulations, achats,
         // back-office) n'est plus dans le rôle : accordé membre par membre

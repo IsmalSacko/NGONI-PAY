@@ -103,6 +103,9 @@ class AuthController extends Controller
             'user' => $user,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            // Admin d'au moins une boutique : lui seul en ouvre une autre et
+            // passe de l'une à l'autre. Un employé ne connaît que la sienne.
+            'proprietaire' => $user->peutOuvrirBoutique(),
             // Conditions à (re)accepter : l'application l'exige avant d'ouvrir la caisse.
             'conditions' => app(ConditionsUtilisation::class)->etat($user),
         ]);

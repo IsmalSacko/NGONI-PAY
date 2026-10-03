@@ -110,8 +110,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
     Route::get('boutiques', [BoutiqueController::class, 'index']);
     Route::post('boutiques', [BoutiqueController::class, 'store']);
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
-    Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware('permission:boutique.update');
-    Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware('permission:boutique.update');
+    Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware(['permission:boutique.update', 'fonctionnalite:objectif_mois']);
+    Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware(['permission:boutique.update', 'fonctionnalite:fidelite']);
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
@@ -141,7 +141,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$bilan->nomFichier($boutique, $mois).'"',
         ]);
-    })->middleware('permission:rapports.view');
+    })->middleware(['permission:rapports.view', 'fonctionnalite:factures_exports']);
     Route::get('statistiques', StatistiqueController::class)->middleware('permission:rapports.view');
     Route::get('journee', [ClotureController::class, 'journee']);
     Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
@@ -155,7 +155,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
     Route::get('produits', [ProduitController::class, 'index'])->middleware('permission:produits.view');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
     Route::get('stocks/a-commander', fn (CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
-        ->middleware('permission:achats.create');
+        ->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);
     Route::post('produits', [ProduitController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('produits/{produit}', [ProduitController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
     Route::post('produits/{produit}/ajuster-stock', [ProduitController::class, 'ajusterStock'])->middleware(['permission:stocks.update', 'abonnement']);
@@ -176,13 +176,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
     Route::delete('equipe/{membre}', [EquipeController::class, 'destroy'])->middleware('permission:utilisateurs.delete');
     Route::delete('equipe/{membre}/compte', [EquipeController::class, 'supprimerCompte'])->middleware('permission:utilisateurs.delete');
 
-    Route::get('fournisseurs', [AchatController::class, 'fournisseurs'])->middleware('permission:achats.view');
-    Route::post('fournisseurs', [AchatController::class, 'creerFournisseur'])->middleware(['permission:achats.create', 'abonnement']);
-    Route::put('fournisseurs/{fournisseur}', [AchatController::class, 'modifierFournisseur'])->middleware('permission:achats.create');
-    Route::delete('fournisseurs/{fournisseur}', [AchatController::class, 'supprimerFournisseur'])->middleware('permission:achats.create');
-    Route::post('fournisseurs/{fournisseur}/paiements', [AchatController::class, 'payer'])->middleware(['permission:achats.create', 'abonnement']);
-    Route::get('achats', [AchatController::class, 'index'])->middleware('permission:achats.view');
-    Route::post('achats', [AchatController::class, 'store'])->middleware(['permission:achats.create', 'abonnement']);
+    Route::get('fournisseurs', [AchatController::class, 'fournisseurs'])->middleware(['permission:achats.view', 'fonctionnalite:achats_fournisseurs']);
+    Route::post('fournisseurs', [AchatController::class, 'creerFournisseur'])->middleware(['permission:achats.create', 'abonnement', 'fonctionnalite:achats_fournisseurs']);
+    Route::put('fournisseurs/{fournisseur}', [AchatController::class, 'modifierFournisseur'])->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);
+    Route::delete('fournisseurs/{fournisseur}', [AchatController::class, 'supprimerFournisseur'])->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);
+    Route::post('fournisseurs/{fournisseur}/paiements', [AchatController::class, 'payer'])->middleware(['permission:achats.create', 'abonnement', 'fonctionnalite:achats_fournisseurs']);
+    Route::get('achats', [AchatController::class, 'index'])->middleware(['permission:achats.view', 'fonctionnalite:achats_fournisseurs']);
+    Route::post('achats', [AchatController::class, 'store'])->middleware(['permission:achats.create', 'abonnement', 'fonctionnalite:achats_fournisseurs']);
 
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');

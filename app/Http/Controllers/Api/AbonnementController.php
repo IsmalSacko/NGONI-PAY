@@ -49,6 +49,10 @@ class AbonnementController extends Controller
 
         return response()->json([
             'data' => $plans,
+            // Les fonctions que la console coche par plan, dans l'ordre : le
+            // comparatif de l'application les affiche telles quelles.
+            'communes' => Plan::COMMUNES,
+            'fonctionnalites' => collect(Plan::FONCTIONNALITES)->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle])->values(),
             'support' => [
                 'whatsapp' => config('ecaisse.support_whatsapp'),
                 'whatsapps' => array_values(array_filter(array_map('trim', explode(';', (string) config('ecaisse.supports_whatsapp'))))),

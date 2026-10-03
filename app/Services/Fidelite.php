@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Boutique;
+use App\Models\Plan;
 use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,12 @@ class Fidelite
     /** @return array{seuil: int, remise_pct: int}|null */
     public function programme(Boutique $boutique): ?array
     {
+        // Hors du plan (Plan::FIDELITE) : le réglage est gardé, mais ni
+        // remise ni suivi tant que l'offre ne l'inclut pas.
+        if (! app(AbonnementService::class)->permet($boutique, Plan::FIDELITE)) {
+            return null;
+        }
+
         return $boutique->fidelite_seuil && $boutique->fidelite_remise_pct
             ? ['seuil' => (int) $boutique->fidelite_seuil, 'remise_pct' => (int) $boutique->fidelite_remise_pct]
             : null;

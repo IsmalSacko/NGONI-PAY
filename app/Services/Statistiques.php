@@ -8,6 +8,7 @@ use App\Models\Achat;
 use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\LigneVente;
+use App\Models\MouvementStock;
 use App\Models\PaiementFournisseur;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
@@ -43,6 +44,12 @@ class Statistiques
 
     /** Sous ce nombre de jours de stock, l'article est à racheter. */
     public const JOURS_COUVERTURE_MIN = 7;
+
+    /**
+     * Âge minimal retenu pour la vitesse d'un article récent : deux ventes le
+     * jour de sa création ne doivent pas annoncer une rupture imminente.
+     */
+    public const JOURS_VITESSE_MIN = 3;
 
     public function __construct(private readonly Rapports $rapports) {}
 
@@ -100,7 +107,7 @@ class Statistiques
             'affluence' => $this->affluence($ventes(), $boutique),
             'produits' => $this->produits($ventes()),
             'categories' => $this->categories($ventes()),
-            'stock' => $this->stock($au),
+            'stock' => $this->stock($au, $boutique),
             'clients' => $this->clients($ventes(), $du),
             'equipe' => $this->equipe($du, $au),
             'achats' => $this->achats($du, $au),
@@ -219,7 +226,7 @@ class Statistiques
      *
      * @return array{dormants: list<array<string, mixed>>, valeur_dormante: int, a_racheter: list<array<string, mixed>>}
      */
-    private function stock(Carbon $au): array
+    private function stock(Carbon $au, Boutique $boutique): array
     {
         $vendus = fn (int $jours) => LigneVente::query()
             ->whereIn('vente_id', Vente::valides()->where('ventes.jour_affaire', '>', $au->copy()->subDays($jours)->toDateString())->select('ventes.id'))
@@ -228,10 +235,24 @@ class Statistiques
             ->pluck(DB::raw('SUM(quantite)'), 'produit_id');
 
         $recents = $vendus(self::JOURS_VITESSE);
-        $enStock = Produit::where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte']);
+        $enStock = Produit::where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte', 'created_at']);
+
+        // Dernier retour en rayon après une rupture (stock passé de 0 à plus
+        // de 0) : une marchandise arrivée hier n'a pas encore eu le temps de
+        // ne pas se vendre. Un retour de vente annulée n'en est pas un.
+        $retours = MouvementStock::query()
+            ->whereNull('vente_id')
+            ->where('quantite', '>', 0)
+            ->whereRaw('stock_apres - quantite <= 0')
+            ->groupBy('produit_id')
+            ->pluck(DB::raw('MAX(created_at)'), 'produit_id');
+        $enRayonDepuis = fn (Produit $p) => isset($retours[$p->id])
+            ? $p->created_at->max(Carbon::parse($retours[$p->id]))
+            : $p->created_at;
+        $limiteDormant = $au->copy()->subDays(self::JOURS_DORMANT)->endOfDay();
 
         $dormants = $enStock
-            ->reject(fn (Produit $p) => isset($recents[$p->id]))
+            ->reject(fn (Produit $p) => isset($recents[$p->id]) || $enRayonDepuis($p)->greaterThan($limiteDormant))
             ->map(fn (Produit $p) => [
                 'produit_id' => $p->id,
                 'nom' => $p->nom,
@@ -244,8 +265,11 @@ class Statistiques
 
         $aRacheter = $enStock
             ->filter(fn (Produit $p) => isset($recents[$p->id]))
-            ->map(function (Produit $p) use ($recents) {
-                $parJour = (int) $recents[$p->id] / self::JOURS_VITESSE;
+            ->map(function (Produit $p) use ($recents, $au) {
+                // Sur l'âge réel d'un article de moins d'un mois : 30 ventes
+                // en 3 jours, c'est 10 par jour, pas 1.
+                $age = (int) $p->created_at->copy()->startOfDay()->diffInDays($au->copy()->startOfDay()) + 1;
+                $parJour = (int) $recents[$p->id] / max(self::JOURS_VITESSE_MIN, min(self::JOURS_VITESSE, $age));
 
                 return [
                     'produit_id' => $p->id,
@@ -261,6 +285,9 @@ class Statistiques
         return [
             'dormants' => $dormants->take(10)->all(),
             'valeur_dormante' => (int) $dormants->sum('valeur'),
+            // Jours avant qu'une boutique neuve ait le recul d'un mois : d'ici
+            // là, une liste vide ne veut pas dire que tout se vend.
+            'moins_vendus_dans' => max(0, self::JOURS_DORMANT - (int) $boutique->created_at->copy()->startOfDay()->diffInDays($au->copy()->startOfDay())),
             'a_racheter' => $aRacheter->take(10)->all(),
         ];
     }

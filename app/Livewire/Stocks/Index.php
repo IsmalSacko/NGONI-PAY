@@ -76,7 +76,34 @@ class Index extends Component
             'produits' => $produits,
             'nRupture' => Produit::where('actif', true)->where('stock', '<=', 0)->count(),
             'nBas' => Produit::where('actif', true)->where('stock', '>', 0)->whereColumn('stock', '<=', 'seuil_alerte')->count(),
-            'valeurStock' => (int) Produit::where('actif', true)->sum(DB::raw('stock * prix_vente')),
+            'valeur' => $this->valeur(),
         ]);
+    }
+
+    /**
+     * Ce que le stock a coûté, ce qu'il rapportera vendu en entier, et la
+     * différence — pour qui voit les prix d'achat seulement (pas le caissier).
+     * Un article sans prix d'achat compte au prix de vente, sans bénéfice.
+     *
+     * @return array{achat: int, vente: int, benefice: int, taux: ?int, sans_prix_achat: int}|null
+     */
+    private function valeur(): ?array
+    {
+        // Comme dans l'application : prix d'achat et chiffre d'affaires.
+        if (! auth()->user()?->can('produits.update') || ! auth()->user()->can('dashboard.view')) {
+            return null;
+        }
+
+        $enStock = Produit::where('actif', true)->where('stock', '>', 0);
+        $achat = (int) (clone $enStock)->sum(DB::raw('stock * COALESCE(prix_achat, prix_vente)'));
+        $vente = (int) (clone $enStock)->sum(DB::raw('stock * prix_vente'));
+
+        return [
+            'achat' => $achat,
+            'vente' => $vente,
+            'benefice' => $vente - $achat,
+            'taux' => $vente === 0 ? null : (int) round(($vente - $achat) * 100 / $vente),
+            'sans_prix_achat' => (clone $enStock)->whereNull('prix_achat')->count(),
+        ];
     }
 }

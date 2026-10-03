@@ -53,10 +53,12 @@ class Index extends Component
 
     public function render()
     {
-        $ventes = Vente::with('caissier', 'client')->latest()->paginate(20);
+        // Comme l'API : sans view_all, ses propres ventes seulement.
+        $visibles = fn () => Vente::query()->when(! Auth::user()->can('ventes.view_all'), fn ($q) => $q->where('user_id', Auth::id()));
+        $ventes = $visibles()->with('caissier', 'client')->latest()->paginate(20);
 
         $detail = $this->venteOuverte
-            ? Vente::with('lignes', 'caissier', 'client')->find($this->venteOuverte)?->setAttribute('annule_par_nom',
+            ? $visibles()->with('lignes', 'caissier', 'client')->find($this->venteOuverte)?->setAttribute('annule_par_nom',
                 \App\Models\User::whereKey(Vente::whereKey($this->venteOuverte)->value('annulee_par'))->value('name'))
             : null;
 

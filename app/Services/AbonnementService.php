@@ -105,6 +105,16 @@ class AbonnementService
         return $this->planDe($abonnement)?->inclut($fonctionnalite) ?? false;
     }
 
+    /**
+     * Le plan de la boutique inclut-il cette fonction, abonnement en cours ou
+     * non : ce qui reste consultable après l'échéance (le back-office) ne
+     * dépend que de l'offre.
+     */
+    public function planInclut(?Boutique $boutique, string $fonctionnalite): bool
+    {
+        return $this->planDe($this->pourBoutique($boutique))?->inclut($fonctionnalite) ?? false;
+    }
+
     public function peutAjouterMembre(Boutique $boutique, int $membresActuels): bool
     {
         $abonnement = $this->pourBoutique($boutique);

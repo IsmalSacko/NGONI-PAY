@@ -11,9 +11,12 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('rapports.imprimer', $q) }}" target="_blank" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">Imprimer / PDF</a>
-            <a href="{{ route('exports.ventes', $q) }}" class="h-11 px-4 rounded-xl bg-accent text-white font-bold flex items-center">Excel : ventes</a>
-            <a href="{{ route('exports.stocks') }}" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">Excel : stocks</a>
-            <a href="{{ route('exports.credits') }}" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">Excel : dettes</a>
+            {{-- Exports Excel : dans l'offre (Plan::FACTURES_EXPORTS) seulement. --}}
+            @if (app(\App\Services\AbonnementService::class)->permet($boutique, \App\Models\Plan::FACTURES_EXPORTS))
+                <a href="{{ route('exports.ventes', $q) }}" class="h-11 px-4 rounded-xl bg-accent text-white font-bold flex items-center">Excel : ventes</a>
+                <a href="{{ route('exports.stocks') }}" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">Excel : stocks</a>
+                <a href="{{ route('exports.credits') }}" class="h-11 px-4 rounded-xl border border-[--color-border-strong] font-bold flex items-center">Excel : dettes</a>
+            @endif
         </div>
     </div>
 
