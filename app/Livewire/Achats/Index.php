@@ -6,11 +6,13 @@ namespace App\Livewire\Achats;
 
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Achat;
+use App\Models\Boutique;
 use App\Models\Fournisseur;
 use App\Models\Produit;
 use App\Services\AchatService;
 use App\Services\Fournisseurs;
 use App\Support\Money\Montant;
+use App\Support\Quantite;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -59,13 +61,13 @@ class Index extends Component
         Auth::user()->can('achats.create') || abort(403);
         $this->resetValidation();
         $this->reset(['fournisseurId', 'reference', 'montantPaye', 'info']);
-        $this->lignes = [['produit_id' => '', 'quantite' => '1', 'prix_achat' => '']];
+        $this->lignes = [['produit_id' => '', 'quantite' => '1', 'prix_achat' => '', 'palier' => '', 'numero_lot' => '', 'peremption' => '']];
         $this->receptionOuverte = true;
     }
 
     public function ajouterLigne(): void
     {
-        $this->lignes[] = ['produit_id' => '', 'quantite' => '1', 'prix_achat' => ''];
+        $this->lignes[] = ['produit_id' => '', 'quantite' => '1', 'prix_achat' => '', 'palier' => '', 'numero_lot' => '', 'peremption' => ''];
     }
 
     public function retirerLigne(int $i): void
@@ -97,12 +99,20 @@ class Index extends Component
         $lignes = [];
         foreach ($this->lignes as $i => $l) {
             $prix = Montant::parse($l['prix_achat']);
-            if ($l['produit_id'] === '' || (int) $l['quantite'] < 1 || $prix === null) {
+            // 12,5 kg, 0,75 m : trois décimales au plus.
+            $quantite = preg_match(Quantite::REGEX_SAISIE, (string) $l['quantite']) ? Quantite::lire((string) $l['quantite']) : null;
+            if ($l['produit_id'] === '' || $quantite === null || $quantite <= 0 || $prix === null) {
                 $this->addError("lignes.$i", 'Article, quantité et prix d’achat requis.');
 
                 continue;
             }
-            $lignes[] = ['produit_id' => $l['produit_id'], 'quantite' => (int) $l['quantite'], 'prix_achat' => $prix];
+            $lignes[] = [
+                'produit_id' => $l['produit_id'], 'quantite' => $quantite, 'prix_achat' => $prix,
+                // Reçu au carton, à la boîte ; pharmacie : le lot et sa péremption.
+                'palier' => ($l['palier'] ?? '') ?: null,
+                'numero_lot' => trim((string) ($l['numero_lot'] ?? '')) ?: null,
+                'peremption' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($l['peremption'] ?? '')) ? $l['peremption'] : null,
+            ];
         }
         if ($lignes === [] || $this->getErrorBag()->isNotEmpty()) {
             return;
@@ -201,7 +211,8 @@ class Index extends Component
         return view('livewire.achats.index', [
             'fournisseurs' => Fournisseur::avecSoldeDu()->orderBy('nom')->get(),
             'achats' => Achat::with(['lignes', 'fournisseur:id,nom'])->latest()->limit(30)->get(),
-            'produits' => Produit::orderBy('nom')->get(['id', 'nom', 'format', 'prix_achat']),
+            'produits' => Produit::orderBy('nom')->get(['id', 'nom', 'format', 'prix_achat', 'unite', 'paliers']),
+            'pharmacie' => (bool) Boutique::find($this->boutiqueActiveId())?->estPharmacie(),
         ]);
     }
 }

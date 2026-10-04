@@ -8,8 +8,10 @@ use App\Enums\Country;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Livewire\Concerns\ReinitialiseUneBoutique;
 use App\Models\Boutique;
+use App\Models\Plan;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\Fidelite;
 use App\Services\Images;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
@@ -31,6 +33,68 @@ use Livewire\WithFileUploads;
 class Index extends Component
 {
     use EstScopeParBoutique, ReinitialiseUneBoutique, WithFileUploads;
+
+    /** Programme de fidélité, comme dans l'application : enregistré de lui-même. */
+    public bool $fideliteActive = false;
+
+    public string $fideliteSeuil = '10';
+
+    public string $fidelitePct = '10';
+
+    public bool $fideliteEnregistree = false;
+
+    public function mount(): void
+    {
+        $this->pays = Boutique::find(Auth::user()->boutique_id)?->pays ?? Country::default()->value;
+        $b = Boutique::find($this->boutiqueActiveId());
+        $this->fideliteActive = (bool) $b?->fidelite_seuil;
+        $this->fideliteSeuil = (string) ($b?->fidelite_seuil ?? 10);
+        $this->fidelitePct = (string) ($b?->fidelite_remise_pct ?? 10);
+    }
+
+    /** Activité : « pharmacie » adapte la caisse et le back-office (mots, détail, lots, ordonnance). */
+    public function choisirActivite(string $activite): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        in_array($activite, Boutique::ACTIVITES, true) || abort(422);
+        Boutique::findOrFail($this->boutiqueActiveId())->forceFill(['activite' => $activite])->save();
+        session()->flash('info', $activite === 'pharmacie' ? 'Mode pharmacie activé : la caisse parle le langage de l’officine.' : 'Mode commerce : la caisse reprend ses réglages habituels.');
+    }
+
+    public function updatedFideliteActive(): void
+    {
+        $this->enregistrerFidelite();
+    }
+
+    public function updatedFideliteSeuil(): void
+    {
+        $this->enregistrerFidelite();
+    }
+
+    public function updatedFidelitePct(): void
+    {
+        $this->enregistrerFidelite();
+    }
+
+    private function enregistrerFidelite(): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $this->fideliteEnregistree = false;
+        $this->resetErrorBag(['fideliteSeuil', 'fidelitePct']);
+        if ($this->fideliteActive && (! ctype_digit(trim($this->fideliteSeuil)) || ! ctype_digit(trim($this->fidelitePct)))) {
+            return;
+        }
+        try {
+            app(Fidelite::class)->regler(Boutique::findOrFail($this->boutiqueActiveId()), [
+                'seuil' => $this->fideliteActive ? (int) $this->fideliteSeuil : null,
+                'remise_pct' => (int) $this->fidelitePct,
+            ]);
+            $this->fideliteEnregistree = true;
+        } catch (ValidationException $e) {
+            $this->addError('fideliteSeuil', $e->errors()['seuil'][0] ?? '');
+            $this->addError('fidelitePct', $e->errors()['remise_pct'][0] ?? '');
+        }
+    }
 
     /** Nouveau logo choisi (fichier temporaire Livewire). */
     public $logo = null;
@@ -74,11 +138,6 @@ class Index extends Component
 
     /** Devise avant modification : le taux se lit « 1 nouvelle = x ancienne ». */
     public string $deviseInitiale = '';
-
-    public function mount(): void
-    {
-        $this->pays = Boutique::find(Auth::user()->boutique_id)?->pays ?? Country::default()->value;
-    }
 
     public function nouvelle(): void
     {
@@ -184,6 +243,10 @@ class Index extends Component
             'possedees' => $user->boutiquesPossedees()->count(),
             'peutRegler' => $user->can('boutique.update'),
             'devises' => Currencies::codes(),
+            'boutiqueActive' => $boutiques->firstWhere('id', $this->boutiqueActiveId()),
+            // Le programme de fidélité est une fonction de l'offre.
+            'fideliteIncluse' => ($b = $boutiques->firstWhere('id', $this->boutiqueActiveId())) !== null
+                && $abonnements->permet($b, Plan::FIDELITE),
         ]);
     }
 }

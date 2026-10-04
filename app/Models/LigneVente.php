@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\QuantiteCast;
 use App\Models\Concerns\BelongsToBoutique;
 use Database\Factories\LigneVenteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * elle appartient à une {@see Vente}, déjà scopée par boutique, et n'a pas
  * besoin d'un second filtre tenant.
  */
-#[Fillable(['produit_id', 'nom_produit', 'prix_unitaire', 'prix_achat', 'taux_tva', 'quantite', 'total_ligne'])]
+#[Fillable(['produit_id', 'nom_produit', 'prix_unitaire', 'prix_achat', 'taux_tva', 'quantite', 'unite', 'contenance', 'lots', 'total_ligne'])]
 class LigneVente extends Model
 {
     /** @use HasFactory<LigneVenteFactory> */
@@ -29,6 +30,9 @@ class LigneVente extends Model
     {
         return [
             'taux_tva' => 'decimal:2',
+            'quantite' => QuantiteCast::class,
+            'contenance' => 'integer',
+            'lots' => 'array',
         ];
     }
 

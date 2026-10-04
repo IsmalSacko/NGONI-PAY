@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\QuantiteCast;
 use App\Models\Concerns\BelongsToBoutique;
 use App\Services\Images;
 use Database\Factories\ProduitFactory;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'categorie_produit_id', 'nom', 'format', 'code', 'code_barre',
+    'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'code', 'code_barre',
     'prix_achat', 'prix_vente', 'taux_tva', 'stock', 'seuil_alerte', 'actif',
 ])]
 class Produit extends Model
@@ -43,6 +44,10 @@ class Produit extends Model
         return [
             'taux_tva' => 'decimal:2',
             'actif' => 'boolean',
+            'stock' => QuantiteCast::class,
+            'seuil_alerte' => QuantiteCast::class,
+            'sur_ordonnance' => 'boolean',
+            'paliers' => 'array',
         ];
     }
 
@@ -60,6 +65,34 @@ class Produit extends Model
     public function mouvementsStock(): HasMany
     {
         return $this->hasMany(MouvementStock::class);
+    }
+
+    /**
+     * @return HasMany<Lot, $this>
+     */
+    public function lots(): HasMany
+    {
+        return $this->hasMany(Lot::class);
+    }
+
+    /**
+     * Palier de détail (« boite » : 16 comprimés à 2 800 F), ou null. L'unité
+     * de base de l'article est son propre palier : contenance 1, son prix.
+     *
+     * @return array{unite: string, contenance: int, prix: int}|null
+     */
+    public function palier(?string $unite): ?array
+    {
+        if ($unite === null || $unite === $this->unite) {
+            return ['unite' => (string) $this->unite, 'contenance' => 1, 'prix' => (int) $this->prix_vente];
+        }
+        foreach ($this->paliers ?? [] as $p) {
+            if (($p['unite'] ?? null) === $unite) {
+                return ['unite' => $unite, 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix']];
+            }
+        }
+
+        return null;
     }
 
     public function estEnRupture(): bool

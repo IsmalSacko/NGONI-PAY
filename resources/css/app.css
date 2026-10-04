@@ -19,6 +19,7 @@
     --color-jaune-doux: #fff4cc;
     --color-succes: #16a34a;
     --color-succes-doux: #e3f6ea;
+    --color-succes-fonce: #0f7a37;
     --color-whatsapp: #25d366;
     --color-border: #e3e8f0;
     --color-border-strong: #d7deea;
@@ -30,7 +31,7 @@
     --color-warn-bg: #fdf1dc;
     --color-warn-fg: #7a3e06;
     --color-danger-bg: #fde7e4;
-    --color-danger-fg: #9b1c12;
+    --color-danger-fg: #b42318;
 
     /* Ombres teintées de bleu nuit (console) : une carte se pose sur le papier
        sans bordure ; « haute » pour ce qui flotte (menus, fenêtres). */
@@ -40,3 +41,19 @@
 
 /* Alpine : masqué jusqu’à son initialisation (liste des pays). */
 [x-cloak] { display: none !important; }
+
+/* Pictogramme Material (comme dans l'application) : <x-charte.icone nom="inventory_2" />. */
+.ms {
+    font-family: 'Material Symbols Rounded';
+    font-weight: 500;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+.ms-plein { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }

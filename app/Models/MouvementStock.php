@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\QuantiteCast;
 use App\Enums\TypeMouvementStock;
 use App\Models\Concerns\BelongsToBoutique;
 use Database\Factories\MouvementStockFactory;
@@ -25,6 +26,8 @@ class MouvementStock extends Model
     {
         return [
             'type' => TypeMouvementStock::class,
+            'quantite' => QuantiteCast::class,
+            'stock_apres' => QuantiteCast::class,
         ];
     }
 

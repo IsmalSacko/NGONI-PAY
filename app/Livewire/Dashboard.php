@@ -10,6 +10,7 @@ use App\Models\LigneVente;
 use App\Models\Produit;
 use App\Models\Vente;
 use App\Services\Journee;
+use App\Services\Rapports;
 use App\Support\Fuseau;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -68,7 +69,7 @@ class Dashboard extends Component
 
         $topProduits = LigneVente::query()
             ->whereHas('vente', fn ($q) => $q->valides()->whereDate('created_at', today()))
-            ->selectRaw('nom_produit, sum(quantite) as quantite, sum(total_ligne) as total')
+            ->selectRaw('nom_produit, sum(quantite * contenance) as quantite, sum(total_ligne) as total')
             ->groupBy('nom_produit')
             ->orderByDesc('total')
             ->limit(5)
@@ -91,6 +92,8 @@ class Dashboard extends Component
             'parMoyen' => $parMoyen,
             'topProduits' => $topProduits,
             'alertes' => $alertes,
+            // Comme la carte du Pilotage : l'encaissé et ce qui reste dû aujourd'hui.
+            'jour' => ($jour = app(Journee::class)->courante()) ? app(Rapports::class)->periode($jour, $jour) : null,
         ]);
     }
 }

@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\MoyenPaiement;
+use App\Models\Client;
 use App\Models\LigneVente;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
+use App\Support\Quantite;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -41,7 +45,7 @@ class Rapports
             ->leftJoin('produits as p', 'p.id', '=', 'lv.produit_id')
             ->whereIn('lv.vente_id', $valides()->select('ventes.id'))
             ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(lv.prix_achat, p.prix_achat) IS NOT NULL THEN lv.total_ligne END), 0) as chiffre')
-            ->selectRaw('COALESCE(SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite), 0) as cout')
+            ->selectRaw('COALESCE(SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite * lv.contenance), 0) as cout')
             ->selectRaw('COALESCE(SUM(CASE WHEN lv.prix_achat IS NULL AND p.prix_achat IS NOT NULL THEN lv.total_ligne END), 0) as estime')
             ->selectRaw('COALESCE(SUM(lv.total_ligne), 0) as brut')
             ->first();
@@ -58,22 +62,16 @@ class Rapports
                 'remises' => (int) $valides()->sum('remise'),
                 'tva' => (int) $valides()->sum('tva'),
                 'panier_moyen' => $nombre > 0 ? (int) round($total / $nombre) : 0,
-                'articles' => (int) LigneVente::whereHas('vente', fn ($q) => $dans($q->valides()))->sum('quantite'),
+                'articles' => Quantite::normaliser(LigneVente::whereHas('vente', fn ($q) => $dans($q->valides()))->sum('quantite')),
             ],
             'annulees' => ['nombre' => (clone $annulees)->count(), 'total' => (int) (clone $annulees)->sum('total')],
             'par_jour' => $valides()
                 ->selectRaw('jour_affaire as jour, COUNT(*) as nombre, SUM(total) as total')
                 ->groupBy('jour_affaire')->orderBy('jour_affaire')->get()
                 ->map(fn ($r) => ['date' => (string) $r->jour, 'nombre' => (int) $r->nombre, 'total' => (int) $r->total]),
-            'par_moyen' => $valides()
-                ->selectRaw('moyen_paiement, COUNT(*) as nombre, SUM(total) as total')
-                ->groupBy('moyen_paiement')->orderByDesc('total')->get()
-                ->map(fn ($r) => [
-                    'moyen' => $r->moyen_paiement instanceof MoyenPaiement ? $r->moyen_paiement->value : (string) $r->moyen_paiement,
-                    'libelle' => ($r->moyen_paiement instanceof MoyenPaiement ? $r->moyen_paiement : MoyenPaiement::tryFrom((string) $r->moyen_paiement))?->label() ?? (string) $r->moyen_paiement,
-                    'nombre' => (int) $r->nombre,
-                    'total' => (int) $r->total,
-                ]),
+            // Par moyen, ce qui a été payé ; le reste dû des ventes forme la
+            // ligne « Crédit client ». Le tout fait le chiffre des ventes.
+            'par_moyen' => $this->parMoyen($valides),
             'par_caissier' => $valides()
                 ->join('users', 'users.id', '=', 'ventes.user_id')
                 ->selectRaw('users.name as nom, COUNT(*) as nombre, SUM(ventes.total) as total')
@@ -85,9 +83,9 @@ class Rapports
             'top_produits' => LigneVente::query()->from('lignes_vente as lv')
                 ->leftJoin('produits as p', 'p.id', '=', 'lv.produit_id')
                 ->whereIn('lv.vente_id', $valides()->select('ventes.id'))
-                ->selectRaw('COALESCE(MAX(p.nom), MAX(lv.nom_produit)) as nom, SUM(lv.quantite) as quantite, SUM(lv.total_ligne) as total')
+                ->selectRaw('COALESCE(MAX(p.nom), MAX(lv.nom_produit)) as nom, MAX(p.unite) as unite, SUM(lv.quantite * lv.contenance) as quantite, SUM(lv.total_ligne) as total')
                 ->groupBy(DB::raw('COALESCE(lv.produit_id, lv.nom_produit)'))->orderByDesc('total')->limit(10)->get()
-                ->map(fn ($r) => ['nom' => (string) $r->nom, 'quantite' => (int) $r->quantite, 'total' => (int) $r->total]),
+                ->map(fn ($r) => ['nom' => (string) $r->nom, 'quantite' => Quantite::normaliser($r->quantite), 'unite' => $r->unite, 'total' => (int) $r->total]),
             'marge' => [
                 'chiffre_couvert' => $chiffreCouvert,
                 'cout' => $cout,
@@ -98,9 +96,70 @@ class Rapports
                 'estimee' => (int) $marge->estime > 0,
             ],
             'credit' => [
-                'accorde' => (int) $valides()->where('moyen_paiement', MoyenPaiement::CreditClient)->sum('total'),
-                'rembourse' => (int) ReglementCredit::whereBetween('created_at', [$debut, $fin])->sum('montant'),
+                // Vendu à crédit : la part des ventes de la période non payée sur
+                // le moment. Fixe : il explique ventes = payé + vendu à crédit.
+                'accorde' => $accorde = (int) $valides()->sum('reste_du'),
+                // Reste à encaisser : ce que ces clients doivent encore
+                // aujourd'hui — leur crédit de la période, plafonné à leur dette
+                // actuelle. Baisse à chaque remboursement.
+                'encore_du' => $encoreDu = $this->encoreDu($valides),
+                'rembourse' => $rembourse = (int) ReglementCredit::whereBetween('created_at', [$debut, $fin])->sum('montant'),
+            ],
+            // L'argent réellement reçu : le payé des ventes et les dettes
+            // remboursées. Le chiffre des ventes, lui, compte aussi le crédit.
+            'encaisse' => [
+                'ventes' => $payeVentes = (int) $valides()->sum('montant_paye'),
+                'remboursements' => $rembourse,
+                'total' => $payeVentes + $rembourse,
+                'a_recevoir' => $encoreDu,
             ],
         ];
+    }
+
+    /**
+     * @param  \Closure(): Builder<Vente>  $valides
+     * @return Collection<int, array{moyen: string, libelle: string, nombre: int, total: int}>
+     */
+    private function parMoyen(\Closure $valides)
+    {
+        $libelle = fn (string $m) => MoyenPaiement::tryFrom($m)?->label() ?? $m;
+        $payes = $valides()->where('montant_paye', '>', 0)
+            ->selectRaw('moyen_paiement, COUNT(*) as nombre, SUM(montant_paye) as total')
+            ->groupBy('moyen_paiement')->get()
+            ->map(function ($r) use ($libelle) {
+                $moyen = $r->moyen_paiement instanceof MoyenPaiement ? $r->moyen_paiement->value : (string) $r->moyen_paiement;
+
+                return ['moyen' => $moyen, 'libelle' => $libelle($moyen), 'nombre' => (int) $r->nombre, 'total' => (int) $r->total];
+            });
+        $credit = $valides()->where('reste_du', '>', 0);
+        $nombreCredit = (clone $credit)->count();
+        if ($nombreCredit > 0) {
+            $m = MoyenPaiement::CreditClient->value;
+            // La part non payée sur le moment (fixe) ; ce qu'il en reste à
+            // encaisser se lit à part (credit.encore_du).
+            $payes->push(['moyen' => $m, 'libelle' => 'Vendu à crédit', 'nombre' => $nombreCredit, 'total' => (int) (clone $credit)->sum('reste_du')]);
+        }
+
+        return $payes->sortByDesc('total')->values();
+    }
+
+    /**
+     * Ce que les clients doivent encore sur les ventes à crédit de la période :
+     * pour chacun, son crédit de la période plafonné à sa dette d'aujourd'hui
+     * (un remboursement règle d'abord sa dette, quelle que soit la vente).
+     *
+     * @param  \Closure(): Builder<Vente>  $valides
+     */
+    private function encoreDu(\Closure $valides): int
+    {
+        $parClient = $valides()->where('reste_du', '>', 0)->whereNotNull('client_id')
+            ->selectRaw('client_id, SUM(reste_du) as reste')->groupBy('client_id')->pluck('reste', 'client_id');
+        if ($parClient->isEmpty()) {
+            return 0;
+        }
+        $soldes = Client::query()->whereKey($parClient->keys())->avecSoldeDu()->get()
+            ->mapWithKeys(fn (Client $c) => [$c->id => max(0, (int) $c->credit_total - (int) $c->reglements_total)]);
+
+        return (int) $parClient->map(fn ($reste, $id) => min((int) $reste, (int) ($soldes[$id] ?? 0)))->sum();
     }
 }

@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\AccesBackOffice;
+use App\Http\Middleware\EstAdminPlateforme;
+use App\Http\Middleware\ExigeAbonnementActif;
+use App\Http\Middleware\ExigeAppPourLesFractions;
+use App\Http\Middleware\ExigeConditions;
+use App\Http\Middleware\ExigeFonctionnalite;
+use App\Http\Middleware\NoterPresence;
 use App\Http\Middleware\SetTenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -24,11 +31,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant' => SetTenantContext::class,
-            'abonnement' => \App\Http\Middleware\ExigeAbonnementActif::class,
-            'fonctionnalite' => \App\Http\Middleware\ExigeFonctionnalite::class,
-            'plateforme' => \App\Http\Middleware\EstAdminPlateforme::class,
-            'backoffice' => \App\Http\Middleware\AccesBackOffice::class,
-            'conditions' => \App\Http\Middleware\ExigeConditions::class,
+            'abonnement' => ExigeAbonnementActif::class,
+            'fonctionnalite' => ExigeFonctionnalite::class,
+            'plateforme' => EstAdminPlateforme::class,
+            'backoffice' => AccesBackOffice::class,
+            'conditions' => ExigeConditions::class,
+            'app-a-jour' => ExigeAppPourLesFractions::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);
@@ -45,8 +53,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Dernière activité, pour la console : l'application comme le back-office.
-        $middleware->appendToGroup('api', \App\Http\Middleware\NoterPresence::class);
-        $middleware->appendToGroup('web', \App\Http\Middleware\NoterPresence::class);
+        $middleware->appendToGroup('api', NoterPresence::class);
+        $middleware->appendToGroup('web', NoterPresence::class);
 
         $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo('connexion');

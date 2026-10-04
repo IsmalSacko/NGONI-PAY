@@ -23,7 +23,7 @@ class CommandeFournisseur
     public const JOURS_COUVERTS = 30;
 
     /**
-     * @return list<array{fournisseur: array{id: string, nom: string, telephone: ?string}|null, articles: list<array{produit_id: string, nom: string, stock: int, seuil: int, quantite: int}>}>
+     * @return list<array{fournisseur: array{id: string, nom: string, telephone: ?string}|null, articles: list<array{produit_id: string, nom: string, stock: int|float, unite: ?string, seuil: int|float, quantite: int}>}>
      */
     public function aCommander(): array
     {
@@ -40,13 +40,13 @@ class CommandeFournisseur
             ->where('v.statut', 'validee')
             ->where('v.jour_affaire', '>=', today()->subDays(self::JOURS_COUVERTS - 1)->toDateString())
             ->groupBy('lv.produit_id')
-            ->selectRaw('lv.produit_id, SUM(lv.quantite) as vendus')
+            ->selectRaw('lv.produit_id, SUM(lv.quantite * lv.contenance) as vendus')
             ->pluck('vendus', 'produit_id');
 
         // Au seuil d'alerte, ou à moins d'une semaine de stock au rythme récent
         // (les « À racheter » du pilotage) : la même liste des deux côtés.
         $produits = $actifs
-            ->filter(fn (Produit $p) => $p->stock <= $p->seuil_alerte || $this->manqueSousPeu($p, (int) ($vendus[$p->id] ?? 0)))
+            ->filter(fn (Produit $p) => $p->stock <= $p->seuil_alerte || $this->manqueSousPeu($p, (float) ($vendus[$p->id] ?? 0)))
             ->values();
         if ($produits->isEmpty()) {
             return [];
@@ -66,7 +66,7 @@ class CommandeFournisseur
 
         $groupes = [];
         foreach ($produits as $p) {
-            $cible = max((int) ($vendus[$p->id] ?? 0), 2 * (int) $p->seuil_alerte, 1);
+            $cible = max((float) ($vendus[$p->id] ?? 0), 2 * $p->seuil_alerte, 1);
             $fournisseur = $fournisseurs[$derniers[$p->id] ?? ''] ?? null;
             $cle = $fournisseur?->id ?? '';
 
@@ -77,9 +77,13 @@ class CommandeFournisseur
             $groupes[$cle]['articles'][] = [
                 'produit_id' => $p->id,
                 'nom' => $p->nom,
-                'stock' => (int) $p->stock,
-                'seuil' => (int) $p->seuil_alerte,
-                'quantite' => max($cible - (int) $p->stock, 1),
+                'stock' => $p->stock,
+                'unite' => $p->unite,
+                'seuil' => $p->seuil_alerte,
+                'quantite' => (int) max(ceil($cible - $p->stock), 1),
+                // Vente par lot ou au détail : on commande au plus grand
+                // conditionnement (la boîte, le carton), arrondi au-dessus.
+                'commande' => $this->auConditionnement($p, max($cible - $p->stock, 1)),
             ];
         }
 
@@ -89,10 +93,18 @@ class CommandeFournisseur
         return array_values($groupes);
     }
 
-    /** Moins de `Statistiques::JOURS_COUVERTURE_MIN` jours de stock au rythme des trente derniers. */
-    private function manqueSousPeu(Produit $p, int $vendus): bool
+    /** @return array{quantite: int, unite: string}|null */
+    private function auConditionnement(Produit $p, float $base): ?array
     {
-        if ($vendus === 0 || $p->stock <= 0) {
+        $grand = collect($p->paliers ?? [])->sortByDesc('contenance')->first();
+
+        return $grand === null ? null : ['quantite' => (int) max(ceil($base / max((int) $grand['contenance'], 1)), 1), 'unite' => (string) $grand['unite']];
+    }
+
+    /** Moins de `Statistiques::JOURS_COUVERTURE_MIN` jours de stock au rythme des trente derniers. */
+    private function manqueSousPeu(Produit $p, float $vendus): bool
+    {
+        if ($vendus <= 0 || $p->stock <= 0) {
             return false;
         }
 

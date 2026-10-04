@@ -1,79 +1,146 @@
 <div class="flex flex-col gap-5">
+    {{-- Même habit que les réglages de l'application : carte héros, cartes blanches, pastilles. --}}
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
-            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Boutiques</h1>
-            <span class="text-[--color-muted] text-sm">
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Boutiques</h1>
+            <span class="text-muted text-sm">
                 Vous possédez {{ $possedees }} boutique{{ $possedees > 1 ? 's' : '' }}{{ $maxBoutiques ? " sur {$maxBoutiques} permise".($maxBoutiques > 1 ? 's' : '').' par votre plan' : '' }}.
             </span>
         </div>
         @if ($peutOuvrir)
-            <button wire:click="nouvelle" class="h-12 px-5 rounded-xl bg-accent text-white font-bold">+ Nouvelle boutique</button>
+            <button wire:click="nouvelle" class="inline-flex items-center gap-2 h-12 px-5 rounded-xl bg-accent text-white font-bold shadow-carte">
+                <x-charte.icone nom="add_business" />Nouvelle boutique
+            </button>
         @endif
     </div>
 
     @if (session('info'))
-        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ session('info') }}</p>
+        <p class="rounded-2xl bg-succes-doux text-succes-fonce px-4 py-3 text-sm font-bold">{{ session('info') }}</p>
     @endif
     @if ($alerte)
-        <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">
+        <p class="rounded-2xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">
             {{ $alerte }} Le plan Pro permet jusqu’à 5 boutiques : abonnez-vous depuis l’application Ngoni Caisse.
         </p>
     @elseif ($peutOuvrir && ! $peutCreer)
-        <p class="rounded-xl bg-[--color-warn-bg] text-[--color-warn-fg] px-4 py-3 text-sm">
-            Votre plan ne permet pas d’autre boutique. Le plan Pro en permet jusqu’à 5.
-        </p>
+        <p class="rounded-2xl bg-warn-bg text-warn-fg px-4 py-3 text-sm">Votre plan ne permet pas d’autre boutique. Le plan Pro en permet jusqu’à 5.</p>
     @endif
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        @foreach ($boutiques as $b)
-            <div class="bg-white border rounded-2xl p-5 flex flex-col gap-2 {{ $b->id === $active ? 'border-accent border-2' : 'border-[--color-border]' }}" wire:key="boutique-{{ $b->id }}">
-                <div class="flex items-start justify-between gap-2">
-                    <h2 class="font-display font-extrabold text-lg">{{ $b->nom }}</h2>
-                    @if ($b->id === $active)
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">Active</span>
+    @if ($boutiqueActive)
+        <x-charte.carte-heros icone="storefront" titre="Boutique active" :valeur="$boutiqueActive->nom">
+            <span class="text-white/90">{{ \App\Enums\Country::tryFrom((string) $boutiqueActive->pays)?->label() }} · devise {{ $boutiqueActive->devise }}</span>
+            <span>{{ $boutiqueActive->estPharmacie() ? 'Pharmacie' : 'Commerce' }}@if ($boutiqueActive->fidelite_seuil) · fidélité : {{ $boutiqueActive->fidelite_remise_pct }} % après {{ $boutiqueActive->fidelite_seuil }} achats @endif</span>
+            @if ($peutRegler)
+                <x-slot:action>
+                    <button wire:click="ouvrirReglages" class="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold">
+                        <x-charte.icone nom="tune" :taille="18" />Réglages
+                    </button>
+                </x-slot:action>
+            @endif
+        </x-charte.carte-heros>
+    @endif
+
+    @if ($boutiqueActive && $peutRegler)
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {{-- Activité : la caisse s'adapte au métier. --}}
+            <x-charte.carte class="p-5 flex flex-col gap-3">
+                <x-charte.en-tete-section icone="work" titre="Activité" sous-titre="La caisse s’adapte à votre métier." />
+                @foreach (['commerce' => ['storefront', 'Commerce', 'Boutique, épicerie, quincaillerie, restaurant… La caisse telle quelle.'], 'pharmacie' => ['local_pharmacy', 'Pharmacie', 'Vente à la boîte, à la plaquette ou au comprimé, lots et péremption, ordonnance, recherche par molécule (DCI).']] as $code => [$icone, $titre, $texte])
+                    @php($choisie = ($boutiqueActive->activite ?: 'commerce') === $code)
+                    <button wire:click="choisirActivite('{{ $code }}')" class="flex items-start gap-3 text-left rounded-2xl p-3 border-2 {{ $choisie ? 'bg-jaune-doux border-jaune' : 'bg-white border-border hover:border-border-strong' }}">
+                        <x-charte.pastille :icone="$icone" :actif="$choisie" :taille="40" />
+                        <span class="flex-1 flex flex-col">
+                            <span class="font-extrabold text-accent">{{ $titre }}</span>
+                            <span class="text-sm text-muted">{{ $texte }}</span>
+                        </span>
+                        @if ($choisie)<x-charte.icone nom="check_circle" plein class="text-accent" />@endif
+                    </button>
+                @endforeach
+            </x-charte.carte>
+
+            {{-- Fidélité : enregistrée d'elle-même, comme dans l'application. --}}
+            <x-charte.carte class="p-5 flex flex-col gap-3">
+                <x-charte.en-tete-section icone="loyalty" titre="Fidélité des clients" sous-titre="Une remise automatique pour vos clients réguliers." />
+                @if ($fideliteIncluse)
+                    <label class="flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3 cursor-pointer">
+                        <span class="font-bold text-accent">Programme {{ $fideliteActive ? 'en cours' : 'arrêté' }}</span>
+                        <input type="checkbox" wire:model.live="fideliteActive" class="w-6 h-6 accent-[#0f2a5c]">
+                    </label>
+                    @if ($fideliteActive)
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="text-sm font-semibold">Au bout de (achats)
+                                <input wire:model.live.debounce.700ms="fideliteSeuil" type="text" inputmode="numeric" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
+                                @error('fideliteSeuil') <span class="block text-danger-fg text-xs">{{ $message }}</span> @enderror
+                            </label>
+                            <label class="text-sm font-semibold">Remise (%)
+                                <input wire:model.live.debounce.700ms="fidelitePct" type="text" inputmode="numeric" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
+                                @error('fidelitePct') <span class="block text-danger-fg text-xs">{{ $message }}</span> @enderror
+                            </label>
+                        </div>
+                        <p class="rounded-xl bg-jaune-doux px-3 py-2 text-sm text-ink">Après {{ $fideliteSeuil }} achats, le suivant a {{ $fidelitePct }} % de remise. Le compte repart ensuite à zéro.</p>
+                    @endif
+                    <span wire:loading.remove wire:target="fideliteActive,fideliteSeuil,fidelitePct" class="text-sm font-bold text-succes-fonce {{ $fideliteEnregistree ? '' : 'invisible' }}">✓ Enregistré : la caisse l’applique</span>
+                    <span wire:loading wire:target="fideliteActive,fideliteSeuil,fidelitePct" class="text-sm text-muted">Enregistrement…</span>
+                @else
+                    <p class="rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">Fonction de l’offre Pro : récompensez vos clients fidèles par une remise automatique.</p>
+                @endif
+            </x-charte.carte>
+
+            {{-- Logo du ticket, et repartir de zéro. --}}
+            <x-charte.carte class="p-5 flex flex-col gap-3">
+                <x-charte.en-tete-section icone="receipt_long" titre="Ticket et logo" sous-titre="Le logo s’imprime en tête des tickets et des factures." />
+                <div class="flex items-center gap-3 flex-wrap">
+                    @if ($boutiqueActive->logo_url)
+                        <img src="{{ $boutiqueActive->logo_vignette_url }}" alt="Logo" class="w-14 h-14 rounded-xl object-contain bg-white shadow-carte">
+                    @endif
+                    <label class="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-accent-soft text-accent text-sm font-bold cursor-pointer">
+                        <x-charte.icone nom="add_photo_alternate" :taille="18" />{{ $boutiqueActive->logo_url ? 'Changer le logo' : 'Ajouter un logo' }}
+                        <input type="file" wire:model="logo" accept="image/png,image/jpeg,image/webp" class="hidden">
+                    </label>
+                    @if ($logo)
+                        <button wire:click="envoyerLogo" class="h-10 px-4 rounded-xl bg-accent text-white text-sm font-bold">Enregistrer le logo</button>
+                    @elseif ($boutiqueActive->logo_url)
+                        <button wire:click="supprimerLogo" wire:confirm="Retirer le logo ?" class="h-10 px-3 text-sm text-danger-fg font-bold">Retirer</button>
                     @endif
                 </div>
-                <span class="text-sm text-[--color-muted]">{{ \App\Enums\Country::tryFrom((string) $b->pays)?->label() }} · devise <strong>{{ $b->devise }}</strong></span>
-                @if ($b->adresse)<span class="text-sm">{{ $b->adresse }}</span>@endif
-                <span class="text-xs text-[--color-muted]">{{ $b->proprietaire_id === auth()->id() ? 'Vous en êtes propriétaire' : 'Membre de l’équipe' }}</span>
-                @if ($b->id === $active && $peutRegler)
-                    <div class="flex items-center gap-3 mt-1">
-                        @if ($b->logo_url)
-                            <img src="{{ $b->logo_vignette_url }}" alt="Logo" class="w-12 h-12 rounded-lg object-contain border border-[--color-border] bg-white">
-                        @endif
-                        <label class="text-xs font-bold text-accent cursor-pointer">
-                            {{ $b->logo_url ? 'Changer le logo' : '+ Ajouter un logo (tickets)' }}
-                            <input type="file" wire:model="logo" accept="image/png,image/jpeg,image/webp" class="hidden">
-                        </label>
-                        @if ($logo)
-                            <button wire:click="envoyerLogo" class="h-8 px-3 rounded-lg bg-accent text-white text-xs font-bold">Enregistrer le logo</button>
-                        @elseif ($b->logo_url)
-                            <button wire:click="supprimerLogo" wire:confirm="Retirer le logo ?" class="text-xs text-danger-fg font-bold">Retirer</button>
+                @error('logo') <span class="text-xs text-danger-fg">{{ $message }}</span> @enderror
+                <button wire:click="ouvrirReglages" class="self-start inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-white shadow-carte text-accent text-sm font-bold">
+                    <x-charte.icone nom="edit" :taille="18" />Nom, pays, devise, NIF, message du ticket…
+                </button>
+            </x-charte.carte>
+
+            @if (\App\Services\ReinitialisationBoutique::autorise(auth()->user(), $boutiqueActive))
+                <x-charte.carte class="p-5 flex flex-col gap-3">
+                    <x-charte.en-tete-section icone="restart_alt" titre="Repartir de zéro" sous-titre="Vos ventes jusqu’ici n’étaient que des essais ?" />
+                    <button wire:click="preparerReinitialisation('{{ $boutiqueActive->id }}')"
+                            class="self-start h-10 px-4 rounded-xl bg-danger-bg text-danger-fg text-sm font-bold">Réinitialiser la boutique</button>
+                </x-charte.carte>
+            @endif
+        </div>
+    @endif
+
+    @if ($boutiques->count() > 1)
+        <x-charte.en-tete-section icone="store" titre="Vos boutiques" sous-titre="Choisissez celle où vous travaillez." />
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach ($boutiques as $b)
+                <x-charte.carte class="p-4 flex items-start gap-3 {{ $b->id === $active ? 'ring-2 ring-jaune' : '' }}" wire:key="boutique-{{ $b->id }}">
+                    <x-charte.pastille icone="storefront" :actif="$b->id === $active" :taille="40" />
+                    <div class="flex-1 min-w-0 flex flex-col gap-1">
+                        <span class="font-display font-extrabold text-accent truncate">{{ $b->nom }}</span>
+                        <span class="text-xs text-muted">{{ \App\Enums\Country::tryFrom((string) $b->pays)?->label() }} · {{ $b->devise }} · {{ $b->proprietaire_id === auth()->id() ? 'propriétaire' : 'équipe' }}</span>
+                        @if ($b->id === $active)
+                            <x-charte.puce ton="jaune" icone="check" class="self-start">Active</x-charte.puce>
+                        @elseif (in_array($b->id, auth()->user()->boutiquesBackOffice(), true))
+                            <form method="POST" action="{{ route('boutique-active') }}">
+                                @csrf
+                                <input type="hidden" name="boutique" value="{{ $b->id }}">
+                                <button class="mt-1 h-9 px-3 rounded-xl bg-accent-soft text-accent text-xs font-bold">Travailler dans cette boutique</button>
+                            </form>
                         @endif
                     </div>
-                    @error('logo') <span class="text-xs text-danger-fg">{{ $message }}</span> @enderror
-                @endif
-                @if ($b->id === $active && $peutRegler)
-                    <button wire:click="ouvrirReglages" class="mt-1 self-start h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Réglages (nom, pays, devise…)</button>
-                @endif
-                {{-- Repartir de zéro après les essais : le propriétaire seul. --}}
-                @if ($b->id === $active && \App\Services\ReinitialisationBoutique::autorise(auth()->user(), $b))
-                    <div class="mt-3 pt-3 border-t border-[--color-border] flex items-center justify-between gap-3 flex-wrap">
-                        <span class="text-xs text-[--color-muted]">Vos ventes jusqu’ici n’étaient que des essais ?</span>
-                        <button wire:click="preparerReinitialisation('{{ $b->id }}')"
-                                class="h-9 px-3 rounded-lg border border-danger-fg/40 text-danger-fg text-xs font-bold hover:bg-danger-bg">Réinitialiser la boutique</button>
-                    </div>
-                @endif
-                @if ($b->id !== $active && in_array($b->id, auth()->user()->boutiquesBackOffice(), true))
-                    <form method="POST" action="{{ route('boutique-active') }}" class="mt-1">
-                        @csrf
-                        <input type="hidden" name="boutique" value="{{ $b->id }}">
-                        <button class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Travailler dans cette boutique</button>
-                    </form>
-                @endif
-            </div>
-        @endforeach
-    </div>
+                </x-charte.carte>
+            @endforeach
+        </div>
+    @endif
 
     @if ($modaleOuverte)
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('modaleOuverte', false)">

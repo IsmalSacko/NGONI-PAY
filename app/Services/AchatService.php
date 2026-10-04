@@ -10,6 +10,7 @@ use App\Models\Fournisseur;
 use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Models\User;
+use App\Support\Quantite;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 class AchatService
 {
     /**
-     * @param  list<array{produit_id: string, quantite: int, prix_achat: int}>  $lignes
+     * @param  list<array{produit_id: string, quantite: int|float, prix_achat: int}>  $lignes
      */
     public function receptionner(User $auteur, array $lignes, ?string $fournisseurId, ?string $reference, int $montantPaye = 0, string $moyen = 'especes', ?string $note = null): Achat
     {
@@ -32,7 +33,11 @@ class AchatService
                 if (! $produits->has($l['produit_id'])) {
                     throw ValidationException::withMessages(['lignes' => ['Article introuvable.']]);
                 }
-                $total += $l['quantite'] * $l['prix_achat'];
+                $total += (int) round($l['quantite'] * $l['prix_achat']);
+                // Reçu à la boîte, compté en comprimés.
+                if ($produits[$l['produit_id']]->palier($l['palier'] ?? null) === null) {
+                    throw ValidationException::withMessages(['lignes' => ['« '.$produits[$l['produit_id']]->nom.' » ne se reçoit pas ainsi.']]);
+                }
             }
 
             if ($montantPaye > $total) {
@@ -52,23 +57,31 @@ class AchatService
 
             foreach ($lignes as $l) {
                 $produit = $produits[$l['produit_id']];
+                $palier = $produit->palier($l['palier'] ?? null);
+                $base = Quantite::normaliser($l['quantite'] * $palier['contenance']);
                 $achat->lignes()->create([
                     'produit_id' => $produit->id,
                     'nom_produit' => $produit->nom,
                     'quantite' => $l['quantite'],
+                    'unite' => $palier['unite'] === '' ? null : $palier['unite'],
+                    'contenance' => $palier['contenance'],
+                    'numero_lot' => $l['numero_lot'] ?? null,
+                    'peremption' => $l['peremption'] ?? null,
                     'prix_achat' => $l['prix_achat'],
-                    'total_ligne' => $l['quantite'] * $l['prix_achat'],
+                    'total_ligne' => (int) round($l['quantite'] * $l['prix_achat']),
                 ]);
 
-                $produit->stock += $l['quantite'];
-                $produit->prix_achat = $l['prix_achat'];
+                $produit->stock = Quantite::normaliser($produit->stock + $base);
+                // Le prix d'achat se garde par unité de base (le comprimé).
+                $produit->prix_achat = (int) round($l['prix_achat'] / $palier['contenance']);
                 $produit->save();
+                app(Lots::class)->entrer($produit, $base, $l['numero_lot'] ?? null, $l['peremption'] ?? null, $achat->id);
 
                 MouvementStock::create([
                     'produit_id' => $produit->id,
                     'user_id' => $auteur->id,
                     'type' => TypeMouvementStock::Entree,
-                    'quantite' => $l['quantite'],
+                    'quantite' => $base,
                     'stock_apres' => $produit->stock,
                     'motif' => 'Réception'.($reference ? ' '.$reference : ''),
                 ]);

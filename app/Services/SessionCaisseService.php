@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\MoyenPaiement;
+use App\Models\ReglementCredit;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
@@ -51,13 +52,22 @@ class SessionCaisseService
         return $session->fresh();
     }
 
-    /** Ventes en espèces encaissées pendant la séance (annulées exclues). */
+    /**
+     * Espèces entrées dans le tiroir pendant la séance (annulées exclues) :
+     * ce qui a été payé des ventes — pas leur reste dû, qui n'est pas encore
+     * là — et les dettes remboursées en espèces.
+     */
     public function totalEspeces(SessionCaisse $session): int
     {
-        return (int) $session->ventes()
+        $ventes = (int) $session->ventes()
             ->valides()
             ->where('moyen_paiement', MoyenPaiement::Especes)
-            ->sum('total');
+            ->sum('montant_paye');
+        $remboursements = (int) ReglementCredit::where('session_caisse_id', $session->id)
+            ->where('moyen_paiement', MoyenPaiement::Especes->value)
+            ->sum('montant');
+
+        return $ventes + $remboursements;
     }
 
     /** Ce que le tiroir devrait contenir : le fond d'ouverture plus les espèces encaissées. */

@@ -5,12 +5,23 @@
 
 <div class="max-w-3xl flex flex-col gap-6">
     <div>
-        <h1 class="font-display font-extrabold text-2xl md:text-3xl">Mon compte</h1>
+        <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Mon compte</h1>
         <p class="text-sm text-muted">Vos informations de connexion.@unless (auth()->user()->est_admin_plateforme) Votre rôle, lui, se règle par le titulaire de la boutique.@endunless</p>
     </div>
 
-    <form wire:submit="enregistrerProfil" class="bg-white border border-border rounded-2xl p-5 md:p-6 flex flex-col gap-4">
-        <h2 class="font-display font-extrabold text-lg">Profil</h2>
+    {{-- Même habit que l'écran Mon compte de l'application. --}}
+    @php($initiales = mb_strtoupper(collect(preg_split('/\s+/', trim(auth()->user()->name)))->take(2)->map(fn ($m) => mb_substr($m, 0, 1))->join('')))
+    <section class="rounded-[20px] p-5 text-white bg-linear-to-br from-nuit-clair to-accent shadow-[0_10px_22px_rgba(15,42,92,.30)] flex items-center gap-4">
+        <span class="w-14 h-14 shrink-0 rounded-full bg-jaune text-accent font-display font-extrabold text-xl flex items-center justify-center">{{ $initiales }}</span>
+        <span class="flex-1 min-w-0 flex flex-col">
+            <span class="font-display font-extrabold text-xl truncate">{{ auth()->user()->name }}</span>
+            <span class="text-white/80 text-sm truncate">{{ auth()->user()->phone }}@if (auth()->user()->email) · {{ auth()->user()->email }}@endif</span>
+            <span class="text-jaune text-sm font-bold">{{ ['admin' => 'Admin', 'gerant' => 'Gérant', 'caissier' => 'Caissier'][auth()->user()->getRoleNames()->first()] ?? (auth()->user()->est_admin_plateforme ? 'Exploitant' : 'Membre') }}</span>
+        </span>
+    </section>
+
+    <form wire:submit="enregistrerProfil" class="bg-white rounded-[20px] shadow-carte p-5 md:p-6 flex flex-col gap-4">
+        <x-charte.en-tete-section icone="person" titre="Profil" sous-titre="Votre nom, votre téléphone de connexion." />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label class="flex flex-col gap-1.5 text-sm font-semibold sm:col-span-2">Nom
                 <input wire:model="name" type="text" autocomplete="name" class="{{ $champ }}">
@@ -27,27 +38,21 @@
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <button type="submit" class="h-12 px-5 rounded-xl bg-accent text-white font-bold" wire:loading.attr="disabled" wire:target="enregistrerProfil">Enregistrer</button>
-            @if ($statutProfil)<span class="text-sm font-bold text-succes" role="status">{{ $statutProfil }}</span>@endif
+            @if ($statutProfil)<span class="text-sm font-bold text-succes-fonce" role="status">{{ $statutProfil }}</span>@endif
         </div>
     </form>
 
     @if ($titulaire)
-        <section class="bg-white border border-border rounded-2xl p-5 md:p-6">
+        <section class="bg-white rounded-[20px] shadow-carte p-5 md:p-6">
             <label class="flex items-start justify-between gap-4 cursor-pointer">
-                <span>
-                    <span class="block font-display font-extrabold text-lg">Bilan du soir</span>
-                    <span class="block text-sm text-muted">Chaque soir à 20 h, une notification avec les ventes du jour de vos boutiques.</span>
-                </span>
-                <input type="checkbox" wire:model.live="bilanQuotidien" class="mt-1 w-5 h-5 shrink-0" aria-label="Recevoir le bilan du soir">
+                <x-charte.en-tete-section icone="notifications_active" titre="Bilan du soir" sous-titre="Chaque soir à 20 h, une notification avec les ventes du jour de vos boutiques." />
+                <input type="checkbox" wire:model.live="bilanQuotidien" class="mt-2 w-6 h-6 shrink-0 accent-[#0f2a5c]" aria-label="Recevoir le bilan du soir">
             </label>
         </section>
     @endif
 
-    <form wire:submit="changerMotDePasse" class="bg-white border border-border rounded-2xl p-5 md:p-6 flex flex-col gap-4">
-        <div>
-            <h2 class="font-display font-extrabold text-lg">Mot de passe</h2>
-            <p class="text-xs text-muted">Au moins 8 caractères. Vos téléphones et tablettes connectés devront se reconnecter.</p>
-        </div>
+    <form wire:submit="changerMotDePasse" class="bg-white rounded-[20px] shadow-carte p-5 md:p-6 flex flex-col gap-4">
+        <x-charte.en-tete-section icone="lock" titre="Mot de passe" sous-titre="Au moins 8 caractères. Vos téléphones et tablettes connectés devront se reconnecter." />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-data="{ voir: false }">
             <label class="flex flex-col gap-1.5 text-sm font-semibold sm:col-span-2">Mot de passe actuel
                 <input wire:model="mot_de_passe_actuel" :type="voir ? 'text' : 'password'" autocomplete="current-password" class="{{ $champ }}">
@@ -66,7 +71,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <button type="submit" class="h-12 px-5 rounded-xl bg-accent text-white font-bold" wire:loading.attr="disabled" wire:target="changerMotDePasse">Changer le mot de passe</button>
-            @if ($statutMotDePasse)<span class="text-sm font-bold text-succes" role="status">{{ $statutMotDePasse }}</span>@endif
+            @if ($statutMotDePasse)<span class="text-sm font-bold text-succes-fonce" role="status">{{ $statutMotDePasse }}</span>@endif
         </div>
     </form>
 </div>

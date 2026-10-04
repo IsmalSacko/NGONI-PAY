@@ -33,7 +33,7 @@
     <div class="page">
         <table class="kpi">
             <tr>
-                <td>Chiffre d’affaires<b>{{ $m($r['ventes']['total']) }}</b>
+                <td>Ventes (chiffre d’affaires)<b>{{ $m($r['ventes']['total']) }}</b>
                     @if ($ecart !== null)<span class="{{ $ecart >= 0 ? 'hausse' : 'baisse' }}">{{ $ecart >= 0 ? '+' : '' }}{{ $ecart }} % par rapport au mois précédent</span>@endif</td>
                 <td>Ventes<b>{{ $r['ventes']['nombre'] }}</b><span class="petit">{{ $r['ventes']['articles'] }} articles</span></td>
                 <td>Panier moyen<b>{{ $m($r['ventes']['panier_moyen']) }}</b></td>
@@ -42,8 +42,8 @@
             </tr>
             <tr>
                 <td>Remises<b>{{ $m($r['ventes']['remises']) }}</b></td>
-                <td>Crédit accordé<b>{{ $m($r['credit']['accorde']) }}</b></td>
-                <td>Crédit remboursé<b>{{ $m($r['credit']['rembourse']) }}</b></td>
+                <td>Vendu à crédit<b>{{ $m($r['credit']['accorde']) }}</b><span class="petit">Reste à encaisser : {{ ($r['credit']['encore_du'] ?? 0) > 0 ? '−' : '' }}{{ $m($r['credit']['encore_du'] ?? 0) }}@isset($r['encaisse']) · Encaissé : {{ $m($r['encaisse']['total']) }}@endisset</span></td>
+                <td>Remboursements<b>{{ $m($r['credit']['rembourse']) }}</b></td>
                 <td>Ventes annulées<b>{{ $r['annulees']['nombre'] }}</b><span class="petit">{{ $m($r['annulees']['total']) }}</span></td>
             </tr>
         </table>
@@ -55,7 +55,7 @@
             <table>
                 <tr><th>Article</th><th class="n">Quantité</th><th class="n">Chiffre</th></tr>
                 @foreach ($r['top_produits'] as $p)
-                    <tr><td>{{ $p['nom'] }}</td><td class="n">{{ $p['quantite'] }}</td><td class="n">{{ $m($p['total']) }}</td></tr>
+                    <tr><td>{{ $p['nom'] }}</td><td class="n">{{ \App\Support\Quantite::formater($p['quantite'], $p['unite'] ?? null) }}</td><td class="n">{{ $m($p['total']) }}</td></tr>
                 @endforeach
             </table>
         @endif

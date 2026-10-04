@@ -6,6 +6,8 @@ namespace App\Livewire\Clients;
 
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Client;
+use App\Models\Vente;
+use App\Support\Money\Montant;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -76,7 +78,7 @@ class Index extends Component
     {
         $this->resetValidation();
         $this->reglementClientId = $clientId;
-        $this->reglementMontant = \App\Support\Money\Montant::saisie(Client::findOrFail($clientId)->soldeDu());
+        $this->reglementMontant = Montant::saisie(Client::findOrFail($clientId)->soldeDu());
         $this->reglementMoyen = 'especes';
     }
 
@@ -88,10 +90,10 @@ class Index extends Component
 
         $client = Client::findOrFail($this->reglementClientId);
         $solde = $client->soldeDu();
-        $montant = \App\Support\Money\Montant::parse($this->reglementMontant);
+        $montant = Montant::parse($this->reglementMontant);
 
         if ($montant === null || $montant <= 0 || $montant > $solde) {
-            $this->addError('reglementMontant', 'Montant entre 1 et '.\App\Support\Money\Montant::format($solde).'.');
+            $this->addError('reglementMontant', 'Montant entre 1 et '.Montant::format($solde).'.');
 
             return;
         }
@@ -115,13 +117,40 @@ class Index extends Component
         Client::findOrFail($clientId)->delete();
     }
 
+    /** Tous, ou « Ils vous doivent ». */
+    public string $filtre = 'tous';
+
+    public function updatedFiltre(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedRecherche(): void
+    {
+        $this->resetPage();
+    }
+
     public function render()
     {
-        $clients = Client::avecSoldeDu()->when($this->recherche, fn ($q) => $q->where('nom', 'like', "%{$this->recherche}%")
-            ->orWhere('telephone', 'like', "%{$this->recherche}%"))
+        // Ce que doit chaque client : restes dus des ventes moins ses remboursements.
+        $dette = '(COALESCE((SELECT SUM(v.reste_du) FROM ventes v WHERE v.client_id = clients.id AND v.statut = ?), 0)'
+            .' - COALESCE((SELECT SUM(r.montant) FROM reglements_credit r WHERE r.client_id = clients.id), 0))';
+        $clients = Client::avecSoldeDu()
+            ->when(trim($this->recherche) !== '', fn ($q) => $q->where(fn ($q) => $q->where('nom', 'like', '%'.trim($this->recherche).'%')
+                ->orWhere('telephone', 'like', '%'.trim($this->recherche).'%')))
+            // « Ils vous doivent » : les plus grosses dettes d'abord, comme l'application.
+            ->when($this->filtre === 'debiteurs', fn ($q) => $q->whereRaw("$dette > 0", [Vente::STATUT_VALIDEE])
+                ->reorder()->orderByRaw("$dette DESC", [Vente::STATUT_VALIDEE]))
             ->orderBy('nom')
-            ->paginate(15);
+            ->paginate(20);
 
-        return view('livewire.clients.index', ['clients' => $clients]);
+        $soldes = Client::avecSoldeDu()->get()->map(fn ($c) => max(0, (int) $c->credit_total - (int) $c->reglements_total));
+
+        return view('livewire.clients.index', [
+            'clients' => $clients,
+            'nClients' => $soldes->count(),
+            'nDebiteurs' => $soldes->filter()->count(),
+            'encours' => (int) $soldes->sum(),
+        ]);
     }
 }

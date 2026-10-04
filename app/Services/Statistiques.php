@@ -13,6 +13,7 @@ use App\Models\PaiementFournisseur;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\Vente;
+use App\Support\Quantite;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
@@ -162,10 +163,11 @@ class Statistiques
             ->get([
                 'lv.produit_id',
                 DB::raw('COALESCE(MAX(p.nom), MAX(lv.nom_produit)) as nom'),
-                DB::raw('SUM(lv.quantite) as quantite'),
+                DB::raw('MAX(p.unite) as unite'),
+                DB::raw('SUM(lv.quantite * lv.contenance) as quantite'),
                 DB::raw('SUM(lv.total_ligne) as total'),
                 DB::raw('SUM(CASE WHEN COALESCE(lv.prix_achat, p.prix_achat) IS NOT NULL THEN lv.total_ligne END) as couvert'),
-                DB::raw('SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite) as cout'),
+                DB::raw('SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite * lv.contenance) as cout'),
             ])
             ->map(function ($l) {
                 $couvert = $l->couvert === null ? null : (int) $l->couvert;
@@ -174,7 +176,8 @@ class Statistiques
                 return [
                     'produit_id' => (string) $l->produit_id,
                     'nom' => (string) $l->nom,
-                    'quantite' => (int) $l->quantite,
+                    'quantite' => Quantite::normaliser($l->quantite),
+                    'unite' => $l->unite,
                     'total' => (int) $l->total,
                     'marge' => $marge,
                     'taux_marge' => $couvert ? round($marge * 100 / $couvert, 1) : null,
@@ -208,7 +211,7 @@ class Statistiques
                 'c.nom', 'c.couleur',
                 DB::raw('SUM(lv.total_ligne) as total'),
                 DB::raw('SUM(CASE WHEN COALESCE(lv.prix_achat, p.prix_achat) IS NOT NULL THEN lv.total_ligne END) as couvert'),
-                DB::raw('SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite) as cout'),
+                DB::raw('SUM(COALESCE(lv.prix_achat, p.prix_achat) * lv.quantite * lv.contenance) as cout'),
             ])
             ->map(fn ($c) => [
                 'nom' => $c->nom ?? 'Sans catégorie',
@@ -232,10 +235,10 @@ class Statistiques
             ->whereIn('vente_id', Vente::valides()->where('ventes.jour_affaire', '>', $au->copy()->subDays($jours)->toDateString())->select('ventes.id'))
             ->whereNotNull('produit_id')
             ->groupBy('produit_id')
-            ->pluck(DB::raw('SUM(quantite)'), 'produit_id');
+            ->pluck(DB::raw('SUM(quantite * contenance)'), 'produit_id');
 
         $recents = $vendus(self::JOURS_VITESSE);
-        $enStock = Produit::where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte', 'created_at']);
+        $enStock = Produit::where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'unite', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte', 'created_at']);
 
         // Dernier retour en rayon après une rupture (stock passé de 0 à plus
         // de 0) : une marchandise arrivée hier n'a pas encore eu le temps de
@@ -257,8 +260,9 @@ class Statistiques
                 'produit_id' => $p->id,
                 'nom' => $p->nom,
                 'stock' => $p->stock,
+                'unite' => $p->unite,
                 // Au prix d'achat quand il est connu : ce que l'article a coûté, pas ce qu'il rapporterait.
-                'valeur' => $p->stock * ($p->prix_achat ?? $p->prix_vente),
+                'valeur' => (int) round($p->stock * ($p->prix_achat ?? $p->prix_vente)),
                 'valeur_estimee' => $p->prix_achat === null,
             ])
             ->sortByDesc('valeur')->values();
@@ -269,12 +273,13 @@ class Statistiques
                 // Sur l'âge réel d'un article de moins d'un mois : 30 ventes
                 // en 3 jours, c'est 10 par jour, pas 1.
                 $age = (int) $p->created_at->copy()->startOfDay()->diffInDays($au->copy()->startOfDay()) + 1;
-                $parJour = (int) $recents[$p->id] / max(self::JOURS_VITESSE_MIN, min(self::JOURS_VITESSE, $age));
+                $parJour = (float) $recents[$p->id] / max(self::JOURS_VITESSE_MIN, min(self::JOURS_VITESSE, $age));
 
                 return [
                     'produit_id' => $p->id,
                     'nom' => $p->nom,
                     'stock' => $p->stock,
+                    'unite' => $p->unite,
                     'vendus_par_jour' => round($parJour, 1),
                     'jours_restants' => (int) floor($p->stock / $parJour),
                 ];

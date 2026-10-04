@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Enums\MoyenPaiement;
+use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Services\Fidelite;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
+use App\Services\Fidelite;
+use App\Services\SessionCaisseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -50,7 +52,11 @@ class ClientController extends Controller
         }
 
         if ($request->boolean('debiteurs')) {
-            $query->whereHas('ventes', fn ($q) => $q->valides()->where('moyen_paiement', 'credit_client'));
+            // Ceux qui doivent encore : restes dus moins remboursements > 0 (un
+            // client qui a tout remboursé n'y est plus). Les plus gros d'abord.
+            $dette = '(COALESCE((SELECT SUM(v.reste_du) FROM ventes v WHERE v.client_id = clients.id AND v.statut = ?), 0)'
+                .' - COALESCE((SELECT SUM(r.montant) FROM reglements_credit r WHERE r.client_id = clients.id), 0))';
+            $query->whereRaw("$dette > 0", [Vente::STATUT_VALIDEE])->reorder()->orderByRaw("$dette DESC", [Vente::STATUT_VALIDEE]);
         }
 
         $page = $query->orderBy('nom')->paginate(30);
@@ -93,12 +99,14 @@ class ClientController extends Controller
     {
         return response()->json([
             'solde_du' => $client->soldeDu(),
-            'achats' => $client->ventes()->valides()->where('moyen_paiement', 'credit_client')->latest()
-                ->get(['id', 'numero', 'total', 'created_at', 'boutique_id'])
-                ->map(fn (Vente $v) => ['id' => $v->id, 'numero_facture' => $v->numero_facture, 'total' => $v->total, 'date' => $v->created_at]),
-            'reglements' => $client->reglements()->with('caissier:id,name')->latest()->get()
-                ->map(fn (ReglementCredit $r) => ['id' => $r->id, 'montant' => $r->montant, 'moyen_paiement' => $r->moyen_paiement,
-                    'note' => $r->note, 'date' => $r->created_at, 'par' => $r->caissier?->name]),
+            // Les ventes qui ont laissé une dette : payé sur le moment, et le reste.
+            'achats' => $client->ventes()->valides()->where('reste_du', '>', 0)->latest()
+                ->get(['id', 'numero', 'total', 'montant_paye', 'reste_du', 'created_at', 'boutique_id'])
+                ->map(fn (Vente $v) => ['id' => $v->id, 'numero_facture' => $v->numero_facture, 'total' => $v->total,
+                    'paye' => (int) $v->montant_paye, 'reste' => (int) $v->reste_du, 'date' => $v->created_at]),
+            // Chaque remboursement porte son reçu (réimprimable).
+            'reglements' => $client->reglements()->with(['caissier:id,name', 'client'])->orderByDesc('numero')->latest()->get()
+                ->map(fn (ReglementCredit $r) => $r->recu()),
         ]);
     }
 
@@ -119,9 +127,17 @@ class ClientController extends Controller
             throw ValidationException::withMessages(['montant' => ['Ce client ne doit rien.']]);
         }
 
-        $client->reglements()->create($data + ['user_id' => $request->user()->id]);
+        // La séance du caissier : un remboursement en espèces entre dans son
+        // tiroir. Numéro de reçu et dette avant / après, figés maintenant.
+        $reglement = DB::transaction(fn () => $client->reglements()->create($data + [
+            'user_id' => $request->user()->id,
+            'session_caisse_id' => app(SessionCaisseService::class)->courante($request->user())?->id,
+            'numero' => (int) ReglementCredit::lockForUpdate()->max('numero') + 1,
+            'solde_avant' => $solde,
+            'solde_apres' => $solde - (int) $data['montant'],
+        ]));
 
-        return response()->json(['solde_du' => $client->soldeDu()], 201);
+        return response()->json(['solde_du' => $client->soldeDu(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
     }
 
     public function destroy(Client $client): JsonResponse

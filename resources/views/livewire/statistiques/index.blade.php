@@ -11,37 +11,40 @@
     $pct = fn (?float $v) => $v === null ? '—' : str_replace(',0', '', number_format($v, 1, ',', ' ')).' %';
     $ind = $comparaison['indicateurs'];
     $joursSemaine = [1 => 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
-    $carte = 'bg-white border border-border rounded-2xl p-5';
+    $carte = 'bg-white rounded-[20px] shadow-carte p-5';
 @endphp
 
 <div class="flex flex-col gap-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Statistiques</h1>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Statistiques</h1>
             <p class="text-sm text-muted">
                 Du {{ $du->translatedFormat('j F') }} au {{ $au->translatedFormat('j F Y') }},
                 comparé au {{ \Carbon\Carbon::parse($comparaison['precedente']['du'])->translatedFormat('j F') }} – {{ \Carbon\Carbon::parse($comparaison['precedente']['au'])->translatedFormat('j F') }}
             </p>
         </div>
-        <div class="flex flex-wrap gap-1 rounded-xl bg-white border border-border p-1" role="group" aria-label="Période">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Période">
             @foreach ($periodes as $code => $libelle)
                 <button type="button" wire:click="$set('periode', '{{ $code }}')" aria-pressed="{{ $periode === $code ? 'true' : 'false' }}"
-                        class="h-9 px-3 rounded-lg text-sm font-bold {{ $periode === $code ? 'bg-accent text-white' : 'text-muted hover:text-ink' }}">{{ $libelle }}</button>
+                        class="inline-flex items-center gap-1 h-10 px-4 rounded-full text-sm font-bold {{ $periode === $code ? 'bg-jaune text-accent' : 'bg-puce text-accent hover:bg-accent-soft' }}">@if ($periode === $code)<x-charte.icone nom="check" :taille="18" />@endif{{ $libelle }}</button>
             @endforeach
         </div>
     </div>
 
-    {{-- L'essentiel, pour tous les plans : où en est-on, par rapport à avant ? --}}
-    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4" wire:loading.class="opacity-60">
+    {{-- L'essentiel, pour tous les plans : où en est-on, par rapport à avant ? Le chiffre en carte héros, comme le Pilotage. --}}
+    <x-charte.carte-heros icone="payments" titre="Chiffre d’affaires" :valeur="$m($ind['chiffre_affaires']['actuel'])" wire:loading.class="opacity-60">
+        <span class="self-start rounded-full bg-white px-3 py-0.5 text-xs">{!! $variation($ind['chiffre_affaires']['variation']) !!} <span class="text-muted font-semibold">vs période précédente</span></span>
+    </x-charte.carte-heros>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4" wire:loading.class="opacity-60">
         @foreach ([
-            ['Chiffre d’affaires', $m($ind['chiffre_affaires']['actuel']), $ind['chiffre_affaires']['variation'], null],
             ['Tickets', number_format($ind['tickets']['actuel'], 0, ',', ' '), $ind['tickets']['variation'], null],
             ['Panier moyen', $m($ind['panier_moyen']['actuel']), $ind['panier_moyen']['variation'], null],
             ['Marge brute', $ind['taux_marge']['actuel'] === null ? 'À renseigner' : $m($ind['marge']['actuel']), $ind['marge']['variation'],
                 $ind['taux_marge']['actuel'] === null ? 'Prix d’achat manquants' : $pct($ind['taux_marge']['actuel']).' du chiffre'],
         ] as [$libelle, $valeur, $var, $precision])
             <div class="{{ $carte }} min-w-0 !p-4 md:!p-5">
-                <p class="text-sm text-muted">{{ $libelle }}</p>
+                <p class="flex items-center gap-2 text-sm font-semibold text-muted"><x-charte.pastille :icone="['Tickets' => 'receipt_long', 'Panier moyen' => 'shopping_basket', 'Marge brute' => 'trending_up'][$libelle] ?? 'insights'" :taille="34" />{{ $libelle }}</p>
                 <p class="mt-1 font-display font-extrabold text-lg md:text-2xl tabular-nums truncate" title="{{ $valeur }}">{{ $valeur }}</p>
                 @if ($precision)<p class="text-xs font-bold">{{ $precision }}</p>@endif
                 <p class="mt-1 text-xs text-muted">{!! $variation($var) !!} vs période précédente</p>
@@ -51,7 +54,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start" wire:loading.class="opacity-60">
         <section class="{{ $carte }} lg:col-span-2">
-            <h2 class="font-display font-extrabold text-lg">Chiffre d’affaires par jour</h2>
+            <x-charte.en-tete-section icone="show_chart" titre="Chiffre d’affaires par jour" />
             @php($courbe = collect($comparaison['par_jour']))
             <x-graphique.courbe class="mt-3 hidden sm:block" :unite="$devise" :legende="['Cette période', 'Période précédente']"
                 :points="$courbe->mapWithKeys(fn ($j) => [$j['date'] => $unites($j['total'])])->all()"
@@ -62,7 +65,7 @@
         </section>
 
         <section class="{{ $carte }}">
-            <h2 class="font-display font-extrabold text-lg">Moyens de paiement</h2>
+            <x-charte.en-tete-section icone="payments" titre="Moyens de paiement" />
             <x-graphique.repartition class="mt-4" :parts="collect($rapport['par_moyen'])->values()->map(fn ($p) => [
                 'libelle' => $p['libelle'],
                 'valeur' => $p['total'],
@@ -80,7 +83,7 @@
 
     @if (! $disponible)
         {{-- Ce que le Pro apporterait : montré, pas caché. --}}
-        <section class="rounded-2xl border-2 border-dashed border-border-strong bg-white p-6 md:p-8">
+        <section class="rounded-[20px] bg-jaune-doux shadow-carte p-6 md:p-8">
             <p class="text-xs font-bold uppercase tracking-wide text-accent">Plan Pro</p>
             <h2 class="mt-1 font-display font-extrabold text-xl">Allez plus loin dans vos chiffres</h2>
             <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -98,7 +101,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start" wire:loading.class="opacity-60">
             <section class="{{ $carte }} lg:col-span-2">
-                <h2 class="font-display font-extrabold text-lg">Affluence</h2>
+                <x-charte.en-tete-section icone="schedule" titre="Affluence" />
                 <p class="text-xs text-muted">Tickets par jour et par heure, heure de {{ str_replace('_', ' ', \Illuminate\Support\Str::after($a['affluence']['fuseau'], '/')) }}</p>
                 @if ($a['affluence']['heure_pointe'] !== null)
                     <p class="mt-3 text-sm">Le plus de monde : <span class="font-bold">le {{ $joursSemaine[$a['affluence']['jour_pointe']] }}</span>, et <span class="font-bold">vers {{ $a['affluence']['heure_pointe'] }} h</span>.</p>
@@ -107,7 +110,7 @@
             </section>
 
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Par catégorie</h2>
+                <x-charte.en-tete-section icone="category" titre="Par catégorie" />
                 <x-graphique.repartition class="mt-4" :parts="collect($a['categories'])->map(fn ($c) => [
                     'libelle' => $c['nom'],
                     'valeur' => $c['total'],
@@ -125,7 +128,7 @@
         </div>
 
         <section class="{{ $carte }}" wire:loading.class="opacity-60">
-            <h2 class="font-display font-extrabold text-lg">Articles</h2>
+            <x-charte.en-tete-section icone="inventory_2" titre="Articles" />
             <div class="mt-3 grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div class="xl:col-span-2 overflow-x-auto">
                     <p class="text-xs text-muted mb-2">Les plus vendus</p>
@@ -177,7 +180,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" wire:loading.class="opacity-60">
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Bientôt fini</h2>
+                <x-charte.en-tete-section icone="inventory" titre="Bientôt fini" />
                 <p class="text-xs text-muted">Il en reste pour moins de {{ \App\Services\Statistiques::JOURS_COUVERTURE_MIN }} jours</p>
                 <ul class="mt-3 divide-y divide-separateur text-sm">
                     @forelse ($a['stock']['a_racheter'] as $p)
@@ -194,7 +197,7 @@
             </section>
 
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Moins vendus</h2>
+                <x-charte.en-tete-section icone="trending_down" titre="Moins vendus" />
                 <p class="text-xs text-muted">Aucune vente depuis {{ \App\Services\Statistiques::JOURS_DORMANT }} jours</p>
                 <p class="mt-3 text-sm">Argent bloqué : <span class="font-display font-extrabold text-xl tabular-nums">{{ $m($a['stock']['valeur_dormante']) }}</span></p>
                 <ul class="mt-2 divide-y divide-separateur text-sm">
@@ -221,7 +224,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" wire:loading.class="opacity-60">
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Clients</h2>
+                <x-charte.en-tete-section icone="groups" titre="Clients" />
                 @php($c = $a['clients'])
                 <div class="mt-3 grid grid-cols-3 gap-3 text-center">
                     @foreach ([['Actifs', $c['actifs']], ['Nouveaux', $c['nouveaux']], ['Revenus 2 fois ou +', $c['fideles']]] as [$libelle, $valeur])
@@ -239,7 +242,7 @@
             </section>
 
             <section class="{{ $carte }}">
-                <h2 class="font-display font-extrabold text-lg">Crédit clients</h2>
+                <x-charte.en-tete-section icone="handshake" titre="Crédit clients" />
                 <p class="mt-2 text-sm">Encours : <span class="font-display font-extrabold text-xl tabular-nums">{{ $m($c['credit']['encours']) }}</span>
                     <span class="text-muted">· {{ $c['credit']['debiteurs'] }} client(s)</span></p>
                 <ul class="mt-2 divide-y divide-separateur text-sm">
@@ -262,7 +265,7 @@
         </div>
 
         <section class="{{ $carte }}" wire:loading.class="opacity-60">
-            <h2 class="font-display font-extrabold text-lg">Équipe</h2>
+            <x-charte.en-tete-section icone="badge" titre="Équipe" />
             {{-- Téléphone : une fiche par vendeur ; six colonnes n'y tiennent pas. --}}
             <ul class="mt-3 sm:hidden divide-y divide-separateur text-sm">
                 @foreach ($a['equipe'] as $u)

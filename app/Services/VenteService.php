@@ -9,10 +9,12 @@ use App\Enums\TypeMouvementStock;
 use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\MouvementStock;
+use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\Vente;
+use App\Support\Quantite;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class VenteService
      * @param  array{
      *     reference_locale: ?string,
      *     client_id: ?string,
-     *     lignes: list<array{produit_id?: ?string, libelle?: ?string, prix_unitaire?: ?int, taux_tva?: ?float, quantite: int}>,
+     *     lignes: list<array{produit_id?: ?string, libelle?: ?string, prix_unitaire?: ?int, taux_tva?: ?float, quantite: int|float}>,
      *     remise: int,
      *     moyen_paiement: string,
      *     montant_recu: ?int,
@@ -80,10 +82,16 @@ class VenteService
 
             $lignes = [];
             $sousTotal = 0;
+            /** @var array<string, int|float> $besoin unités de base demandées par article */
+            $besoin = [];
 
             foreach ($data['lignes'] as $ligne) {
+                // 1,250 kg à 3 500 F : 4 375 F — le total d'une ligne se compte
+                // au franc près.
+                $ligne['quantite'] = Quantite::normaliser($ligne['quantite']);
+
                 if (empty($ligne['produit_id'])) {
-                    $totalLigne = (int) $ligne['prix_unitaire'] * $ligne['quantite'];
+                    $totalLigne = (int) round((int) $ligne['prix_unitaire'] * $ligne['quantite']);
                     $sousTotal += $totalLigne;
 
                     $lignes[] = [
@@ -105,18 +113,34 @@ class VenteService
                     throw ValidationException::withMessages(['lignes' => ["Produit introuvable : {$ligne['produit_id']}."]]);
                 }
 
-                if ($produit->stock < $ligne['quantite']) {
-                    throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$produit->stock})."]]);
+                // Au détail (pharmacie) : une boîte, une plaquette ou un
+                // comprimé, chacun à son prix ; le stock se compte en unités
+                // de base (16 comprimés pour une boîte de 16).
+                $palier = $produit->palier($ligne['palier'] ?? null);
+                if ($palier === null) {
+                    throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » ne se vend pas ainsi."]]);
+                }
+                $base = Quantite::normaliser($ligne['quantite'] * $palier['contenance']);
+                $besoin[$produit->id] = Quantite::normaliser(($besoin[$produit->id] ?? 0) + $base);
+
+                if (round($produit->stock - $besoin[$produit->id], 3) < 0) {
+                    $reste = Quantite::formater($produit->stock, $produit->unite);
+                    throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$reste})."]]);
                 }
 
-                $totalLigne = $produit->prix_vente * $ligne['quantite'];
+                $totalLigne = (int) round($palier['prix'] * $ligne['quantite']);
                 $sousTotal += $totalLigne;
 
                 $lignes[] = [
                     'produit' => $produit,
                     'nom' => $produit->nom,
                     'quantite' => $ligne['quantite'],
-                    'prix_unitaire' => $produit->prix_vente,
+                    'unite' => $palier['unite'] === '' ? null : $palier['unite'],
+                    'contenance' => $palier['contenance'],
+                    'base' => $base,
+                    'prix_unitaire' => $palier['prix'],
+                    // Prix d'achat d'une unité de base : la marge se calcule
+                    // sur quantité × contenance.
                     'prix_achat' => $produit->prix_achat,
                     'taux_tva' => $produit->taux_tva,
                     'total_ligne' => $totalLigne,
@@ -134,10 +158,22 @@ class VenteService
             $total = $sousTotal - $remise;
 
             $moyenPaiement = MoyenPaiement::from($data['moyen_paiement']);
-            $montantRecu = $moyenPaiement === MoyenPaiement::Especes ? ($data['montant_recu'] ?? $total) : null;
+            // Le crédit est le reste non payé : le client paie ce qu'il peut
+            // (montant_paye, avec le moyen choisi), la différence est sa dette.
+            // « Crédit client » seul : rien de payé, comme avant.
+            $paye = $moyenPaiement === MoyenPaiement::CreditClient
+                ? 0
+                : min($total, (int) ($data['montant_paye'] ?? $total));
+            $reste = $total - $paye;
+            if ($reste > 0) {
+                $this->autoriserCredit($data, $caissier);
+            }
 
-            if ($moyenPaiement === MoyenPaiement::Especes && $montantRecu < $total) {
-                throw ValidationException::withMessages(['montant_recu' => ['Le montant reçu est inférieur au total.']]);
+            $montantRecu = $moyenPaiement === MoyenPaiement::Especes ? (int) ($data['montant_recu'] ?? $paye) : null;
+            if ($moyenPaiement === MoyenPaiement::Especes && $montantRecu < $paye) {
+                throw ValidationException::withMessages(['montant_recu' => [
+                    $reste > 0 ? 'Le montant reçu est inférieur au montant payé.' : 'Le montant reçu est inférieur au total.',
+                ]]);
             }
 
             $tva = 0;
@@ -170,13 +206,17 @@ class VenteService
                 'remise' => $remise,
                 'tva' => $tva,
                 'total' => $total,
+                'montant_paye' => $paye,
+                'reste_du' => $reste,
                 'moyen_paiement' => $moyenPaiement,
                 'montant_recu' => $montantRecu,
-                'monnaie_rendue' => $montantRecu !== null ? $montantRecu - $total : null,
+                'monnaie_rendue' => $montantRecu !== null ? $montantRecu - $paye : null,
                 'statut' => 'validee',
                 'vendue_hors_ligne' => $data['vendue_hors_ligne'] ?? false,
                 'remise_fidelite' => $programme !== null,
                 'synchronisee_le' => now(),
+                // Pharmacie : qui a prescrit, le numéro, pour qui.
+                'ordonnance' => array_filter($data['ordonnance'] ?? []) ?: null,
             ]);
 
             foreach ($lignes as $l) {
@@ -187,6 +227,10 @@ class VenteService
                     'prix_achat' => $l['prix_achat'] ?? null,
                     'taux_tva' => $l['taux_tva'],
                     'quantite' => $l['quantite'],
+                    'unite' => $l['unite'] ?? null,
+                    'contenance' => $l['contenance'] ?? 1,
+                    // Le lot qui périme le plus tôt part le premier.
+                    'lots' => $l['produit'] === null ? null : (app(Lots::class)->prelever($l['produit'], $l['base']) ?: null),
                     'total_ligne' => $l['total_ligne'],
                 ]);
 
@@ -196,7 +240,7 @@ class VenteService
                 }
 
                 $produit = $l['produit'];
-                $produit->stock -= $l['quantite'];
+                $produit->stock = Quantite::normaliser($produit->stock - $l['base']);
                 $produit->save();
 
                 MouvementStock::create([
@@ -204,7 +248,7 @@ class VenteService
                     'user_id' => $caissier->id,
                     'vente_id' => $vente->id,
                     'type' => TypeMouvementStock::Sortie,
-                    'quantite' => -$l['quantite'],
+                    'quantite' => -$l['base'],
                     'stock_apres' => $produit->stock,
                     'motif' => 'Vente n°'.$vente->numeroFormate(),
                 ]);
@@ -248,9 +292,9 @@ class VenteService
             }
 
             // - une dette déjà remboursée (le client aurait payé pour rien).
-            if ($vente->moyen_paiement === MoyenPaiement::CreditClient && $vente->client_id !== null) {
+            if ($vente->reste_du > 0 && $vente->client_id !== null) {
                 $client = Client::find($vente->client_id);
-                if ($client !== null && $client->soldeDu() < $vente->total) {
+                if ($client !== null && $client->soldeDu() < $vente->reste_du) {
                     throw ValidationException::withMessages(['vente' => [
                         'Le client a déjà remboursé une partie de ses achats à crédit : annuler cette vente fausserait sa dette.',
                     ]]);
@@ -269,15 +313,17 @@ class VenteService
                 if ($produit === null) {
                     continue;
                 }
-                $produit->stock += $ligne->quantite;
+                $base = Quantite::normaliser($ligne->quantite * ($ligne->contenance ?: 1));
+                $produit->stock = Quantite::normaliser($produit->stock + $base);
                 $produit->save();
+                app(Lots::class)->rendre($ligne->lots);
 
                 MouvementStock::create([
                     'produit_id' => $produit->id,
                     'user_id' => $auteur->id,
                     'vente_id' => $vente->id,
                     'type' => TypeMouvementStock::Entree,
-                    'quantite' => $ligne->quantite,
+                    'quantite' => $base,
                     'stock_apres' => $produit->stock,
                     'motif' => 'Annulation vente '.$vente->numeroFormate(),
                 ]);
@@ -285,5 +331,25 @@ class VenteService
 
             return $vente->load(['lignes', 'client', 'caissier']);
         });
+    }
+
+    /**
+     * Il reste à payer : on doit savoir qui doit, et le vendeur doit avoir le
+     * droit (Permissions::DROITS) et l'offre (Plan::VENTE_CREDIT) de faire
+     * crédit. Une vente rejouée après une coupure est refusée de même.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function autoriserCredit(array $data, User $caissier): void
+    {
+        if (empty($data['client_id'])) {
+            throw ValidationException::withMessages(['client_id' => ['Choisissez le client qui paiera plus tard.']]);
+        }
+        abort_unless($caissier->can('ventes.credit'), 403, 'Vous n’avez pas le droit de vendre à crédit.');
+        abort_unless(
+            app(AbonnementService::class)->permet(Boutique::find(app(TenantContext::class)->boutiqueId()), Plan::VENTE_CREDIT),
+            403,
+            'La vente à crédit n’est pas incluse dans votre offre.',
+        );
     }
 }

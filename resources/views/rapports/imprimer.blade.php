@@ -28,14 +28,17 @@
         · édité le {{ \App\Support\Fuseau::heure(now(), 'd/m/Y à H:i', $boutique->pays) }} · montants en {{ $boutique->devise }}
     </p>
     <div class="kpi">
-        <div>Chiffre d’affaires<b>{{ $m($r['ventes']['total']) }}</b></div>
+        <div>Ventes (chiffre d’affaires)<b>{{ $m($r['ventes']['total']) }}</b></div>
+        @isset($r['encaisse'])<div>Encaissé<b>{{ $m($r['encaisse']['total']) }}</b></div>@endisset
+        <div>Vendu à crédit<b>{{ $m($r['credit']['accorde']) }}</b></div>
+        <div>Reste à encaisser<b>{{ ($r['credit']['encore_du'] ?? 0) > 0 ? '−' : '' }}{{ $m($r['credit']['encore_du'] ?? 0) }}</b></div>
+        <div>Remboursements<b>{{ $m($r['credit']['rembourse']) }}</b></div>
         <div>Tickets<b>{{ $r['ventes']['nombre'] }}</b></div>
         <div>Panier moyen<b>{{ $m($r['ventes']['panier_moyen']) }}</b></div>
         <div>Marge brute<b>{{ $r['marge']['taux'] === null ? 'prix d’achat non renseignés' : $m($r['marge']['marge']).' ('.$r['marge']['taux'].' %)' }}</b>@if ($r['marge']['taux'] !== null && $r['marge']['couverture'] < 100)<small>sur {{ $r['marge']['couverture'] }} % des ventes</small>@endif</div>
         <div>Remises<b>{{ $m($r['ventes']['remises']) }}</b></div>
         <div>TVA collectée<b>{{ $m($r['ventes']['tva']) }}</b></div>
         <div>Annulées<b>{{ $r['annulees']['nombre'] }} · {{ $m($r['annulees']['total']) }}</b></div>
-        <div>Crédit accordé / remboursé<b>{{ $m($r['credit']['accorde']) }} / {{ $m($r['credit']['rembourse']) }}</b></div>
     </div>
     @foreach ([['Par moyen de paiement', $r['par_moyen'], 'libelle'], ['Par caissier', $r['par_caissier'], 'nom']] as [$titre, $lignes, $cle])
         <h2>{{ $titre }}</h2>
@@ -45,7 +48,7 @@
     @endforeach
     <h2>Meilleurs articles</h2>
     <table><tr><th>Article</th><th class="n">Quantité</th><th class="n">Total</th></tr>
-        @foreach ($r['top_produits'] as $l)<tr><td>{{ $l['nom'] }}</td><td class="n">{{ $l['quantite'] }}</td><td class="n">{{ $m($l['total']) }}</td></tr>@endforeach
+        @foreach ($r['top_produits'] as $l)<tr><td>{{ $l['nom'] }}</td><td class="n">{{ \App\Support\Quantite::formater($l['quantite'], $l['unite'] ?? null) }}</td><td class="n">{{ $m($l['total']) }}</td></tr>@endforeach
     </table>
     <h2>Jour par jour</h2>
     <table><tr><th>Date</th><th class="n">Ventes</th><th class="n">Total</th></tr>

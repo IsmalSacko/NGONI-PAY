@@ -8,6 +8,7 @@ use App\Enums\TypeMouvementStock;
 use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Models\User;
+use App\Support\Quantite;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,20 +19,26 @@ use Illuminate\Support\Facades\DB;
  */
 class StockService
 {
-    public function ajuster(Produit $produit, int $nouveauStock, User $auteur, ?string $motif = null): Produit
+    public function ajuster(Produit $produit, int|float|string $nouveauStock, User $auteur, ?string $motif = null): Produit
     {
         return DB::transaction(function () use ($produit, $nouveauStock, $auteur, $motif): Produit {
             // Relit sous verrou : une vente encaissée entre-temps a pu modifier
             // le stock, l'écart doit se calculer sur la valeur à jour.
             $courant = Produit::lockForUpdate()->findOrFail($produit->id);
-            $ecart = $nouveauStock - $courant->stock;
+            $nouveauStock = Quantite::normaliser($nouveauStock);
+            $ecart = Quantite::normaliser($nouveauStock - $courant->stock);
 
-            if ($ecart === 0) {
+            if ($ecart == 0) {
                 return $courant;
             }
 
             $courant->stock = $nouveauStock;
             $courant->save();
+            // Une perte (casse, inventaire) sort des lots, le plus proche de sa
+            // péremption d'abord ; un surplus reste sans lot.
+            if ($ecart < 0) {
+                app(Lots::class)->prelever($courant, -$ecart);
+            }
 
             MouvementStock::create([
                 'produit_id' => $courant->id,

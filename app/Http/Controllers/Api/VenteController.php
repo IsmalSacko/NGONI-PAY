@@ -6,34 +6,73 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
-use App\Models\Boutique;
-use App\Models\Plan;
 use App\Models\Vente;
-use App\Services\AbonnementService;
 use App\Services\VenteService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class VenteController extends Controller
 {
     public function __construct(private readonly VenteService $ventes) {}
 
+    /**
+     * Ventes, par pages de 30, les plus récentes d'abord. Facultatif : une
+     * période (`du`, `au`, jours d'affaires) et une recherche (n° de ticket ou
+     * de facture, client, article). Chaque page dit aussi, pour ses jours, le
+     * nombre et le total des ventes valides de toute la recherche — l'en-tête
+     * « Aujourd'hui · 12 ventes · 85 000 F » ne dépend pas de ce qui est chargé.
+     */
     public function index(Request $request): JsonResponse
     {
-        $query = Vente::with(['lignes', 'client', 'caissier'])->latest()->orderByDesc('numero');
+        $request->validate([
+            'du' => ['nullable', 'date_format:Y-m-d'],
+            'au' => ['nullable', 'date_format:Y-m-d'],
+            'recherche' => ['nullable', 'string', 'max:80'],
+        ]);
 
-        // Sans view_all (caissier) : ses propres ventes seulement.
-        if (! $request->user()->can('ventes.view_all')) {
-            $query->where('user_id', $request->user()->id);
-        }
+        $filtre = function ($query) use ($request) {
+            // Sans view_all (caissier) : ses propres ventes seulement.
+            if (! $request->user()->can('ventes.view_all')) {
+                $query->where('ventes.user_id', $request->user()->id);
+            }
+            if ($request->filled('depuis')) {
+                $query->where('ventes.created_at', '>=', $request->date('depuis'));
+            }
+            if ($request->filled('du')) {
+                $query->where('ventes.jour_affaire', '>=', $request->string('du'));
+            }
+            if ($request->filled('au')) {
+                $query->where('ventes.jour_affaire', '<=', $request->string('au'));
+            }
+            if ($request->filled('recherche')) {
+                $texte = trim((string) $request->string('recherche'));
+                $terme = '%'.$texte.'%';
+                $numero = ltrim($texte, '#0');
+                $query->where(function ($q) use ($terme, $numero): void {
+                    $q->where('ventes.numero_facture', 'like', $terme)
+                        ->when(ctype_digit($numero), fn ($q) => $q->orWhere('ventes.numero', (int) $numero))
+                        ->orWhereHas('client', fn ($c) => $c->where('nom', 'like', $terme)->orWhere('telephone', 'like', $terme))
+                        ->orWhereHas('lignes', fn ($l) => $l->where('nom_produit', 'like', $terme));
+                });
+            }
 
-        if ($request->filled('depuis')) {
-            $query->where('created_at', '>=', $request->date('depuis'));
-        }
+            return $query;
+        };
 
-        return response()->json($query->paginate(30));
+        $page = $filtre(Vente::with(['lignes', 'client', 'caissier']))->latest()->orderByDesc('numero')->paginate(30);
+
+        $jours = collect($page->items())->map(fn (Vente $v) => $v->jour_affaire?->toDateString())->filter()->unique()->values();
+        $resume = $jours->isEmpty() ? collect() : $filtre(Vente::query())->valides()
+            ->whereIn('ventes.jour_affaire', $jours->all())
+            ->selectRaw('ventes.jour_affaire as jour, COUNT(*) as nombre, SUM(ventes.total) as total')
+            ->groupBy('ventes.jour_affaire')->get()
+            ->map(fn ($r) => ['date' => substr((string) $r->jour, 0, 10), 'nombre' => (int) $r->nombre, 'total' => (int) $r->total])
+            ->values();
+
+        return response()->json([...$page->toArray(), 'jours' => $resume]);
     }
 
     public function show(Request $request, Vente $vente): JsonResponse
@@ -58,22 +97,27 @@ class VenteController extends Controller
             'lignes.*.libelle' => ['nullable', 'string', 'max:120', 'required_without:lignes.*.produit_id'],
             'lignes.*.prix_unitaire' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_with:lignes.*.libelle'],
             'lignes.*.taux_tva' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            // Au poids ou au demi : jusqu'à trois décimales (1,250 kg).
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001', 'max:1000000', 'decimal:0,3'],
+            // Pharmacie : le palier vendu (boîte, plaquette, comprimé).
+            'lignes.*.palier' => ['nullable', 'string', 'max:20'],
+            'ordonnance' => ['nullable', 'array'],
+            'ordonnance.prescripteur' => ['nullable', 'string', 'max:120'],
+            'ordonnance.numero' => ['nullable', 'string', 'max:60'],
+            'ordonnance.patient' => ['nullable', 'string', 'max:120'],
             'remise' => ['nullable', 'integer', 'min:0'],
             'moyen_paiement' => ['required', Rule::enum(MoyenPaiement::class)],
             'montant_recu' => ['nullable', 'integer', 'min:0'],
+            // Payé maintenant ; le reste est la dette du client. Absent : tout
+            // payé (ou rien, pour « crédit client »), comme les anciennes versions.
+            'montant_paye' => ['nullable', 'integer', 'min:0'],
             'vendue_hors_ligne' => ['nullable', 'boolean'],
             // Remise de fidélité demandée : le serveur la calcule lui-même.
             'remise_fidelite' => ['nullable', 'boolean'],
         ]);
 
         if (($data['remise_fidelite'] ?? false) && empty($data['client_id'])) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['client_id' => ['La remise de fidélité va à un client : choisissez-le.']]);
-        }
-
-        // À crédit : on doit savoir qui doit.
-        if (($data['moyen_paiement'] ?? null) === MoyenPaiement::CreditClient->value && empty($data['client_id'])) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['client_id' => ['Choisissez le client qui paiera plus tard.']]);
+            throw ValidationException::withMessages(['client_id' => ['La remise de fidélité va à un client : choisissez-le.']]);
         }
 
         // Ce que le vendeur n'a pas le droit de faire (Permissions::DROITS).
@@ -87,9 +131,6 @@ class VenteController extends Controller
         }
         $refus = match (true) {
             ($data['remise'] ?? 0) > 0 && ! ($data['remise_fidelite'] ?? false) && ! $user->can('ventes.remise') => 'Vous n’avez pas le droit de faire des remises.',
-            $data['moyen_paiement'] === MoyenPaiement::CreditClient->value && ! $user->can('ventes.credit') => 'Vous n’avez pas le droit de vendre à crédit.',
-            $data['moyen_paiement'] === MoyenPaiement::CreditClient->value
-                && ! app(AbonnementService::class)->permet(Boutique::find(app(TenantContext::class)->boutiqueId()), Plan::VENTE_CREDIT) => 'La vente à crédit n’est pas incluse dans votre offre.',
             collect($data['lignes'])->contains(fn ($l) => empty($l['produit_id'])) && ! $user->can('ventes.montant_libre') => 'Vous n’avez pas le droit de vendre au montant libre.',
             default => null,
         };

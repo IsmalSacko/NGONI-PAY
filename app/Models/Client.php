@@ -42,13 +42,14 @@ class Client extends Model
     public function scopeAvecSoldeDu($query)
     {
         return $query
-            ->withSum(['ventes as credit_total' => fn ($q) => $q->valides()->where('moyen_paiement', 'credit_client')], 'total')
+            // Ce qui reste dû sur chaque vente (paiement partiel ou crédit total).
+            ->withSum(['ventes as credit_total' => fn ($q) => $q->valides()], 'reste_du')
             ->withSum('reglements as reglements_total', 'montant');
     }
 
     public function soldeDu(): int
     {
-        $credit = (int) $this->ventes()->valides()->where('moyen_paiement', 'credit_client')->sum('total');
+        $credit = (int) $this->ventes()->valides()->sum('reste_du');
 
         return max(0, $credit - (int) $this->reglements()->sum('montant'));
     }

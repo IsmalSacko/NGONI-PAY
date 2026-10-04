@@ -29,6 +29,14 @@ class Boutique extends Model
     /** Adresse du logo, pour l'application et les tickets. */
     protected $appends = ['logo_url', 'logo_vignette_url'];
 
+    /** Activité choisie dans les réglages : la pharmacie adapte la caisse. */
+    public const ACTIVITES = ['commerce', 'pharmacie'];
+
+    public function estPharmacie(): bool
+    {
+        return $this->activite === 'pharmacie';
+    }
+
     protected function casts(): array
     {
         return [

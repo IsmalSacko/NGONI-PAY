@@ -66,8 +66,12 @@ class AchatController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
             'lignes' => ['required', 'array', 'min:1'],
             'lignes.*.produit_id' => ['required', 'uuid', Rule::exists('produits', 'id')->where('boutique_id', $boutique)],
-            'lignes.*.quantite' => ['required', 'integer', 'min:1'],
+            'lignes.*.quantite' => ['required', 'numeric', 'min:0.001', 'max:1000000', 'decimal:0,3'],
             'lignes.*.prix_achat' => ['required', 'integer', 'min:0', 'max:1000000000'],
+            // Pharmacie : reçu à la boîte, le lot et sa date de péremption.
+            'lignes.*.palier' => ['nullable', 'string', 'max:20'],
+            'lignes.*.numero_lot' => ['nullable', 'string', 'max:60'],
+            'lignes.*.peremption' => ['nullable', 'date_format:Y-m-d'],
             'montant_paye' => ['nullable', 'integer', 'min:0'],
             'moyen_paiement' => ['nullable', Rule::in(self::MOYENS)],
         ]);

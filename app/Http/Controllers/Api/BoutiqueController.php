@@ -15,6 +15,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Boutiques du compte : celles où il a un rôle, la création d'une nouvelle
@@ -80,6 +81,16 @@ class BoutiqueController extends Controller
         $data = $request->validate(['objectif_mensuel' => ['present', 'nullable', 'integer', 'min:1', 'max:100000000000']]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         $boutique->forceFill(['objectif_mensuel' => $data['objectif_mensuel']])->save();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    /** Activité de la boutique : « pharmacie » adapte la caisse (mots, détail, lots, ordonnance). */
+    public function activite(Request $request): JsonResponse
+    {
+        $data = $request->validate(['activite' => ['required', Rule::in(Boutique::ACTIVITES)]]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->forceFill(['activite' => $data['activite']])->save();
 
         return response()->json(['data' => $boutique->fresh()]);
     }

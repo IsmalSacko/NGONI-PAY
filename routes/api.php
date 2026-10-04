@@ -21,16 +21,17 @@ use App\Http\Controllers\Api\PublicationPlayController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\StatistiqueController;
+use App\Http\Controllers\Api\UniteController;
 use App\Http\Controllers\Api\VenteController;
 use App\Models\Boutique;
 use App\Services\BilanMensuel;
 use App\Services\CommandeFournisseur;
+use App\Services\ConditionsUtilisation;
 use App\Services\Parrainage;
 use App\Support\Tenancy\TenantContext;
 use App\Support\VersionApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use App\Services\ConditionsUtilisation;
 use Illuminate\Support\Facades\Route;
 
 Route::get('pays', [PaysController::class, 'index']);
@@ -94,7 +95,7 @@ Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('platefo
 // — des milliers de requêtes par minute et par téléphone.
 Route::post('deconnexion', [AuthController::class, 'logout']);
 
-Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group(function (): void {
     Route::get('moi', [AuthController::class, 'me']);
     Route::post('conditions/accepter', [AuthController::class, 'accepterConditions']);
     // Son propre compte, pour tout membre : profil et mot de passe (jamais le rôle).
@@ -115,6 +116,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
     Route::post('boutiques', [BoutiqueController::class, 'store']);
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware(['permission:boutique.update', 'fonctionnalite:objectif_mois']);
+    Route::put('boutique/activite', [BoutiqueController::class, 'activite'])->middleware('permission:boutique.update');
     Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware(['permission:boutique.update', 'fonctionnalite:fidelite']);
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
@@ -157,6 +159,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions'])->group(function (): 
     Route::delete('categories/{categorie}', [CategorieProduitController::class, 'destroy'])->middleware(['permission:categories.delete', 'abonnement']);
 
     Route::get('produits', [ProduitController::class, 'index'])->middleware('permission:produits.view');
+    // Unités créées par la boutique (« tas », « boule »…).
+    Route::get('unites', [UniteController::class, 'index'])->middleware('permission:produits.view');
+    Route::post('unites', [UniteController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
+    Route::put('unites/{unite}', [UniteController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
+    Route::delete('unites/{unite}', [UniteController::class, 'destroy'])->middleware(['permission:produits.update', 'abonnement']);
+    // Pharmacie : lots qui périment dans les 90 jours (ou déjà périmés).
+    Route::get('stocks/peremption', [ProduitController::class, 'peremption'])->middleware('permission:produits.view');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
     Route::get('stocks/a-commander', fn (CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
         ->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);

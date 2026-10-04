@@ -117,7 +117,7 @@ class RapportsTest extends TestCase
         $this->actingAs($this->admin);
         $this->dans();
 
-        $this->get('/rapports')->assertOk()->assertSee('Chiffre d’affaires', false)->assertSee('19 000');
+        $this->get('/rapports')->assertOk()->assertSee('Ventes (chiffre d’affaires)', false)->assertSee('19 000')->assertSee('Encaissé', false)->assertSee('Vendu à crédit', false)->assertSee('Reste à encaisser', false);
         $this->get('/rapports/imprimer?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertSee('Rapport d’activité', false);
 
         $ventes = $this->get('/exports/ventes?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->streamedContent();

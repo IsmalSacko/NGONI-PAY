@@ -2,33 +2,41 @@
 <div class="flex flex-col gap-5" wire:poll.visible.30s>
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
-            <h1 class="font-display font-extrabold text-2xl md:text-3xl">Équipe</h1>
-            <span class="text-[--color-muted] text-sm">Comptes ayant accès à la boutique.</span>
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Équipe</h1>
+            <span class="text-muted text-sm">Comptes ayant accès à la boutique.</span>
         </div>
         @if ($peutAjouter)
-            <button wire:click="nouveauCompte" class="h-12 px-5 rounded-xl bg-accent text-white font-bold">+ Nouveau membre</button>
+            <button wire:click="nouveauCompte" class="inline-flex items-center gap-2 h-12 px-5 rounded-xl bg-accent text-white font-bold shadow-carte">
+                <x-charte.icone nom="person_add" />Nouveau membre
+            </button>
         @endif
     </div>
 
-    <details class="bg-white border border-[--color-border] rounded-2xl px-5 py-3 text-sm">
-        <summary class="font-bold cursor-pointer">Qui peut faire quoi ?</summary>
-        <ul class="mt-2 flex flex-col gap-1 text-[--color-muted]">
-            <li><strong class="text-[--color-ink]">Admin</strong> : tout, y compris l’équipe, les réglages de la boutique et l’abonnement.</li>
-            <li><strong class="text-[--color-ink]">Gérant</strong> : caisse, catalogue, stocks, clients. Par défaut aussi le chiffre d’affaires, les achats et le back-office. Pas l’équipe ni l’abonnement.</li>
-            <li><strong class="text-[--color-ink]">Caissier</strong> : encaisser, ses propres ventes, ajouter un client.</li>
-            <li class="mt-1">Pour chaque gérant ou caissier, le bouton <strong class="text-[--color-ink]">Droits</strong> permet de cocher ce qu’il peut voir et faire en plus : chiffre d’affaires, articles et prix, annulations, achats, back-office.</li>
+    {{-- Même habit que l'écran Équipe de l'application. --}}
+    @php($parRole = $membres->groupBy(fn ($m) => $m->roles->first()?->name ?? 'caissier')->map->count())
+    <x-charte.carte-heros icone="badge" titre="Votre équipe" :valeur="$membres->count().' membre'.($membres->count() > 1 ? 's' : '')">
+        <span>{{ collect(['admin' => 'admin', 'gerant' => 'gérant', 'caissier' => 'caissier'])->filter(fn ($l, $r) => ($parRole[$r] ?? 0) > 0)->map(fn ($l, $r) => $parRole[$r].' '.$l.($parRole[$r] > 1 ? 's' : ''))->join(' · ') }}</span>
+    </x-charte.carte-heros>
+
+    <details class="bg-white rounded-[20px] shadow-carte px-5 py-3 text-sm">
+        <summary class="font-bold cursor-pointer text-accent inline-flex items-center gap-2"><x-charte.icone nom="help" :taille="20" />Qui peut faire quoi ?</summary>
+        <ul class="mt-2 flex flex-col gap-1 text-muted">
+            <li><strong class="text-ink">Admin</strong> : tout, y compris l’équipe, les réglages de la boutique et l’abonnement.</li>
+            <li><strong class="text-ink">Gérant</strong> : caisse, catalogue, stocks, clients. Par défaut aussi le chiffre d’affaires, les achats et le back-office. Pas l’équipe ni l’abonnement.</li>
+            <li><strong class="text-ink">Caissier</strong> : encaisser, ses propres ventes, ajouter un client.</li>
+            <li class="mt-1">Pour chaque gérant ou caissier, le bouton <strong class="text-ink">Droits</strong> permet de cocher ce qu’il peut voir et faire en plus : chiffre d’affaires, articles et prix, annulations, achats, back-office.</li>
         </ul>
     </details>
 
     @if ($info)
-        <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>
+        <p class="rounded-2xl bg-succes-doux text-succes-fonce px-4 py-3 text-sm font-bold">{{ $info }}</p>
     @endif
     @if ($motDePasseProvisoire)
-        <div class="rounded-xl border-2 border-accent bg-white px-4 py-3 text-sm flex flex-col gap-2">
+        <div class="rounded-2xl bg-jaune-doux shadow-carte px-4 py-3 text-sm flex flex-col gap-2">
             <span>Mot de passe provisoire, affiché une seule fois :</span>
             <code class="text-lg font-bold tracking-wider">{{ $motDePasseProvisoire }}</code>
             @if ($lienWhatsApp)
-                <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="self-start h-10 px-4 rounded-lg bg-whatsapp text-white font-bold inline-flex items-center">Envoyer par WhatsApp</a>
+                <a href="{{ $lienWhatsApp }}" target="_blank" rel="noopener" class="self-start h-10 px-4 rounded-xl bg-whatsapp text-white font-bold inline-flex items-center">Envoyer par WhatsApp</a>
             @endif
         </div>
     @endif
@@ -36,8 +44,8 @@
         <p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>
     @endif
 
-    <section class="bg-white border border-[--color-border] rounded-2xl overflow-hidden">
-        <div class="hidden md:grid grid-cols-[2fr_1.3fr_1fr_1fr_200px] gap-3 px-5 py-3 bg-fond-tableau border-b border-[--color-border] text-xs font-bold text-[--color-muted] uppercase">
+    <section class="bg-white rounded-[20px] shadow-carte overflow-hidden">
+        <div class="hidden md:grid grid-cols-[2fr_1.3fr_1fr_1fr_200px] gap-3 px-5 py-3 bg-paper/60 border-b border-separateur text-xs font-bold text-muted uppercase">
             <span>Nom</span><span>Téléphone</span><span>Rôle</span><span>Statut</span><span></span>
         </div>
         @foreach ($membres as $membre)
@@ -47,10 +55,10 @@
                 <span class="font-bold">
                     {{ $membre->name }}
                     @if ($membre->id === $proprietaireId)
-                        <span class="ml-1 text-xs font-bold text-[--color-muted]">(propriétaire)</span>
+                        <span class="ml-1 text-xs font-bold text-muted">(propriétaire)</span>
                     @endif
                     @if ($role !== 'admin')
-                        <span class="block text-xs font-normal text-[--color-muted]">
+                        <span class="block text-xs font-normal text-muted">
                             @php($siens = $droitsParMembre[$membre->id] ?? [])
                             {{ $siens === [] ? 'Aucun droit en plus' : collect($siens)->map(fn ($d) => $catalogueDroits[$d]['libelle'])->join(' · ') }}
                         </span>
@@ -59,7 +67,7 @@
                 <span><x-telephone :numero="$membre->phone" /></span>
                 <span>
                     @if ($modifiable)
-                        <select wire:change="changerRole('{{ $membre->id }}', $event.target.value)" class="h-9 px-2 rounded-lg border border-[--color-border-strong] bg-white">
+                        <select wire:change="changerRole('{{ $membre->id }}', $event.target.value)" class="h-9 px-2 rounded-xl bg-white border border-border-strong bg-white">
                             @foreach ($libelles as $code => $libelle)
                                 <option value="{{ $code }}" @selected($role === $code)>{{ $libelle }}</option>
                             @endforeach
@@ -72,7 +80,7 @@
                     @if ($membre->is_active)
                         <span class="text-xs font-bold rounded px-2 py-1 bg-accent-soft text-accent-dark">Actif</span>
                     @else
-                        <span class="text-xs font-bold rounded px-2 py-1 bg-puce text-[--color-muted]">Désactivé</span>
+                        <span class="text-xs font-bold rounded px-2 py-1 bg-puce text-muted">Désactivé</span>
                     @endif
                 </span>
                 @if ($modifiable)
@@ -81,8 +89,8 @@
                             <button wire:click="ouvrirDroits('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-accent text-accent text-xs font-bold">Droits</button>
                         @endif
                         <button wire:click="retirer('{{ $membre->id }}')" wire:confirm="Retirer {{ $membre->name }} de l’équipe de cette boutique ?"
-                                class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">Retirer</button>
-                        <button wire:click="basculerActivation('{{ $membre->id }}')" class="h-9 px-3 rounded-lg border border-[--color-border-strong] text-xs font-bold">
+                                class="h-9 px-3 rounded-xl bg-white border border-border-strong text-xs font-bold">Retirer</button>
+                        <button wire:click="basculerActivation('{{ $membre->id }}')" class="h-9 px-3 rounded-xl bg-white border border-border-strong text-xs font-bold">
                             {{ $membre->is_active ? 'Désactiver' : 'Réactiver' }}
                         </button>
                     </div>
@@ -95,27 +103,27 @@
 
     @if ($modaleOuverte)
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 p-0 md:p-4" wire:click.self="$set('modaleOuverte', false)">
-            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-sm flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-                <h2 class="font-display font-extrabold text-xl">Nouveau membre</h2>
+            <div class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-sm flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+                <h2 class="font-display font-extrabold text-xl text-accent">Nouveau membre</h2>
                 <form wire:submit="enregistrer" class="flex flex-col gap-3">
                     <div>
                         <label class="block text-sm font-semibold mb-1">Nom</label>
-                        <input wire:model="name" type="text" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        <input wire:model="name" type="text" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
                         @error('name') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-1">Téléphone</label>
-                        <input wire:model="telephone" type="tel" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        <input wire:model="telephone" type="tel" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
                         @error('telephone') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-1">Mot de passe <span class="font-normal text-[--color-muted]">(facultatif : laissé vide, un mot de passe provisoire est créé)</span></label>
-                        <input wire:model="password" type="password" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
+                        <label class="block text-sm font-semibold mb-1">Mot de passe <span class="font-normal text-muted">(facultatif : laissé vide, un mot de passe provisoire est créé)</span></label>
+                        <input wire:model="password" type="password" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
                         @error('password') <p class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-1">Rôle</label>
-                        <select wire:model.live="role" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong] bg-white">
+                        <select wire:model.live="role" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong bg-white">
                             <option value="caissier">Caissier</option>
                             <option value="gerant">Gérant</option>
                             <option value="admin">Admin</option>
@@ -129,14 +137,14 @@
                             @foreach ($catalogueDroits as $cle => $d)
                                 <label class="flex items-start gap-2 text-sm">
                                     <input type="checkbox" wire:model="droits" value="{{ $cle }}" class="mt-1">
-                                    <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-[--color-muted]">{{ $d['explication'] }}</span></span>
+                                    <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-muted">{{ $d['explication'] }}</span></span>
                                 </label>
                             @endforeach
                         </fieldset>
                     @endif
                     <div class="flex gap-3 mt-2">
-                        <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
-                        <button type="submit" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Ajouter</button>
+                        <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-xl bg-white border border-border-strong font-bold">Annuler</button>
+                        <button type="submit" class="flex-1 h-11 rounded-xl bg-accent text-white font-bold">Ajouter</button>
                     </div>
                 </form>
             </div>
@@ -146,22 +154,22 @@
     {{-- Droits d'un membre : ce qu'il peut voir et faire en plus de son rôle. --}}
     @if ($membreDroits)
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 p-0 md:p-4" wire:click.self="$set('droitsDe', null)">
-            <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-md flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
                 <div>
-                    <h2 class="font-display font-extrabold text-xl">Droits de {{ $membreDroits->name }}</h2>
-                    <p class="text-sm text-[--color-muted]">En plus de son rôle de {{ $libelles[$membreDroits->roles->first()?->name] ?? '' }}. Décochez ce qu’il ne doit ni voir ni faire.</p>
+                    <h2 class="font-display font-extrabold text-xl text-accent">Droits de {{ $membreDroits->name }}</h2>
+                    <p class="text-sm text-muted">En plus de son rôle de {{ $libelles[$membreDroits->roles->first()?->name] ?? '' }}. Décochez ce qu’il ne doit ni voir ni faire.</p>
                 </div>
                 <div class="flex flex-col gap-3">
                     @foreach ($catalogueDroits as $cle => $d)
                         <label class="flex items-start gap-3 text-sm rounded-xl border border-[--color-border] px-3 py-2">
                             <input type="checkbox" wire:model="droitsMembre" value="{{ $cle }}" class="mt-1">
-                            <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-[--color-muted]">{{ $d['explication'] }}</span></span>
+                            <span><span class="font-semibold">{{ $d['libelle'] }}</span><span class="block text-xs text-muted">{{ $d['explication'] }}</span></span>
                         </label>
                     @endforeach
                 </div>
                 <div class="flex gap-3">
-                    <button type="button" wire:click="$set('droitsDe', null)" class="flex-1 h-11 rounded-lg border border-[--color-border-strong] font-bold">Annuler</button>
-                    <button type="button" wire:click="enregistrerDroits" class="flex-1 h-11 rounded-lg bg-accent text-white font-bold">Enregistrer</button>
+                    <button type="button" wire:click="$set('droitsDe', null)" class="flex-1 h-11 rounded-xl bg-white border border-border-strong font-bold">Annuler</button>
+                    <button type="button" wire:click="enregistrerDroits" class="flex-1 h-11 rounded-xl bg-accent text-white font-bold">Enregistrer</button>
                 </div>
             </div>
         </div>

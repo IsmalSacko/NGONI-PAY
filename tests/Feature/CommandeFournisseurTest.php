@@ -75,7 +75,7 @@ class CommandeFournisseurTest extends TestCase
         $this->assertCount(2, $groupes);
         $this->assertSame('Grossiste Diallo', $groupes[0]['fournisseur']['nom']);
         $this->assertSame('+22370000002', $groupes[0]['fournisseur']['telephone']);
-        $this->assertSame([['produit_id' => $riz->id, 'nom' => 'Riz 25 kg', 'stock' => 4, 'seuil' => 5, 'quantite' => 14]], $groupes[0]['articles'], '18 vendus en un mois − 4 en stock');
+        $this->assertSame([['produit_id' => $riz->id, 'nom' => 'Riz 25 kg', 'stock' => 4, 'unite' => null, 'seuil' => 5, 'quantite' => 14, 'commande' => null]], $groupes[0]['articles'], '18 vendus en un mois − 4 en stock');
 
         $this->assertNull($groupes[1]['fournisseur'], 'jamais acheté : sans fournisseur, en dernier');
         $this->assertSame(6, $groupes[1]['articles'][0]['quantite'], 'jamais vendu : deux fois le seuil');

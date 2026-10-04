@@ -176,4 +176,86 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(4, $this->riz->fresh()->stock);
         $this->assertSame(0, Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
     }
+
+    public function test_paiement_partiel_le_reste_devient_la_dette_du_client(): void
+    {
+        $this->dans();
+        $fatou = Client::create(['nom' => 'Fatou']);
+        // Le tiroir du caissier : 5 000 F de fond.
+        $this->api($this->caissier)->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
+
+        // 2 riz = 10 000 F ; il paie 4 000 F en espèces maintenant, il en doit 6 000.
+        $sansClient = $this->vendre($this->caissier, ['montant_paye' => 4000, 'montant_recu' => 5000]);
+        $sansClient->assertUnprocessable()->assertJsonValidationErrors('client_id');
+
+        $vente = $this->vendre($this->caissier, ['montant_paye' => 4000, 'montant_recu' => 5000, 'client_id' => $fatou->id])
+            ->assertCreated()->assertJsonPath('montant_paye', 4000)->assertJsonPath('reste_du', 6000)->assertJsonPath('monnaie_rendue', 1000);
+
+        $this->api($this->caissier)->getJson("/api/clients/{$fatou->id}/credit")
+            ->assertJsonPath('solde_du', 6000)
+            ->assertJsonPath('achats.0.paye', 4000)->assertJsonPath('achats.0.reste', 6000);
+
+        // Le tiroir n'attend que ce qui a été payé : 5 000 + 4 000.
+        $this->api($this->caissier)->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 9000);
+
+        // Il rembourse 2 500 F en espèces : sa dette baisse, le tiroir les attend,
+        // et il reçoit un reçu : dette avant, payé, reste.
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 2500, 'moyen_paiement' => 'especes'])
+            ->assertCreated()->assertJsonPath('solde_du', 3500)
+            ->assertJsonPath('recu.numero', 1)
+            ->assertJsonPath('recu.solde_avant', 6000)
+            ->assertJsonPath('recu.montant', 2500)
+            ->assertJsonPath('recu.solde_apres', 3500)
+            ->assertJsonPath('recu.client', 'Fatou')
+            ->assertJsonPath('recu.par', 'Caissier');
+        $this->api($this->caissier)->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 11500);
+
+        // Les chiffres : 10 000 de ventes, 4 000 + 2 500 reçus, 6 000 accordés à crédit.
+        $rapport = $this->api($this->admin)->getJson('/api/rapports')->assertOk();
+        $rapport->assertJsonPath('ventes.total', 10000)
+            ->assertJsonPath('encaisse.ventes', 4000)
+            ->assertJsonPath('encaisse.remboursements', 2500)
+            ->assertJsonPath('encaisse.total', 6500)
+            ->assertJsonPath('credit.accorde', 6000)
+            // Vendu à crédit reste 6 000 ; il reste à encaisser 6 000 − 2 500.
+            ->assertJsonPath('credit.encore_du', 3500);
+        $moyens = collect($rapport->json('par_moyen'))->pluck('total', 'moyen');
+        $this->assertSame(['credit_client' => 6000, 'especes' => 4000], $moyens->sortKeys()->all(), 'la ligne crédit porte le reste dû');
+
+        $this->api($this->admin)->getJson('/api/dashboard')
+            ->assertJsonPath('ventes_jour.total', 10000)
+            // Encaissé du jour, comme le rapport : payé des ventes + remboursements.
+            ->assertJsonPath('ventes_jour.encaisse', 6500)
+            ->assertJsonPath('ventes_jour.a_recevoir', 3500);
+        $this->assertNotNull($vente->json('id'));
+
+        // Les débiteurs (raccourci du Pilotage) : elle y est tant qu'elle doit,
+        // plus du tout une fois sa dette remboursée.
+        $this->api($this->caissier)->getJson('/api/clients?debiteurs=1')->assertJsonCount(1, 'data')->assertJsonPath('data.0.solde_du', 3500);
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 3500, 'moyen_paiement' => 'wave'])
+            ->assertCreated()->assertJsonPath('recu.numero', 2)->assertJsonPath('recu.solde_apres', 0);
+        // Les reçus restent consultables (et réimprimables) depuis la fiche du client.
+        $this->api($this->caissier)->getJson("/api/clients/{$fatou->id}/credit")->assertJsonPath('reglements.0.numero', 2)->assertJsonPath('reglements.1.solde_avant', 6000);
+        $this->api($this->caissier)->getJson('/api/clients?debiteurs=1')->assertJsonCount(0, 'data');
+    }
+
+    public function test_rien_paye_maintenant_et_regles_du_credit(): void
+    {
+        $this->dans();
+        $fatou = Client::create(['nom' => 'Fatou']);
+
+        // Payé 0 F avec un vrai moyen : tout en dette.
+        $this->vendre($this->caissier, ['montant_paye' => 0, 'client_id' => $fatou->id])
+            ->assertCreated()->assertJsonPath('montant_paye', 0)->assertJsonPath('reste_du', 10000);
+        // Plus que le total : ramené au total, rien n'est dû.
+        $this->vendre($this->caissier, ['montant_paye' => 99999])->assertCreated()->assertJsonPath('reste_du', 0);
+        // Reçu en espèces inférieur au payé annoncé.
+        $this->vendre($this->caissier, ['montant_paye' => 4000, 'montant_recu' => 3000, 'client_id' => $fatou->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('montant_recu');
+
+        // Sans le droit de faire crédit, un paiement partiel est refusé.
+        $this->caissier->revokePermissionTo('ventes.credit');
+        $this->vendre($this->caissier, ['montant_paye' => 4000, 'client_id' => $fatou->id])
+            ->assertForbidden()->assertJsonPath('message', 'Vous n’avez pas le droit de vendre à crédit.');
+    }
 }

@@ -71,8 +71,8 @@ class ExportController extends Controller
                     $ecrire([
                         $p->nom, $p->format, $p->categorie?->nom, $p->code_barre, $p->stock, $p->seuil_alerte,
                         $p->prix_achat === null ? '' : $this->nombre($p->prix_achat, $devise), $this->nombre($p->prix_vente, $devise),
-                        $p->prix_achat === null ? '' : $this->nombre($p->prix_achat * $p->stock, $devise),
-                        $this->nombre($p->prix_vente * $p->stock, $devise), $devise,
+                        $p->prix_achat === null ? '' : $this->nombre((int) round($p->prix_achat * $p->stock), $devise),
+                        $this->nombre((int) round($p->prix_vente * $p->stock), $devise), $devise,
                     ]);
                 }
             });
