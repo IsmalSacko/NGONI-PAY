@@ -130,6 +130,10 @@
                                 class="h-10 px-4 rounded-xl bg-accent text-white font-bold text-sm inline-flex items-center gap-1.5 shadow-sm hover:bg-accent-dark">
                             <x-plateforme.picto nom="ok" class="w-4 h-4" />Approuver
                         </button>
+                        <button wire:click="approuver({{ $demande->id }}, true)" wire:confirm="Le paiement d’un accès à vie a bien été reçu ? Le plan s’active immédiatement, sans échéance."
+                                class="h-10 px-4 rounded-xl border border-accent text-accent font-bold text-sm inline-flex items-center gap-1.5 hover:bg-accent/5">
+                            Sans échéance
+                        </button>
                         <button wire:click="demanderRefus({{ $demande->id }})"
                                 class="h-10 px-4 rounded-xl font-bold text-sm text-danger-fg hover:bg-danger-bg {{ $refusEnCours === $demande->id ? 'bg-danger-bg' : '' }}">Refuser</button>
                     </div>

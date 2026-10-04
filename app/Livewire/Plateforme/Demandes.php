@@ -8,6 +8,7 @@ use App\Models\DemandeAbonnement;
 use App\Services\AbonnementService;
 use App\Services\RechercheDemandes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -48,14 +49,15 @@ class Demandes extends Component
         $this->resetPage();
     }
 
-    public function approuver(int $id, AbonnementService $service): void
+    /** [$sansEcheance] : le commerçant a payé un accès à vie. */
+    public function approuver(int $id, AbonnementService $service, bool $sansEcheance = false): void
     {
         $this->reset(['info', 'alerte']);
         $demande = DemandeAbonnement::with('proprietaire')->findOrFail($id);
 
         try {
-            $abonnement = $service->approuver($demande, Auth::user());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+            $abonnement = $service->approuver($demande, Auth::user(), sansEcheance: $sansEcheance);
+        } catch (ValidationException $e) {
             $this->alerte = collect($e->errors())->flatten()->first();
 
             return;
@@ -80,7 +82,7 @@ class Demandes extends Component
 
         try {
             $service->refuser($demande, Auth::user(), $this->motif);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->alerte = collect($e->errors())->flatten()->first();
 
             return;

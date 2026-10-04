@@ -217,18 +217,21 @@ class AbonnementService
         );
     }
 
-    /** L'exploitant a constaté le paiement : le plan s'active pour la durée payée. */
-    public function approuver(DemandeAbonnement $demande, User $exploitant, ?string $note = null): Abonnement
+    /**
+     * L'exploitant a constaté le paiement : le plan s'active pour la durée
+     * payée, ou sans échéance quand le commerçant a payé un accès à vie.
+     */
+    public function approuver(DemandeAbonnement $demande, User $exploitant, ?string $note = null, bool $sansEcheance = false): Abonnement
     {
         $this->exigerEnAttente($demande);
 
-        $abonnement = DB::transaction(function () use ($demande, $exploitant, $note): Abonnement {
+        $abonnement = DB::transaction(function () use ($demande, $exploitant, $note, $sansEcheance): Abonnement {
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $demande->user_id],
                 [
                     'plan' => $demande->plan,
                     'debut' => now()->toDateString(),
-                    'fin' => $this->finProjetee($demande->user_id, $demande->plan, $demande->mois)?->toDateString(),
+                    'fin' => $sansEcheance ? null : $this->finProjetee($demande->user_id, $demande->plan, $demande->mois)?->toDateString(),
                     'est_actif' => true,
                     'est_manuel' => false,
                     'accorde_par' => null,

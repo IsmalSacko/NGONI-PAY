@@ -112,6 +112,21 @@ class ConsolePlateformeTest extends TestCase
         $this->assertSame(StatutDemande::Refusee, $autre->fresh()->statut);
     }
 
+    public function test_une_demande_payee_a_vie_s_approuve_sans_echeance(): void
+    {
+        $demande = app(AbonnementService::class)->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Annuel);
+
+        Livewire::actingAs($this->exploitant)->test(Demandes::class)
+            ->assertSee('Sans échéance')
+            ->call('approuver', $demande->id, true)
+            ->assertSee('sans échéance');
+
+        $abonnement = $this->awa->abonnement()->first();
+        $this->assertSame('pro', $abonnement->plan);
+        $this->assertNull($abonnement->fin);
+        $this->assertTrue($abonnement->estEnCours());
+    }
+
     public function test_les_demandes_se_rangent_par_onglet_et_se_retrouvent_par_recherche(): void
     {
         $service = app(AbonnementService::class);
