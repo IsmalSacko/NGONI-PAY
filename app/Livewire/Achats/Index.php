@@ -136,6 +136,9 @@ class Index extends Component
     public function creerFournisseur(): void
     {
         Auth::user()->can('achats.create') || abort(403);
+        if (! $this->abonnementActif()) {
+            return;
+        }
         $this->validate(['nomFournisseur' => ['required', 'string', 'max:255'], 'telFournisseur' => ['nullable', 'string', 'max:30']], [], ['nomFournisseur' => 'nom']);
         $f = Fournisseur::create(['nom' => $this->nomFournisseur, 'telephone' => $this->telFournisseur ?: null]);
         $this->reset(['nomFournisseur', 'telFournisseur', 'fournisseurOuvert']);
@@ -155,6 +158,9 @@ class Index extends Component
     public function enregistrerFournisseur(Fournisseurs $fournisseurs): void
     {
         Auth::user()->can('achats.create') || abort(403);
+        if (! $this->abonnementActif()) {
+            return;
+        }
         $this->resetValidation();
         try {
             $fournisseurs->modifier(Fournisseur::findOrFail($this->fournisseurEdite), ['nom' => $this->nomEdite, 'telephone' => $this->telEdite ?: null]);
@@ -171,6 +177,9 @@ class Index extends Component
     public function supprimerFournisseur(string $id, Fournisseurs $fournisseurs): void
     {
         Auth::user()->can('achats.create') || abort(403);
+        if (! $this->abonnementActif()) {
+            return;
+        }
         $this->info = null;
         try {
             $fournisseurs->retirer(Fournisseur::findOrFail($id));
@@ -195,6 +204,9 @@ class Index extends Component
     public function payer(AchatService $achats): void
     {
         Auth::user()->can('achats.create') || abort(403);
+        if (! $this->abonnementActif()) {
+            return;
+        }
         $this->resetValidation();
         try {
             $achats->payer(Fournisseur::findOrFail($this->paiementPour), Auth::user(), (int) (Montant::parse($this->paiementMontant) ?? 0), $this->moyen);

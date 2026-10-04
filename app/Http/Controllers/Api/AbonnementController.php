@@ -68,6 +68,15 @@ class AbonnementController extends Controller
         $abonnement = $this->abonnements->pourBoutique($boutique);
         $plan = $this->abonnements->planDe($abonnement);
 
+        // Abonnement terminé ou révoqué : l'application ne doit plus présenter
+        // les fonctions du plan comme incluses (le serveur les refuse déjà).
+        // Seul ce qui reste consultable après l'échéance demeure : le
+        // back-office et l'historique des achats.
+        $fonctions = $plan?->fonctionnalitesIncluses() ?? [];
+        if (! ($abonnement?->estEnCours() ?? false)) {
+            $fonctions = array_values(array_intersect($fonctions, [Plan::BACKOFFICE_WEB, Plan::ACHATS_FOURNISSEURS]));
+        }
+
         $enAttente = $boutique->proprietaire_id === null ? null
             : DemandeAbonnement::where('user_id', $boutique->proprietaire_id)->enAttente()->latest('id')->first();
 
@@ -81,7 +90,7 @@ class AbonnementController extends Controller
                 'fin' => $abonnement?->fin?->toDateString(),
                 'max_boutiques' => $plan?->max_boutiques,
                 'max_membres' => $plan?->max_membres,
-                'fonctionnalites' => $plan?->fonctionnalitesIncluses() ?? [],
+                'fonctionnalites' => $fonctions,
                 'est_proprietaire' => $boutique->proprietaire_id === $request->user()->id,
                 'peut_demander' => $request->user()->can('abonnement.manage'),
                 'demande_en_attente' => $enAttente === null ? null : $this->demandeJson($enAttente),

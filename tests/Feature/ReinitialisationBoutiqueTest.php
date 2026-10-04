@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\RestaurationBoutique;
 use App\Services\VenteService;
@@ -382,6 +383,16 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(1, $this->compter('ventes', $this->boutiqueIbrahim));
         // La restauration reste à l'exploitant.
         $this->withToken($jeton)->getJson("/api/plateforme/comptes/{$this->awa->id}/reinitialisation")->assertForbidden();
+    }
+
+    public function test_essai_termine_la_boutique_ne_se_reinitialise_plus(): void
+    {
+        app(AbonnementService::class)->revoquer($this->awa);
+        $jeton = $this->awa->createToken('app')->plainTextToken;
+
+        $this->withToken($jeton)->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER'])
+            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
+        $this->assertSame(1, $this->compter('ventes', $this->boutiqueAwa));
     }
 
     public function test_un_admin_qui_n_est_pas_proprietaire_ne_peut_pas(): void

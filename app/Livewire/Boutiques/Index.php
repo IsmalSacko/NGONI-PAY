@@ -211,6 +211,12 @@ class Index extends Component
     {
         $b = Boutique::find($boutiqueId);
         ($b !== null && $boutiqueId === $this->boutiqueActiveId() && ReinitialisationBoutique::autorise(Auth::user(), $b)) || abort(403);
+
+        // Abonnement terminé : la boutique est en lecture seule, elle ne
+        // s'efface pas non plus.
+        if (! $this->abonnementActif()) {
+            throw ValidationException::withMessages(['confirmation' => ['Votre essai ou abonnement est terminé : abonnez-vous pour réinitialiser la boutique.']]);
+        }
     }
 
     protected function apresReinitialisation(string $boutique): void

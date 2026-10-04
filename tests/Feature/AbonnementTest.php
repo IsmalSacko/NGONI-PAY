@@ -14,6 +14,7 @@ use App\Models\Abonnement;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
 use App\Models\NotificationApp;
+use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
@@ -339,10 +340,24 @@ class AbonnementTest extends TestCase
         $this->get('/tableau-de-bord')->assertOk()->assertSee('Essai gratuit terminé');
     }
 
+    public function test_un_abonnement_revoque_ne_presente_plus_les_fonctions_du_plan(): void
+    {
+        $this->awa->abonnement()->update(['plan' => 'pro', 'fin' => null]);
+        $this->api()->getJson('/api/abonnement')->assertJsonFragment(['vente_gros']);
+
+        app(AbonnementService::class)->revoquer($this->awa);
+
+        // Les cadenas reviennent dans l'application ; le back-office et les
+        // achats restent consultables.
+        $this->api()->getJson('/api/abonnement')
+            ->assertJsonPath('data.est_en_cours', false)
+            ->assertJsonPath('data.fonctionnalites', ['backoffice_web', 'achats_fournisseurs']);
+    }
+
     public function test_les_seances_de_caisse_sont_reservees_au_pro(): void
     {
         // Essai : tout est inclus.
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', array_keys(\App\Models\Plan::FONCTIONNALITES));
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', array_keys(Plan::FONCTIONNALITES));
         $session = $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
 
         // Passé en Basic : plus de nouvelle séance, mais la vente passe sans,
