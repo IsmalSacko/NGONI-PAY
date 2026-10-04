@@ -159,7 +159,7 @@ class ConsoleMobileTest extends TestCase
             ->assertJsonPath('titre', 'Nouvelle version de l’application');
         $this->console()->getJson('/api/plateforme/annonces/modele/campagne')->assertOk()->assertJsonPath('quand', 'programmer');
         // Message libre : le lien mène par défaut au back-office des boutiques.
-        $this->console()->getJson('/api/plateforme/annonces/modele/message')->assertOk()->assertJsonPath('lien', route('tableau-de-bord'));
+        $this->console()->getJson('/api/plateforme/annonces/modele/message')->assertOk()->assertJsonPath('lien', url('/app'));
         $this->console()->getJson('/api/plateforme/annonces/modele/mise_a_jour')->assertOk()->assertJsonPath('lien', config('mobile.store_url'));
     }
 

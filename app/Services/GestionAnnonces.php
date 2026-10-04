@@ -44,7 +44,7 @@ class GestionAnnonces
                 'quand' => 'maintenant',
             ],
             'campagne' => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => '', 'quand' => 'programmer'],
-            default => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => route('tableau-de-bord'), 'quand' => 'maintenant'],
+            default => ['type' => $type, 'titre' => '', 'message' => '', 'version' => '', 'lien' => url('/app'), 'quand' => 'maintenant'],
         };
     }
 
