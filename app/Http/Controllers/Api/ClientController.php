@@ -75,6 +75,8 @@ class ClientController extends Controller
             'telephone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
+            'revendeur' => ['nullable', 'boolean'],
         ]);
 
         return response()->json(Client::create($data), 201);
@@ -87,6 +89,8 @@ class ClientController extends Controller
             'telephone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
+            'revendeur' => ['nullable', 'boolean'],
         ]);
 
         $client->update($data);

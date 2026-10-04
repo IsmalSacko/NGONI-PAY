@@ -79,9 +79,9 @@
                     @endif
                     <div class="flex-1 min-w-0 flex flex-col">
                         <span class="font-bold text-ink truncate">{{ $produit->nom }}@if ($produit->format) <span class="font-normal text-muted">· {{ $produit->format }}</span>@endif</span>
-                        <span class="text-xs text-muted truncate">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}@if ($produit->unite) / {{ \App\Support\Quantite::symbole($produit->unite) }}@endif · seuil {{ \App\Support\Quantite::formaterStock($produit->seuil_alerte, $produit->unite, $produit->paliers) }}@if ($produit->categorie) · {{ $produit->categorie->nom }}@endif</span>
+                        <span class="text-xs text-muted truncate">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}@if ($produit->unite) / {{ \App\Support\Quantite::symbole($produit->unite) }}@endif · seuil {{ \App\Support\Quantite::formaterStockCourt($produit->seuil_alerte, $produit->unite, $produit->paliers) }}@if (! empty($produit->paliers) && $produit->stock > 0) · {{ \App\Support\Quantite::formaterStock($produit->stock, $produit->unite, $produit->paliers) }}@endif@if ($produit->categorie) · {{ $produit->categorie->nom }}@endif</span>
                     </div>
-                    @php($stockLisible = \App\Support\Quantite::formaterStock($produit->stock, $produit->unite, $produit->paliers))
+                    @php($stockLisible = \App\Support\Quantite::formaterStockCourt($produit->stock, $produit->unite, $produit->paliers))
                     @if ($produit->estEnRupture())
                         <x-charte.puce ton="danger" icone="remove_shopping_cart">Rupture</x-charte.puce>
                     @elseif ($produit->stockFaible())

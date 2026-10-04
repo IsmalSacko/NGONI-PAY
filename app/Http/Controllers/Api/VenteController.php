@@ -6,8 +6,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\ExigeAppPourLesFractions;
 use App\Models\Vente;
 use App\Services\VenteService;
+use App\Support\Presence\Appareil;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -100,7 +102,9 @@ class VenteController extends Controller
             // Au poids ou au demi : jusqu'à trois décimales (1,250 kg).
             'lignes.*.quantite' => ['required', 'numeric', 'min:0.001', 'max:1000000', 'decimal:0,3'],
             // Pharmacie : le palier vendu (boîte, plaquette, comprimé).
-            'lignes.*.palier' => ['nullable', 'string', 'max:20'],
+            'lignes.*.palier' => ['nullable', 'string', 'max:40'],
+            // Vente en gros : « gros » pour tout le panier (droit de remise).
+            'tarif' => ['nullable', 'in:detail,gros'],
             'ordonnance' => ['nullable', 'array'],
             'ordonnance.prescripteur' => ['nullable', 'string', 'max:120'],
             'ordonnance.numero' => ['nullable', 'string', 'max:60'],
@@ -135,6 +139,13 @@ class VenteController extends Controller
             default => null,
         };
         abort_if($refus !== null, 403, $refus);
+
+        // Une application d'avant la vente en gros a affiché — et encaissé — le
+        // prix de détail : sa vente le garde, même rejouée plus tard.
+        $version = Appareil::depuisRequete($request)->version;
+        if ($version !== null && version_compare(explode('+', $version)[0], ExigeAppPourLesFractions::VERSION_GROS, '<')) {
+            $data['sans_prix_de_gros'] = true;
+        }
 
         $vente = $this->ventes->encaisser($data, $user);
 

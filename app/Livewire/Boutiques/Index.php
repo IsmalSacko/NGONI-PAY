@@ -61,6 +61,27 @@ class Index extends Component
         session()->flash('info', $activite === 'pharmacie' ? 'Mode pharmacie activé : la caisse parle le langage de l’officine.' : 'Mode commerce : la caisse reprend ses réglages habituels.');
     }
 
+    /** Vos ventes : au détail, au détail et en gros (offre Pro), en gros uniquement. */
+    public function choisirModeVente(string $mode): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        in_array($mode, Boutique::MODES_VENTE, true) || abort(422);
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
+        if ($mode === 'detail_gros' && ! app(AbonnementService::class)->permet($b, Plan::VENTE_GROS)) {
+            session()->flash('info', 'Vente en gros : fonction de l’offre Pro.');
+
+            return;
+        }
+        $b->forceFill(['mode_vente' => $mode, 'vente_commence_en_gros' => $mode === 'detail_gros' && $b->vente_commence_en_gros])->save();
+    }
+
+    public function basculerCommenceEnGros(): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
+        $b->forceFill(['vente_commence_en_gros' => $b->venteEnGros() && ! $b->vente_commence_en_gros])->save();
+    }
+
     public function updatedFideliteActive(): void
     {
         $this->enregistrerFidelite();

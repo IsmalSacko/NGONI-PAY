@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * elle appartient à une {@see Vente}, déjà scopée par boutique, et n'a pas
  * besoin d'un second filtre tenant.
  */
-#[Fillable(['produit_id', 'nom_produit', 'prix_unitaire', 'prix_achat', 'taux_tva', 'quantite', 'unite', 'contenance', 'lots', 'total_ligne'])]
+#[Fillable(['produit_id', 'nom_produit', 'prix_unitaire', 'prix_gros', 'prix_detail', 'prix_achat', 'taux_tva', 'quantite', 'unite', 'contenance', 'lots', 'total_ligne'])]
 class LigneVente extends Model
 {
     /** @use HasFactory<LigneVenteFactory> */
@@ -33,6 +33,7 @@ class LigneVente extends Model
             'quantite' => QuantiteCast::class,
             'contenance' => 'integer',
             'lots' => 'array',
+            'prix_gros' => 'boolean',
         ];
     }
 

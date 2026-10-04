@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['nom', 'telephone', 'email', 'notes', 'points_fidelite'])]
+#[Fillable(['nom', 'telephone', 'email', 'notes', 'points_fidelite', 'revendeur'])]
 class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */
@@ -39,6 +39,11 @@ class Client extends Model
      * Ce que le client doit : ventes validées payées « à crédit », moins ses
      * règlements. Une vente à crédit annulée n'est plus due.
      */
+    protected function casts(): array
+    {
+        return ['revendeur' => 'boolean'];
+    }
+
     public function scopeAvecSoldeDu($query)
     {
         return $query

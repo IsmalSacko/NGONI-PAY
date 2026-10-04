@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
     'tva', 'total', 'montant_paye', 'reste_du', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
-    'jour_affaire', 'numero_jour', 'remise_fidelite', 'numero_facture', 'ordonnance',
+    'jour_affaire', 'numero_jour', 'remise_fidelite', 'numero_facture', 'ordonnance', 'tarif',
 ])]
 class Vente extends Model
 {

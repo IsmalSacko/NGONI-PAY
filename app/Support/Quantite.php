@@ -164,17 +164,20 @@ final class Quantite
     }
 
     /**
-     * Stock d'un article vendu par lot ou au détail, en clair : 53 comprimés
-     * (boîte de 16) → « 3 boîtes + 5 comprimés ». Sans palier : la quantité.
+     * Stock d'un article vendu aussi par lot ou au détail : le nombre d'abord,
+     * le détail entre parenthèses — 53 comprimés (boîte de 16) → « 53 comprimés
+     * (3 boîtes + 5 comprimés) ». Sans conditionnement : la quantité.
      *
      * @param  list<array{unite: string, contenance: int}>|null  $paliers
      */
     public static function formaterStock(mixed $stock, ?string $unite, ?array $paliers): string
     {
-        $reste = self::normaliser($stock);
-        if (empty($paliers) || $reste <= 0) {
-            return self::formater($reste, $unite);
+        $total = self::normaliser($stock);
+        if (empty($paliers) || $total <= 0) {
+            return self::formater($total, $unite);
         }
+        $enBase = fn ($n) => $unite === null ? self::formater($n).' pièce'.($n >= 2 ? 's' : '') : self::formater($n, $unite);
+        $reste = $total;
         $morceaux = [];
         foreach (collect($paliers)->sortByDesc('contenance') as $p) {
             $n = (int) floor($reste / max((int) $p['contenance'], 1));
@@ -183,11 +186,23 @@ final class Quantite
                 $reste = self::normaliser($reste - $n * (int) $p['contenance']);
             }
         }
-        if ($reste > 0 || $morceaux === []) {
-            $morceaux[] = $unite === null ? self::formater($reste).' pièce'.($reste >= 2 ? 's' : '') : self::formater($reste, $unite);
+        // Moins d'un carton : rien à détailler. Sinon le nombre saisi d'abord.
+        if ($morceaux === []) {
+            return $enBase($total);
+        }
+        if ($reste > 0) {
+            $morceaux[] = $enBase($reste);
         }
 
-        return implode(' + ', $morceaux);
+        return $enBase($total).' ('.implode(' + ', $morceaux).')';
+    }
+
+    /** Le stock en un nombre (« 49 pièces ») pour une puce : le détail par carton est ailleurs. */
+    public static function formaterStockCourt(mixed $stock, ?string $unite, ?array $paliers): string
+    {
+        $n = self::normaliser($stock);
+
+        return ! empty($paliers) && $unite === null ? self::formater($n).' pièce'.($n >= 2 ? 's' : '') : self::formater($n, $unite);
     }
 
     /** Le symbole à écrire après un prix : « 3 500 F / kg ». */

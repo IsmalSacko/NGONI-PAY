@@ -57,6 +57,28 @@
                 @endforeach
             </x-charte.carte>
 
+            {{-- Vos ventes : détail, détail et gros, gros uniquement. --}}
+            <x-charte.carte class="p-5 flex flex-col gap-3">
+                <x-charte.en-tete-section icone="local_shipping" titre="Vos ventes" sous-titre="Au détail, en gros, ou les deux." />
+                @foreach (['detail' => ['person', 'Au détail', 'Un prix par article. La caisse telle quelle.'], 'detail_gros' => ['local_shipping', 'Au détail et en gros', 'Un prix de gros en plus : dès une quantité, pour vos revendeurs, ou d’un toucher à la caisse.'], 'gros' => ['warehouse', 'En gros uniquement', 'Un seul prix par article : votre prix de gros.']] as $code => [$icone, $titre, $texte])
+                    @php($choisie = ($boutiqueActive->mode_vente ?: 'detail') === $code)
+                    <button wire:click="choisirModeVente('{{ $code }}')" class="flex items-start gap-3 text-left rounded-2xl p-3 border-2 {{ $choisie ? 'bg-jaune-doux border-jaune' : 'bg-white border-border hover:border-border-strong' }}">
+                        <x-charte.pastille :icone="$icone" :actif="$choisie" :taille="40" />
+                        <span class="flex-1 flex flex-col">
+                            <span class="font-extrabold text-accent">{{ $titre }}@if ($code === 'detail_gros' && ! app(\App\Services\AbonnementService::class)->permet($boutiqueActive, \App\Models\Plan::VENTE_GROS)) <span class="text-xs font-bold">🔒 Pro</span>@endif</span>
+                            <span class="text-sm text-muted">{{ $texte }}</span>
+                        </span>
+                        @if ($choisie)<x-charte.icone nom="check_circle" plein class="text-accent" />@endif
+                    </button>
+                @endforeach
+                @if ($boutiqueActive->venteEnGros())
+                    <label class="flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3 cursor-pointer">
+                        <span class="font-bold text-accent">Chaque vente commence en gros</span>
+                        <input type="checkbox" wire:click="basculerCommenceEnGros" @checked($boutiqueActive->vente_commence_en_gros) class="w-6 h-6 accent-[#0f2a5c]">
+                    </label>
+                @endif
+            </x-charte.carte>
+
             {{-- Fidélité : enregistrée d'elle-même, comme dans l'application. --}}
             <x-charte.carte class="p-5 flex flex-col gap-3">
                 <x-charte.en-tete-section icone="loyalty" titre="Fidélité des clients" sous-titre="Une remise automatique pour vos clients réguliers." />

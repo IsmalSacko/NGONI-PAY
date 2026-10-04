@@ -85,6 +85,22 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $boutique->fresh()]);
     }
 
+    /** Vos ventes : au détail, au détail et en gros, en gros uniquement. */
+    public function ventes(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mode_vente' => ['required', Rule::in(Boutique::MODES_VENTE)],
+            'vente_commence_en_gros' => ['nullable', 'boolean'],
+        ]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->forceFill([
+            'mode_vente' => $data['mode_vente'],
+            'vente_commence_en_gros' => $data['mode_vente'] === 'detail_gros' && ($data['vente_commence_en_gros'] ?? false),
+        ])->save();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
     /** Activité de la boutique : « pharmacie » adapte la caisse (mots, détail, lots, ordonnance). */
     public function activite(Request $request): JsonResponse
     {

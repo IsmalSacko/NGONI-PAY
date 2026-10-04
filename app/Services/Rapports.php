@@ -72,6 +72,11 @@ class Rapports
             // Par moyen, ce qui a été payé ; le reste dû des ventes forme la
             // ligne « Crédit client ». Le tout fait le chiffre des ventes.
             'par_moyen' => $this->parMoyen($valides),
+            // Vente en gros : ce qui s'est vendu au prix de gros, ligne par ligne.
+            'par_tarif' => [
+                'gros' => (int) LigneVente::whereIn('vente_id', $valides()->select('ventes.id'))->where('prix_gros', true)->sum('total_ligne'),
+                'detail' => (int) LigneVente::whereIn('vente_id', $valides()->select('ventes.id'))->where('prix_gros', false)->sum('total_ligne'),
+            ],
             'par_caissier' => $valides()
                 ->join('users', 'users.id', '=', 'ventes.user_id')
                 ->selectRaw('users.name as nom, COUNT(*) as nombre, SUM(ventes.total) as total')

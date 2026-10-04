@@ -49,6 +49,11 @@ class Index extends Component
 
     public string $prix_achat = '';
 
+    /** Vente en gros : le prix de gros et dès quelle quantité il s'applique. */
+    public string $prix_gros = '';
+
+    public string $seuil_gros = '';
+
     /** Photo choisie pour l'article (fichier temporaire Livewire). */
     public $photo = null;
 
@@ -128,7 +133,7 @@ class Index extends Component
     public function nouveauProduit(): void
     {
         $this->resetValidation();
-        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'stock', 'unite', 'photo', 'retirerPhoto',
+        $this->reset(['produitId', 'categorie_produit_id', 'nom', 'format', 'code', 'code_barre', 'prix_vente', 'prix_achat', 'prix_gros', 'seuil_gros', 'stock', 'unite', 'photo', 'retirerPhoto',
             'dci', 'sur_ordonnance', 'numero_lot', 'peremption', 'paliers']);
         $this->taux_tva = '18';
         $this->seuil_alerte = '10';
@@ -149,6 +154,8 @@ class Index extends Component
         $this->code_barre = (string) $produit->code_barre;
         $this->prix_vente = Montant::saisie($produit->prix_vente);
         $this->prix_achat = $produit->prix_achat === null ? '' : Montant::saisie($produit->prix_achat);
+        $this->prix_gros = $produit->prix_gros === null ? '' : Montant::saisie((int) $produit->prix_gros);
+        $this->seuil_gros = $produit->seuil_gros === null ? '' : Quantite::formater($produit->seuil_gros);
         $this->taux_tva = (string) $produit->taux_tva;
         $this->stock = Quantite::formater($produit->stock);
         $this->seuil_alerte = Quantite::formater($produit->seuil_alerte);
@@ -195,6 +202,8 @@ class Index extends Component
             // Saisi dans la devise (« 2,50 » en euros), stocké en unités mineures.
             'prix_vente' => ['required', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
             'prix_achat' => ['nullable', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
+            'prix_gros' => ['nullable', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
+            'seuil_gros' => ['nullable', 'string', 'regex:'.Quantite::REGEX_SAISIE],
             'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:3072'],
             'taux_tva' => ['required', 'numeric', 'min:0', 'max:100'],
             'stock' => ['required', 'string', 'regex:'.Quantite::REGEX_SAISIE],
@@ -231,6 +240,13 @@ class Index extends Component
         }
         $data['prix_vente'] = Montant::parse($data['prix_vente']);
         $data['prix_achat'] = Montant::parse($data['prix_achat'] ?? null);
+        // Vente en gros : seulement dans une boutique « au détail et en gros ».
+        if (Boutique::find($this->boutiqueActiveId())?->venteEnGros()) {
+            $data['prix_gros'] = Montant::parse($data['prix_gros'] ?? null);
+            $data['seuil_gros'] = trim((string) ($data['seuil_gros'] ?? '')) === '' ? null : Quantite::lire($data['seuil_gros']);
+        } else {
+            unset($data['prix_gros'], $data['seuil_gros']);
+        }
         $data['stock'] = Quantite::lire($data['stock']) ?? 0;
         $data['seuil_alerte'] = Quantite::lire($data['seuil_alerte']) ?? 0;
         $data['unite'] = ($data['unite'] ?? '') ?: null;

@@ -43,6 +43,9 @@ class Plan extends Model
     /** Objectif de chiffre du mois et sa jauge. */
     public const OBJECTIF_MOIS = 'objectif_mois';
 
+    /** Deux prix par article, détail et gros (réglage « Vos ventes »). */
+    public const VENTE_GROS = 'vente_gros';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
@@ -59,6 +62,7 @@ class Plan extends Model
         self::DROITS_MEMBRES => 'Droits par membre de l’équipe',
         self::FACTURES_EXPORTS => 'Factures A4, exports, bilan mensuel',
         self::OBJECTIF_MOIS => 'Objectif du mois',
+        self::VENTE_GROS => 'Vente en gros (deux prix)',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */

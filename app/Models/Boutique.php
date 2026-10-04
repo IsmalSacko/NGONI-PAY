@@ -32,6 +32,14 @@ class Boutique extends Model
     /** Activité choisie dans les réglages : la pharmacie adapte la caisse. */
     public const ACTIVITES = ['commerce', 'pharmacie'];
 
+    /** Vos ventes : au détail, au détail et en gros, en gros uniquement. */
+    public const MODES_VENTE = ['detail', 'detail_gros', 'gros'];
+
+    public function venteEnGros(): bool
+    {
+        return $this->mode_vente === 'detail_gros';
+    }
+
     public function estPharmacie(): bool
     {
         return $this->activite === 'pharmacie';
@@ -40,6 +48,7 @@ class Boutique extends Model
     protected function casts(): array
     {
         return [
+            'vente_commence_en_gros' => 'boolean',
             'objectif_mensuel' => 'integer',
             'fidelite_seuil' => 'integer',
             'fidelite_remise_pct' => 'integer',

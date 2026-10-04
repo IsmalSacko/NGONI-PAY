@@ -48,7 +48,7 @@
                 </div>
                 <div class="flex flex-col items-end gap-1 shrink-0">
                     <span class="font-extrabold text-accent tabular-nums">{{ \App\Support\Money\Montant::format($produit->prix_vente) }}@if ($produit->unite)<span class="font-normal text-muted text-sm"> / {{ \App\Support\Quantite::symbole($produit->unite) }}</span>@endif</span>
-                    @php($stock = \App\Support\Quantite::formaterStock($produit->stock, $produit->unite, $produit->paliers))
+                    @php($stock = \App\Support\Quantite::formaterStockCourt($produit->stock, $produit->unite, $produit->paliers))
                     <x-charte.puce :ton="$produit->estEnRupture() ? 'danger' : ($produit->stockFaible() ? 'warn' : 'succes')">{{ $produit->estEnRupture() ? 'Rupture' : $stock }}</x-charte.puce>
                 </div>
                 <div class="flex gap-1 shrink-0">
@@ -142,6 +142,27 @@
                             @error('prix_vente') <p data-erreur class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
+
+                    @php($boutiqueGros = \App\Models\Boutique::find($this->boutiqueActiveId()))
+                    @if ($boutiqueGros?->venteEnGros())
+                        {{-- Vente en gros : un second prix, et dès quelle quantité il s'applique. --}}
+                        @if (app(\App\Services\AbonnementService::class)->permet($boutiqueGros, \App\Models\Plan::VENTE_GROS))
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">{{ $boutiqueGros->estPharmacie() ? 'Prix institution' : 'Prix de gros' }} <span class="font-normal text-muted">({{ $devise }}, facultatif)</span></label>
+                                    <input wire:model="prix_gros" type="text" inputmode="decimal" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
+                                    @error('prix_gros') <p data-erreur class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">À partir de <span class="font-normal text-muted">(quantité)</span></label>
+                                    <input wire:model="seuil_gros" type="text" inputmode="decimal" placeholder="12" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
+                                    @error('seuil_gros') <p data-erreur class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
+                                </div>
+                            </div>
+                        @else
+                            <p class="rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">🔒 Prix de gros : fonction de l’offre Pro.</p>
+                        @endif
+                    @endif
                     @if ($marge)
                         <p class="text-sm font-semibold {{ $marge['perte'] ? 'text-danger-fg' : 'text-accent-dark' }}">{{ $marge['texte'] }}</p>
                     @endif
@@ -205,7 +226,15 @@
 
                     {{-- Vente par lot (boutique) ou au détail (pharmacie) : cachée tant qu'on ne l'ouvre pas. --}}
                     <details class="rounded-lg border border-[--color-border] bg-[--color-bg] p-3" @if (count($paliers) > 0 || $pharmacie) open @endif>
-                        <summary class="cursor-pointer font-semibold">{{ $pharmacie ? 'Vente au détail (boîte, plaquette…)' : 'Se vend aussi en carton, paquet…' }}</summary>
+                        {{-- Un vrai bouton : libellé court, aide en gris, « + » à droite. --}}
+                        <summary class="list-none cursor-pointer flex items-center gap-3 h-12 px-3 rounded-xl bg-white border border-border-strong hover:border-accent">
+                            <x-charte.icone nom="inventory_2" class="text-muted" />
+                            <span class="flex-1 flex flex-col leading-tight">
+                                <span class="font-bold text-accent">{{ $pharmacie ? 'Vente au détail' : 'Vente par lot' }} <span class="font-normal text-muted text-xs">(facultatif)</span></span>
+                                <span class="text-xs text-muted">{{ $pharmacie ? 'Boîte, plaquette… avec son propre prix' : 'Carton, paquet… avec son propre prix' }}</span>
+                            </span>
+                            <x-charte.icone nom="add_circle" class="text-accent" />
+                        </summary>
                         <p class="text-xs text-muted mt-1">L'article est l'unité de base ({{ $unite ? \App\Support\Quantite::LIBELLES[$unite] ?? $unite : 'la pièce' }}) : son prix et son stock se comptent ainsi. Chaque conditionnement dit combien il en contient, et son prix.</p>
                         @foreach ($paliers as $i => $p)
                             {{-- Une rangée par conditionnement : contenant | contient | prix | retirer. --}}
@@ -218,10 +247,17 @@
                                         <option value="{{ $u }}">{{ ucfirst($u) }}</option>
                                     @endforeach
                                 </select>
-                                <input wire:model="paliers.{{ $i }}.contenance" type="text" inputmode="numeric" placeholder="Contient…" title="Combien d’unités il contient" class="flex-1 min-w-0 h-10 px-2 rounded-xl bg-white border border-border-strong">
-                                <input wire:model="paliers.{{ $i }}.prix" type="text" inputmode="decimal" placeholder="Prix ({{ $devise }})" class="flex-1 min-w-0 h-10 px-2 rounded-xl bg-white border border-border-strong">
+                                <input wire:model.live.debounce.500ms="paliers.{{ $i }}.contenance" type="text" inputmode="numeric" placeholder="Contient…" title="Combien d’unités il contient" class="flex-1 min-w-0 h-10 px-2 rounded-xl bg-white border border-border-strong">
+                                <input wire:model.live.debounce.500ms="paliers.{{ $i }}.prix" type="text" inputmode="decimal" placeholder="Prix ({{ $devise }})" class="flex-1 min-w-0 h-10 px-2 rounded-xl bg-white border border-border-strong">
                                 <button type="button" wire:click="retirerPalier({{ $i }})" class="shrink-0 w-10 h-10 text-muted" title="Retirer">✕</button>
                             </div>
+                            {{-- Un lot bien moins cher à l'unité que le prix de base : sans doute une faute de frappe. --}}
+                            @php($c = (int) ($p['contenance'] ?? 0))
+                            @php($px = \App\Support\Money\Montant::parse((string) ($p['prix'] ?? '')))
+                            @php($base = \App\Support\Money\Montant::parse($prix_vente))
+                            @if ($c >= 2 && $px !== null && $base && $px * 2 < $base * $c)
+                                <p class="text-sm font-bold text-warn-fg mt-1">Attention : 1 {{ \App\Support\Quantite::symbole($p['unite']) ?? $p['unite'] }} à {{ \App\Support\Money\Montant::format($px) }} revient à {{ \App\Support\Money\Montant::format((int) round($px / $c)) }} par {{ $unite ? \App\Support\Quantite::symbole($unite) : 'pièce' }}, contre {{ \App\Support\Money\Montant::format($base) }} à l’unité.</p>
+                            @endif
                             @foreach (['unite', 'contenance', 'prix'] as $champ)
                                 @error("paliers.$i.$champ") <p data-erreur class="text-sm text-danger-fg mt-1">{{ $message }}</p> @enderror
                             @endforeach

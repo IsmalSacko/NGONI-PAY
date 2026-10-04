@@ -28,10 +28,13 @@ class Index extends Component
 
     public string $telephone = '';
 
+    /** Vente en gros : ses achats passent d'eux-mêmes au prix de gros. */
+    public bool $revendeur = false;
+
     public function nouveauClient(): void
     {
         $this->resetValidation();
-        $this->reset(['clientId', 'nom', 'telephone']);
+        $this->reset(['clientId', 'nom', 'telephone', 'revendeur']);
         $this->modaleOuverte = true;
     }
 
@@ -42,6 +45,7 @@ class Index extends Component
         $this->clientId = $client->id;
         $this->nom = $client->nom;
         $this->telephone = (string) $client->telephone;
+        $this->revendeur = (bool) $client->revendeur;
         $this->modaleOuverte = true;
     }
 
@@ -56,6 +60,7 @@ class Index extends Component
         $data = $this->validate([
             'nom' => ['required', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
+            'revendeur' => ['boolean'],
         ]);
 
         if ($this->clientId) {

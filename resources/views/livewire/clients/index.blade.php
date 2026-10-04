@@ -43,6 +43,9 @@
                     <span class="font-bold text-ink truncate">{{ $client->nom }}</span>
                     <span class="text-xs text-muted truncate">{{ $client->telephone ?: 'Sans téléphone' }}</span>
                 </span>
+                @if ($client->revendeur)
+                    <x-charte.puce ton="jaune" icone="storefront">Revendeur</x-charte.puce>
+                @endif
                 @if ($doit > 0)
                     <x-charte.puce ton="danger" icone="hourglass_bottom">Doit {{ \App\Support\Money\Montant::format($doit) }}</x-charte.puce>
                 @endif
@@ -82,6 +85,15 @@
                         <label class="block text-sm font-semibold mb-1">Téléphone</label>
                         <input wire:model="telephone" type="text" class="w-full h-11 px-3 rounded-xl bg-white border border-border-strong">
                     </div>
+                    @if (\App\Models\Boutique::find($this->boutiqueActiveId())?->venteEnGros())
+                        <label class="flex items-center justify-between gap-3 rounded-2xl bg-white shadow-carte px-4 py-3 cursor-pointer">
+                            <span class="flex flex-col">
+                                <span class="font-bold text-accent">Revendeur</span>
+                                <span class="text-xs text-muted">Ses achats passent d’eux-mêmes au prix de gros.</span>
+                            </span>
+                            <input type="checkbox" wire:model="revendeur" class="w-6 h-6 accent-[#0f2a5c]">
+                        </label>
+                    @endif
                     <div class="flex gap-3 mt-2">
                         <button type="button" wire:click="$set('modaleOuverte', false)" class="flex-1 h-11 rounded-xl bg-white border border-border-strong font-bold">Annuler</button>
                         <button type="submit" class="flex-1 h-11 rounded-xl bg-accent text-white font-bold">Enregistrer</button>

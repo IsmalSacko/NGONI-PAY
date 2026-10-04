@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Support\Quantite;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -85,6 +86,22 @@ class VenteService
             /** @var array<string, int|float> $besoin unités de base demandées par article */
             $besoin = [];
 
+            // Vente en gros (boutique « au détail et en gros », offre qui
+            // l'inclut) : tout le panier au prix de gros pour un client
+            // revendeur ou par la bascule de la caisse — celle-ci demande le
+            // droit d'accorder des remises. Sinon, ligne par ligne, à partir
+            // du seuil de quantité de l'article.
+            $grosPermis = $boutique->venteEnGros() && empty($data['sans_prix_de_gros'])
+                && app(AbonnementService::class)->permet($boutique, Plan::VENTE_GROS);
+            $revendeur = ! empty($data['client_id']) && (bool) Client::whereKey($data['client_id'])->value('revendeur');
+            $grosDemande = ($data['tarif'] ?? 'detail') === 'gros';
+            // « Chaque vente commence en gros » : le gros est la règle de la
+            // boutique, le caissier n'a pas besoin du droit de remise.
+            if ($grosPermis && $grosDemande && ! $revendeur && ! $boutique->vente_commence_en_gros && ! $caissier->can('ventes.remise')) {
+                throw new HttpResponseException(response()->json(['message' => 'Vous n’avez pas le droit de vendre au prix de gros.'], 403));
+            }
+            $toutEnGros = $grosPermis && ($grosDemande || $revendeur);
+
             foreach ($data['lignes'] as $ligne) {
                 // 1,250 kg à 3 500 F : 4 375 F — le total d'une ligne se compte
                 // au franc près.
@@ -128,7 +145,10 @@ class VenteService
                     throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$reste})."]]);
                 }
 
-                $totalLigne = (int) round($palier['prix'] * $ligne['quantite']);
+                $enGros = $grosPermis && $palier['prix_gros'] !== null
+                    && ($toutEnGros || ($produit->seuil_gros !== null && $produit->seuil_gros > 0 && $base >= $produit->seuil_gros));
+                $prix = $enGros ? $palier['prix_gros'] : $palier['prix'];
+                $totalLigne = (int) round($prix * $ligne['quantite']);
                 $sousTotal += $totalLigne;
 
                 $lignes[] = [
@@ -138,7 +158,10 @@ class VenteService
                     'unite' => $palier['unite'] === '' ? null : $palier['unite'],
                     'contenance' => $palier['contenance'],
                     'base' => $base,
-                    'prix_unitaire' => $palier['prix'],
+                    'prix_unitaire' => $prix,
+                    // Le ticket barre le prix de détail à côté du prix de gros.
+                    'prix_gros' => $enGros,
+                    'prix_detail' => $enGros ? $palier['prix'] : null,
                     // Prix d'achat d'une unité de base : la marge se calcule
                     // sur quantité × contenance.
                     'prix_achat' => $produit->prix_achat,
@@ -214,6 +237,7 @@ class VenteService
                 'statut' => 'validee',
                 'vendue_hors_ligne' => $data['vendue_hors_ligne'] ?? false,
                 'remise_fidelite' => $programme !== null,
+                'tarif' => $toutEnGros ? 'gros' : 'detail',
                 'synchronisee_le' => now(),
                 // Pharmacie : qui a prescrit, le numéro, pour qui.
                 'ordonnance' => array_filter($data['ordonnance'] ?? []) ?: null,
@@ -229,6 +253,8 @@ class VenteService
                     'quantite' => $l['quantite'],
                     'unite' => $l['unite'] ?? null,
                     'contenance' => $l['contenance'] ?? 1,
+                    'prix_gros' => $l['prix_gros'] ?? false,
+                    'prix_detail' => $l['prix_detail'] ?? null,
                     // Le lot qui périme le plus tôt part le premier.
                     'lots' => $l['produit'] === null ? null : (app(Lots::class)->prelever($l['produit'], $l['base']) ?: null),
                     'total_ligne' => $l['total_ligne'],

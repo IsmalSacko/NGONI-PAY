@@ -90,7 +90,7 @@ class PharmacieBackofficeTest extends TestCase
 
         Livewire::test(StocksIndex::class)
             ->assertSee('Péremption')
-            ->assertSee('4 boîtes')
+            ->assertSee('64 comprimés (4 boîtes)')
             ->set('filtre', 'peremption')
             ->assertSee('Lot L-1')
             ->assertDontSee('Lot L-2');
@@ -102,7 +102,7 @@ class PharmacieBackofficeTest extends TestCase
         Livewire::test(ProduitsIndex::class)
             ->call('nouveauProduit')
             ->assertDontSee('Molécule (DCI)')
-            ->assertSee('Se vend aussi en carton, paquet');
+            ->assertSee('Vente par lot');
         Livewire::test(StocksIndex::class)->assertDontSee('Péremption');
     }
 

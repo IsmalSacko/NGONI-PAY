@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'code', 'code_barre',
-    'prix_achat', 'prix_vente', 'taux_tva', 'stock', 'seuil_alerte', 'actif',
+    'prix_achat', 'prix_vente', 'prix_gros', 'seuil_gros', 'taux_tva', 'stock', 'seuil_alerte', 'actif',
 ])]
 class Produit extends Model
 {
@@ -46,6 +46,7 @@ class Produit extends Model
             'actif' => 'boolean',
             'stock' => QuantiteCast::class,
             'seuil_alerte' => QuantiteCast::class,
+            'seuil_gros' => QuantiteCast::class,
             'sur_ordonnance' => 'boolean',
             'paliers' => 'array',
         ];
@@ -79,16 +80,16 @@ class Produit extends Model
      * Palier de détail (« boite » : 16 comprimés à 2 800 F), ou null. L'unité
      * de base de l'article est son propre palier : contenance 1, son prix.
      *
-     * @return array{unite: string, contenance: int, prix: int}|null
+     * @return array{unite: string, contenance: int, prix: int, prix_gros: ?int}|null
      */
     public function palier(?string $unite): ?array
     {
         if ($unite === null || $unite === $this->unite) {
-            return ['unite' => (string) $this->unite, 'contenance' => 1, 'prix' => (int) $this->prix_vente];
+            return ['unite' => (string) $this->unite, 'contenance' => 1, 'prix' => (int) $this->prix_vente, 'prix_gros' => $this->prix_gros === null ? null : (int) $this->prix_gros];
         }
         foreach ($this->paliers ?? [] as $p) {
             if (($p['unite'] ?? null) === $unite) {
-                return ['unite' => $unite, 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix']];
+                return ['unite' => $unite, 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix'], 'prix_gros' => isset($p['prix_gros']) ? (int) $p['prix_gros'] : null];
             }
         }
 

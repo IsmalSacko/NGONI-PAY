@@ -175,6 +175,9 @@ class ProduitController extends Controller
             }],
             'prix_achat' => ['nullable', 'integer', 'min:0'],
             'prix_vente' => [$requis, 'integer', 'min:0'],
+            // Vente en gros : le prix de gros, et dès quelle quantité il s'applique.
+            'prix_gros' => ['nullable', 'integer', 'min:0'],
+            'seuil_gros' => ['nullable', 'numeric', 'min:0', 'max:100000000', 'decimal:0,3'],
             'taux_tva' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'stock' => ['nullable', 'numeric', 'min:0', 'max:100000000', 'decimal:0,3'],
             'seuil_alerte' => ['nullable', 'numeric', 'min:0', 'max:100000000', 'decimal:0,3'],
@@ -189,13 +192,15 @@ class ProduitController extends Controller
             'paliers.*.unite' => ['required', 'string', 'max:40', 'distinct', Quantite::regle()],
             'paliers.*.contenance' => ['required', 'integer', 'min:2', 'max:100000'],
             'paliers.*.prix' => ['required', 'integer', 'min:0', 'max:1000000000'],
+            'paliers.*.prix_gros' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
             'actif' => ['nullable', 'boolean'],
         ]);
 
         // Du plus petit au plus grand ; aucun palier : pas de détail.
         if (array_key_exists('paliers', $data)) {
             $paliers = collect($data['paliers'] ?? [])
-                ->map(fn ($p) => ['unite' => $p['unite'], 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix']])
+                ->map(fn ($p) => array_filter(['unite' => $p['unite'], 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix'],
+                    'prix_gros' => isset($p['prix_gros']) ? (int) $p['prix_gros'] : null], fn ($v) => $v !== null))
                 ->sortBy('contenance')->values()->all();
             $data['paliers'] = $paliers === [] ? null : $paliers;
         }
