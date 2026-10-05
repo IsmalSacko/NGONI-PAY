@@ -20,7 +20,7 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id',
         'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id',
     ];
 

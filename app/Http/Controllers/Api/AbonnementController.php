@@ -11,6 +11,7 @@ use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\PlanTarif;
 use App\Services\AbonnementService;
+use App\Services\PaiementJeko;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,8 +95,41 @@ class AbonnementController extends Controller
                 'est_proprietaire' => $boutique->proprietaire_id === $request->user()->id,
                 'peut_demander' => $request->user()->can('abonnement.manage'),
                 'demande_en_attente' => $enAttente === null ? null : $this->demandeJson($enAttente),
+                // Paiement Mobile Money intégré (Jèko) : boutiques ivoiriennes seulement.
+                'paiement_mobile' => app(PaiementJeko::class)->proposeA($boutique)
+                    ? ['moyens' => collect(config('jeko.moyens'))->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle])->values()]
+                    : null,
             ],
         ]);
+    }
+
+    /** Payer une offre par Mobile Money (Jèko) : la page de paiement où envoyer le commerçant. */
+    public function payerMobile(Request $request, PaiementJeko $jeko): JsonResponse
+    {
+        $data = $request->validate([
+            'plan' => ['required', 'string', 'max:30'],
+            'cycle' => ['nullable', Rule::enum(CycleFacturation::class)],
+            'moyen' => ['required', 'string', 'max:20'],
+        ]);
+
+        $resultat = $jeko->demarrer(
+            Boutique::findOrFail(app(TenantContext::class)->boutiqueId()),
+            $request->user(),
+            $data['plan'],
+            CycleFacturation::tryFrom((string) ($data['cycle'] ?? '')) ?? CycleFacturation::Mensuel,
+            $data['moyen'],
+        );
+
+        return response()->json(['data' => $this->demandeJson($resultat['demande']), 'redirect_url' => $resultat['redirect_url']], 201);
+    }
+
+    /** Au retour du commerçant : le paiement relu chez Jèko, l'abonnement activé s'il est payé. */
+    public function statutPaiementMobile(DemandeAbonnement $demande, PaiementJeko $jeko): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless($demande->user_id === $boutique->proprietaire_id && $demande->jeko_paiement_id !== null, 404);
+
+        return response()->json(['data' => $this->demandeJson($jeko->verifier($demande))]);
     }
 
     public function demandes(): JsonResponse

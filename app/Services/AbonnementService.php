@@ -141,6 +141,7 @@ class AbonnementService
         ?string $telephoneContact = null,
         ?UploadedFile $preuve = null,
         ?string $preuveNote = null,
+        bool $prevenir = true,
     ): DemandeAbonnement {
         $plan = Plan::parCode($codePlan);
 
@@ -184,6 +185,12 @@ class AbonnementService
             'statut' => StatutDemande::EnAttente,
         ]);
 
+        // Paiement Mobile Money (Jèko) : l'exploitant n'a rien à vérifier, il
+        // est prévenu quand le paiement est confirmé, pas à l'ouverture.
+        if (! $prevenir) {
+            return $demande;
+        }
+
         Apres::reponse(function () use ($demande): void {
             try {
                 Mail::to(config('ecaisse.notification_email'))->send(new DemandeAbonnementMail($demande));
@@ -221,7 +228,7 @@ class AbonnementService
      * L'exploitant a constaté le paiement : le plan s'active pour la durée
      * payée, ou sans échéance quand le commerçant a payé un accès à vie.
      */
-    public function approuver(DemandeAbonnement $demande, User $exploitant, ?string $note = null, bool $sansEcheance = false): Abonnement
+    public function approuver(DemandeAbonnement $demande, ?User $exploitant, ?string $note = null, bool $sansEcheance = false): Abonnement
     {
         $this->exigerEnAttente($demande);
 
@@ -242,7 +249,8 @@ class AbonnementService
             $demande->update([
                 'statut' => StatutDemande::Approuvee,
                 'decide_le' => now(),
-                'decide_par' => $exploitant->id,
+                // Sans exploitant : approuvée d'elle-même, le paiement Mobile Money confirmé par Jèko.
+                'decide_par' => $exploitant?->id,
                 'note_decision' => $note,
             ]);
 
