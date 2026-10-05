@@ -17,5 +17,14 @@ return [
     /* Pays des boutiques à qui le paiement est proposé : les portefeuilles de Jèko sont ivoiriens. */
     'pays' => ['CI'],
 
+    /*
+     * Frais de Jèko répercutés sur le commerçant qui paie par Mobile Money :
+     * le prix est majoré pour que, frais déduits, l'offre soit payée en entier.
+     */
+    'frais_pourcentage' => (float) env('JEKO_FRAIS_POURCENTAGE', 1.5),
+
+    /* Sans paiement confirmé après ce délai, la demande est annulée d'elle-même, motif à l'appui. */
+    'delai_minutes' => (int) env('JEKO_DELAI_MINUTES', 30),
+
     'moyens' => ['wave' => 'Wave', 'orange' => 'Orange Money', 'mtn' => 'MTN MoMo', 'moov' => 'Moov Money', 'djamo' => 'Djamo'],
 ];

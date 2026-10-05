@@ -38,6 +38,20 @@ class PaiementJeko
             && filled(config('jeko.store_id')) && filled(config('jeko.webhook_secret'));
     }
 
+    /**
+     * Frais Mobile Money pour un prix : de quoi recevoir le prix entier une fois
+     * les frais de Jèko prélevés (4 000 F → 61 F, payés 4 061 F).
+     */
+    public static function frais(int $montant): int
+    {
+        $taux = (float) config('jeko.frais_pourcentage');
+        if ($taux <= 0) {
+            return 0;
+        }
+
+        return (int) ceil($montant * 100 / (100 - $taux)) - $montant;
+    }
+
     /** Proposé à cette boutique : Jèko configuré, et une boutique ivoirienne. */
     public function proposeA(?Boutique $boutique): bool
     {
@@ -69,13 +83,14 @@ class PaiementJeko
             throw ValidationException::withMessages(['moyen' => ['Le paiement Mobile Money n’accepte que le franc CFA (XOF).']]);
         }
 
+        $demande->update(['frais_mobile' => self::frais($demande->montant)]);
         $reference = 'NGONI-ABO-'.$demande->id;
         $retour = url('/paiement-abonnement').'?reference='.$reference;
 
         try {
             $reponse = $this->client()->post('/partner_api/payment_requests', [
                 'storeId' => config('jeko.store_id'),
-                'amountCents' => $demande->montant * 100,
+                'amountCents' => ($demande->montant + $demande->frais_mobile) * 100,
                 'currency' => 'XOF',
                 'reference' => $reference,
                 'paymentDetails' => [
@@ -138,13 +153,56 @@ class PaiementJeko
             $plan = Plan::parCode($demande->plan)?->nom ?? $demande->plan;
             app(AlertesExploitant::class)->envoyer(
                 'Abonnement payé par Mobile Money',
-                ($demande->boutique?->nom ?? 'Une boutique').' · '.$plan.' · '.number_format($demande->montant, 0, ',', ' ').' F par '.$moyen
+                ($demande->boutique?->nom ?? 'Une boutique').' · '.$plan.' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.$moyen
+                    .($demande->frais_mobile > 0 ? ' (dont '.number_format($demande->frais_mobile, 0, ',', ' ').' F de frais)' : '')
                     .($abonnement->fin ? ' · jusqu’au '.$abonnement->fin->format('d/m/Y') : ''),
                 '/console/demandes',
             );
 
             return $demande->fresh();
         });
+    }
+
+    /**
+     * Filet de sécurité (planifié) : les paiements restés en attente sont relus
+     * chez Jèko — commerçant parti sans revenir, webhook perdu. Sans paiement
+     * après le délai (30 min), la demande est annulée avec son motif, et le
+     * commerçant prévenu : elle n'encombre plus la console, il peut réessayer.
+     */
+    public function verifierEnAttente(): int
+    {
+        if (! $this->actif()) {
+            return 0;
+        }
+
+        $demandes = DemandeAbonnement::enAttente()->whereNotNull('jeko_paiement_id')->get();
+        foreach ($demandes as $demande) {
+            $demande = $this->verifier($demande);
+            if ($demande->statut === StatutDemande::EnAttente && $demande->created_at->lt(now()->subMinutes((int) config('jeko.delai_minutes')))) {
+                $this->annulerFauteDePaiement($demande);
+            }
+        }
+
+        return $demandes->count();
+    }
+
+    private function annulerFauteDePaiement(DemandeAbonnement $demande): void
+    {
+        $delai = (int) config('jeko.delai_minutes');
+        $motif = "Paiement Mobile Money non reçu dans les {$delai} minutes : demande annulée automatiquement.";
+        $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => $motif]);
+
+        $proprietaire = User::find($demande->user_id);
+        if ($proprietaire !== null) {
+            $plan = Plan::parCode($demande->plan)?->nom ?? $demande->plan;
+            app(NotifierCompte::class)->envoyer(
+                $proprietaire,
+                'Paiement de l’abonnement non reçu',
+                "Nous n’avons pas reçu le paiement de votre abonnement {$plan} par Mobile Money dans les {$delai} minutes : "
+                    .'la demande est annulée et rien n’a été prélevé. Vous pouvez réessayer depuis la page Abonnement.',
+                email: false,
+            );
+        }
     }
 
     /** Webhook : vrai seulement si la signature HMAC-SHA256 du corps brut est celle de Jèko. */

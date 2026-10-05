@@ -20,7 +20,7 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'frais_mobile',
         'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id',
     ];
 
@@ -31,6 +31,7 @@ class DemandeAbonnement extends Model
             'statut' => StatutDemande::class,
             'mois' => 'integer',
             'montant' => 'integer',
+            'frais_mobile' => 'integer',
             'decide_le' => 'datetime',
         ];
     }

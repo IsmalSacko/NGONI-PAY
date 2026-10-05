@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\PaiementJeko;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -102,11 +103,32 @@ class PaiementJekoTest extends TestCase
         $this->assertSame('jeko_wave', $demande->moyen);
         $this->assertSame('pr-1', $demande->jeko_paiement_id);
         Http::assertSent(fn (Request $r) => $r->method() === 'POST'
-            && $r['amountCents'] === $demande->montant * 100
+            // Prix + 1,5 % de frais : le prix entier reste une fois les frais prélevés.
+            && $r['amountCents'] === ($demande->montant + $demande->frais_mobile) * 100
             && $r['storeId'] === 'magasin-1'
             && $r['reference'] === 'NGONI-ABO-'.$demande->id
             && $r->hasHeader('X-API-KEY', 'cle'));
         Mail::assertNotSent(DemandeAbonnementMail::class);
+    }
+
+    public function test_les_frais_mobile_money_sont_ajoutes_au_prix(): void
+    {
+        $this->assertSame(61, PaiementJeko::frais(4000));
+        $this->assertSame(1523, PaiementJeko::frais(100000));
+
+        $demande = $this->payer();
+        $this->assertSame(PaiementJeko::frais($demande->montant), $demande->frais_mobile);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.paiement_mobile.frais_pourcentage', 1.5);
+    }
+
+    public function test_un_paiement_reste_en_attente_s_active_a_la_verification_planifiee(): void
+    {
+        $demande = $this->payer();
+        $this->statutJeko = 'success';
+
+        $this->artisan('ecaisse:verifier-paiements-mobile')->assertSuccessful();
+
+        $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
     }
 
     public function test_le_webhook_signe_active_l_abonnement_une_seule_fois(): void
@@ -161,6 +183,23 @@ class PaiementJekoTest extends TestCase
         $this->get('/paiement-abonnement?reference=NGONI-ABO-'.$demande->id.'&issue=succes')->assertOk()->assertSee('Paiement reçu');
 
         $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
+    }
+
+    public function test_sans_paiement_apres_30_minutes_la_demande_s_annule_avec_son_motif(): void
+    {
+        $demande = $this->payer();
+
+        $this->travel(20)->minutes();
+        $this->artisan('ecaisse:verifier-paiements-mobile')->assertSuccessful();
+        $this->assertSame(StatutDemande::EnAttente, $demande->fresh()->statut, 'encore dans le délai');
+
+        $this->travel(15)->minutes();
+        $this->artisan('ecaisse:verifier-paiements-mobile')->assertSuccessful();
+
+        $demande->refresh();
+        $this->assertSame(StatutDemande::Annulee, $demande->statut);
+        $this->assertStringContainsString('non reçu dans les 30 minutes', $demande->note_decision);
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $this->kone->id, 'titre' => 'Paiement de l’abonnement non reçu']);
     }
 
     public function test_une_tentative_abandonnee_ne_bloque_pas_la_suivante(): void

@@ -108,7 +108,7 @@
                         <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="text-muted">Abonnement actuel :</span> <x-statut-abonnement :abonnement="$demande->proprietaire?->abonnement" />
                             @if ($demande->jeko_paiement_id)
-                                <span class="text-muted">· payé par <span class="font-semibold text-ink">{{ config('jeko.moyens')[substr((string) $demande->moyen, 5)] ?? 'Mobile Money' }}</span> via Jèko</span>
+                                <span class="text-muted">· payé par <span class="font-semibold text-ink">{{ config('jeko.moyens')[substr((string) $demande->moyen, 5)] ?? 'Mobile Money' }}</span> via Jèko @if ($demande->frais_mobile > 0)(+ {{ number_format($demande->frais_mobile, 0, ',', ' ') }} F de frais)@endif</span>
                                 @unless ($tranchee)<span class="ml-1 rounded-full bg-jaune-doux px-2 py-0.5 text-xs font-bold text-ink">paiement en cours chez l’opérateur</span>@endunless
                             @elseif ($demande->moyen)<span class="text-muted">· moyen annoncé : <span class="font-semibold text-ink">{{ $demande->moyen }}</span></span>@endif
                         </p>
