@@ -119,6 +119,12 @@ class PaiementJekoTest extends TestCase
         $demande = $this->payer();
         $this->assertSame(PaiementJeko::frais($demande->montant), $demande->frais_mobile);
         $this->api()->getJson('/api/abonnement')->assertJsonPath('data.paiement_mobile.frais_pourcentage', 1.5);
+
+        // Un taux par moyen (contrat du prestataire) : 4 % → 4 167 F payés pour 4 000 F.
+        config(['jeko.frais_par_moyen.mtn' => 4.0]);
+        $this->assertSame(167, PaiementJeko::frais(4000, 'mtn'));
+        $this->assertSame(61, PaiementJeko::frais(4000, 'wave'));
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.paiement_mobile.moyens.2.frais_pourcentage', 4);
     }
 
     public function test_un_paiement_reste_en_attente_s_active_a_la_verification_planifiee(): void

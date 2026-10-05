@@ -97,7 +97,13 @@ class AbonnementController extends Controller
                 'demande_en_attente' => $enAttente === null ? null : $this->demandeJson($enAttente),
                 // Paiement Mobile Money intégré (Jèko) : boutiques ivoiriennes seulement.
                 'paiement_mobile' => app(PaiementJeko::class)->proposeA($boutique)
-                    ? ['frais_pourcentage' => (float) config('jeko.frais_pourcentage'), 'moyens' => collect(config('jeko.moyens'))->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle])->values()]
+                    ? [
+                        'frais_pourcentage' => PaiementJeko::taux(),
+                        // Chaque moyen avec son taux : l'application affiche le total exact à payer.
+                        'moyens' => collect(config('jeko.moyens'))
+                            ->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle, 'frais_pourcentage' => PaiementJeko::taux($code)])
+                            ->values(),
+                    ]
                     : null,
             ],
         ]);

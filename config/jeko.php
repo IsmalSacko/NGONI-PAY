@@ -18,10 +18,16 @@ return [
     'pays' => ['CI'],
 
     /*
-     * Frais de Jèko répercutés sur le commerçant qui paie par Mobile Money :
-     * le prix est majoré pour que, frais déduits, l'offre soit payée en entier.
+     * Frais répercutés sur le commerçant qui paie par Mobile Money, par moyen
+     * de paiement (taux du contrat du prestataire) : le prix est majoré pour
+     * que, frais déduits, l'offre soit payée en entier. Un moyen absent prend
+     * le taux par défaut.
      */
     'frais_pourcentage' => (float) env('JEKO_FRAIS_POURCENTAGE', 1.5),
+    'frais_par_moyen' => [
+        // Jèko : 1,5 % sur tous les moyens (developer.jeko.africa, tarifs).
+        'wave' => 1.5, 'orange' => 1.5, 'mtn' => 1.5, 'moov' => 1.5, 'djamo' => 1.5,
+    ],
 
     /* Sans paiement confirmé après ce délai, la demande est annulée d'elle-même, motif à l'appui. */
     'delai_minutes' => (int) env('JEKO_DELAI_MINUTES', 30),

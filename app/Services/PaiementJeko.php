@@ -38,14 +38,21 @@ class PaiementJeko
             && filled(config('jeko.store_id')) && filled(config('jeko.webhook_secret'));
     }
 
-    /**
-     * Frais Mobile Money pour un prix : de quoi recevoir le prix entier une fois
-     * les frais de Jèko prélevés (4 000 F → 61 F, payés 4 061 F).
-     */
-    public static function frais(int $montant): int
+    /** Taux des frais pour ce moyen de paiement (le taux par défaut s'il n'en a pas). */
+    public static function taux(?string $moyen = null): float
     {
-        $taux = (float) config('jeko.frais_pourcentage');
-        if ($taux <= 0) {
+        return (float) (config('jeko.frais_par_moyen')[$moyen] ?? config('jeko.frais_pourcentage'));
+    }
+
+    /**
+     * Frais Mobile Money pour un prix et un moyen : de quoi recevoir le prix
+     * entier une fois la commission prélevée (4 000 F à 1,5 % → 61 F, payés 4 061 F ;
+     * à 4 % → 167 F, payés 4 167 F).
+     */
+    public static function frais(int $montant, ?string $moyen = null): int
+    {
+        $taux = self::taux($moyen);
+        if ($taux <= 0 || $taux >= 100) {
             return 0;
         }
 
@@ -83,7 +90,7 @@ class PaiementJeko
             throw ValidationException::withMessages(['moyen' => ['Le paiement Mobile Money n’accepte que le franc CFA (XOF).']]);
         }
 
-        $demande->update(['frais_mobile' => self::frais($demande->montant)]);
+        $demande->update(['frais_mobile' => self::frais($demande->montant, $moyen)]);
         $reference = 'NGONI-ABO-'.$demande->id;
         $retour = url('/paiement-abonnement').'?reference='.$reference;
 
