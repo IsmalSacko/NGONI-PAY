@@ -147,7 +147,10 @@ class VenteService
                 // Pas de stock : une prestation ne se compte pas.
                 if (! empty($ligne['service_id'])) {
                     $service = $services->get($ligne['service_id']);
-                    $prix = $service === null ? null : $produit->prixService($service->id, $express);
+                    // Retrait d'une commande de pressing : le prix figé au dépôt (jamais
+                    // fourni par une requête — la validation de la caisse l'écarte).
+                    $prix = isset($ligne['prix_fige']) ? (int) $ligne['prix_fige']
+                        : ($service === null ? null : $produit->prixService($service->id, $express));
                     if ($prix === null) {
                         throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » ne se fait pas dans ce service."]]);
                     }
