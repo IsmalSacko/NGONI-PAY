@@ -46,6 +46,9 @@ class Plan extends Model
     /** Deux prix par article, détail et gros (réglage « Vos ventes »). */
     public const VENTE_GROS = 'vente_gros';
 
+    /** Pressing : le service express et la grille des tarifs (le pressing de base reste dans tous les plans). */
+    public const PRESSING_AVANCE = 'pressing_avance';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
@@ -63,6 +66,7 @@ class Plan extends Model
         self::FACTURES_EXPORTS => 'Factures A4, exports, bilan mensuel',
         self::OBJECTIF_MOIS => 'Objectif du mois',
         self::VENTE_GROS => 'Vente en gros (deux prix)',
+        self::PRESSING_AVANCE => 'Pressing : express et grille des tarifs',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */

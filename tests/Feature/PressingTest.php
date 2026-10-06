@@ -161,6 +161,26 @@ class PressingTest extends TestCase
         $this->assertSame([true, true], array_column($express->json('lignes'), 'express'));
     }
 
+    public function test_hors_pro_le_classique_passe_et_l_express_est_refuse(): void
+    {
+        $s = $this->passerEnPressing();
+        $chemise = $this->api()->postJson('/api/produits', [
+            'nom' => 'Chemise', 'prix_vente' => 500, 'taux_tva' => 0,
+            'tarifs' => [['service_id' => $s['Lavage + repassage'], 'prix' => 500, 'prix_express' => 800]],
+        ])->assertCreated()->json();
+        $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
+
+        $depot = fn (bool $express) => $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $chemise['id'], 'service_id' => $s['Lavage + repassage'], 'quantite' => 1]],
+            'express' => $express,
+            'moyen_paiement' => 'especes',
+        ]);
+
+        $depot(false)->assertCreated()->assertJsonPath('total', 500);
+        $depot(true)->assertForbidden()->assertJsonPath('fonctionnalite', 'pressing_avance');
+        $this->api()->getJson('/api/abonnement')->assertJsonMissing(['pressing_avance']);
+    }
+
     public function test_un_habit_ne_se_vend_pas_dans_un_service_qu_il_n_a_pas(): void
     {
         $s = $this->passerEnPressing();
