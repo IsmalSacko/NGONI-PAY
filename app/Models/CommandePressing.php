@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * retrait — c'est là que naît la vente. Les prix sont figés au dépôt.
  */
 #[Fillable([
-    'boutique_id', 'numero', 'reference_locale', 'client_id', 'user_id', 'statut', 'express', 'total',
+    'boutique_id', 'numero', 'reference_locale', 'client_id', 'user_id', 'statut', 'etape', 'historique', 'express', 'total',
     'acompte', 'moyen_acompte', 'retrait_prevu_le', 'prete_le', 'retiree_le', 'retiree_par', 'vente_id',
     'annulee_le', 'motif_annulation', 'notes',
 ])]
@@ -26,11 +26,20 @@ class CommandePressing extends Model
 
     public const DEPOSEE = 'deposee';
 
+    /** Au travail : l'étape en cours est dans `etape`. */
+    public const EN_TRAITEMENT = 'en_traitement';
+
     public const PRETE = 'prete';
 
     public const RETIREE = 'retiree';
 
     public const ANNULEE = 'annulee';
+
+    /** Les commandes pas encore rendues. */
+    public const OUVERTES = [self::DEPOSEE, self::EN_TRAITEMENT, self::PRETE];
+
+    /** Les étapes du travail, dans l'ordre. Facultatives : on peut passer directement à « prête ». */
+    public const ETAPES = ['lavage' => 'Lavage', 'sechage' => 'Séchage', 'repassage' => 'Repassage', 'controle' => 'Contrôle qualité'];
 
     protected $table = 'commandes_pressing';
 
@@ -38,8 +47,18 @@ class CommandePressing extends Model
     {
         return [
             'numero' => 'integer', 'express' => 'boolean', 'total' => 'integer', 'acompte' => 'integer',
-            'retrait_prevu_le' => 'datetime', 'prete_le' => 'datetime', 'retiree_le' => 'datetime', 'annulee_le' => 'datetime',
+            'historique' => 'array', 'retrait_prevu_le' => 'datetime', 'prete_le' => 'datetime', 'retiree_le' => 'datetime', 'annulee_le' => 'datetime',
         ];
+    }
+
+    /**
+     * Ajoute un pas à l'historique : quoi, quand, par qui.
+     *
+     * @return list<array{quoi: string, le: string, par: ?string}>
+     */
+    public function avecPas(string $quoi, ?User $par): array
+    {
+        return [...($this->historique ?? []), ['quoi' => $quoi, 'le' => now()->toIso8601String(), 'par' => $par?->name]];
     }
 
     /** « C-0012 ». */
@@ -58,11 +77,17 @@ class CommandePressing extends Model
 
     public function enRetard(): bool
     {
-        return in_array($this->statut, [self::DEPOSEE, self::PRETE], true)
+        return in_array($this->statut, self::OUVERTES, true)
             && $this->retrait_prevu_le !== null && $this->retrait_prevu_le->isPast();
     }
 
     /** @return HasMany<LigneCommandePressing, $this> */
+    /** @return HasMany<EncaissementPressing, $this> */
+    public function encaissements(): HasMany
+    {
+        return $this->hasMany(EncaissementPressing::class, 'commande_id');
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(LigneCommandePressing::class, 'commande_id');

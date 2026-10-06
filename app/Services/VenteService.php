@@ -276,6 +276,8 @@ class VenteService
                 'tva' => $tva,
                 'total' => $total,
                 'montant_paye' => $paye,
+                // Pressing : acompte déjà encaissé au dépôt, à ne pas recompter dans la caisse.
+                'acompte_deduit' => min($paye, (int) ($data['acompte_deduit'] ?? 0)),
                 'reste_du' => $reste,
                 'moyen_paiement' => $moyenPaiement,
                 'montant_recu' => $montantRecu,

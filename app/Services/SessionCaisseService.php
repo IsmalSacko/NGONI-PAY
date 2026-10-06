@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\MoyenPaiement;
+use App\Models\EncaissementPressing;
 use App\Models\ReglementCredit;
 use App\Models\SessionCaisse;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -55,19 +57,23 @@ class SessionCaisseService
     /**
      * Espèces entrées dans le tiroir pendant la séance (annulées exclues) :
      * ce qui a été payé des ventes — pas leur reste dû, qui n'est pas encore
-     * là — et les dettes remboursées en espèces.
+     * là — et les dettes remboursées en espèces. Pressing : l'acompte entre le
+     * jour du dépôt (et sort s'il est rendu) ; au retrait, il n'est pas recompté.
      */
     public function totalEspeces(SessionCaisse $session): int
     {
         $ventes = (int) $session->ventes()
             ->valides()
             ->where('moyen_paiement', MoyenPaiement::Especes)
-            ->sum('montant_paye');
+            ->sum(DB::raw('montant_paye - acompte_deduit'));
         $remboursements = (int) ReglementCredit::where('session_caisse_id', $session->id)
             ->where('moyen_paiement', MoyenPaiement::Especes->value)
             ->sum('montant');
+        $acomptes = EncaissementPressing::where('session_caisse_id', $session->id)
+            ->where('moyen_paiement', MoyenPaiement::Especes->value)
+            ->get()->sum(fn (EncaissementPressing $e) => $e->signe());
 
-        return $ventes + $remboursements;
+        return $ventes + $remboursements + $acomptes;
     }
 
     /** Ce que le tiroir devrait contenir : le fond d'ouverture plus les espèces encaissées. */

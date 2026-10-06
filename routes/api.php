@@ -216,10 +216,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
     // Pressing : le registre des commandes (dépôt → prête → retrait, où naît la vente).
+    Route::get('commandes-pressing/reglages', [\App\Http\Controllers\Api\CommandePressingController::class, 'reglages'])->middleware('permission:ventes.view');
+    Route::put('commandes-pressing/reglages', [\App\Http\Controllers\Api\CommandePressingController::class, 'majReglages'])->middleware('permission:boutique.update');
     Route::get('commandes-pressing/compteurs', [\App\Http\Controllers\Api\CommandePressingController::class, 'compteurs'])->middleware('permission:ventes.view');
     Route::get('commandes-pressing', [\App\Http\Controllers\Api\CommandePressingController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('commandes-pressing/{commande}', [\App\Http\Controllers\Api\CommandePressingController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('commandes-pressing', [\App\Http\Controllers\Api\CommandePressingController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    Route::post('commandes-pressing/{commande}/etape', [\App\Http\Controllers\Api\CommandePressingController::class, 'etape'])->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/prete', [\App\Http\Controllers\Api\CommandePressingController::class, 'prete'])->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/retrait', [\App\Http\Controllers\Api\CommandePressingController::class, 'retrait'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     Route::post('commandes-pressing/{commande}/annuler', [\App\Http\Controllers\Api\CommandePressingController::class, 'annuler'])->middleware('permission:ventes.delete');

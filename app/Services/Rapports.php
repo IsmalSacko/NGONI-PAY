@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\MoyenPaiement;
 use App\Models\Client;
+use App\Models\EncaissementPressing;
 use App\Models\LigneVente;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
@@ -112,10 +113,12 @@ class Rapports
             ],
             // L'argent réellement reçu : le payé des ventes et les dettes
             // remboursées. Le chiffre des ventes, lui, compte aussi le crédit.
+            // Pressing : l'acompte compte le jour du dépôt, pas au retrait.
             'encaisse' => [
-                'ventes' => $payeVentes = (int) $valides()->sum('montant_paye'),
+                'ventes' => $payeVentes = (int) $valides()->sum(DB::raw('montant_paye - acompte_deduit')),
                 'remboursements' => $rembourse,
-                'total' => $payeVentes + $rembourse,
+                'acomptes' => $acomptes = (int) EncaissementPressing::whereBetween('created_at', [$debut, $fin])->get()->sum(fn (EncaissementPressing $e) => $e->signe()),
+                'total' => $payeVentes + $rembourse + $acomptes,
                 'a_recevoir' => $encoreDu,
             ],
         ];

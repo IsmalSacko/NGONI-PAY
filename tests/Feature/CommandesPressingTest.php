@@ -179,4 +179,68 @@ class CommandesPressingTest extends TestCase
         $this->api()->postJson("/api/commandes-pressing/{$vieille['id']}/retrait", ['moyen_paiement' => 'especes'])->assertOk();
         $this->api()->getJson('/api/commandes-pressing/compteurs')->assertJson(['data' => ['abandon' => 0, 'retard' => 1]]);
     }
+
+    public function test_etapes_du_travail_avec_historique(): void
+    {
+        $c = $this->deposer()->assertCreated()->json('data');
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/etape", ['etape' => 'lavage'])->assertOk()
+            ->assertJsonPath('data.statut', 'en_traitement')->assertJsonPath('data.etape', 'lavage');
+        $this->assertCount(1, $this->api()->getJson('/api/commandes-pressing?filtre=en_cours')->json('data'), 'au travail, elle reste en cours');
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/etape", ['etape' => 'repassage'])->assertOk();
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/etape", ['etape' => 'teinture'])->assertUnprocessable();
+        $fini = $this->api()->postJson("/api/commandes-pressing/{$c['id']}/prete")->assertOk()->json('data');
+
+        $this->assertSame(['deposee', 'lavage', 'repassage', 'prete'], array_column($fini['historique'], 'quoi'));
+        $this->assertSame('Awa', $fini['historique'][1]['par']);
+        $this->assertNull($fini['etape']);
+    }
+
+    public function test_acompte_compte_au_depot_pas_au_retrait(): void
+    {
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
+        $c = $this->deposer(['acompte' => 1000, 'moyen_acompte' => 'especes'])->assertCreated()->json('data');
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 11000);
+
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/retrait", ['moyen_paiement' => 'especes', 'montant_donne' => 2000])->assertOk();
+        $vente = Vente::firstOrFail();
+        $this->assertSame(2600, (int) $vente->total);
+        $this->assertSame(1000, (int) $vente->acompte_deduit);
+        $this->assertSame(400, (int) $vente->monnaie_rendue);
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 12600);
+
+        $jour = now()->toDateString();
+        $this->api()->getJson("/api/rapports?du={$jour}&au={$jour}")->assertOk()
+            ->assertJsonPath('encaisse.acomptes', 1000)->assertJsonPath('encaisse.ventes', 1600)->assertJsonPath('encaisse.total', 2600);
+    }
+
+    public function test_annulation_rembourse_l_acompte(): void
+    {
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
+        $c = $this->deposer(['acompte' => 1000])->assertCreated()->json('data');
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/annuler", ['motif' => 'client parti', 'rembourser' => true])->assertOk()
+            ->assertJsonPath('data.rembourse', 1000);
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 10000);
+    }
+
+    public function test_le_reste_peut_passer_en_credit_au_retrait(): void
+    {
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
+        $c = $this->deposer(['acompte' => 1000])->assertCreated()->json('data');
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/retrait", ['moyen_paiement' => 'especes', 'credit' => true])->assertOk()
+            ->assertJsonPath('data.statut', 'retiree');
+        $vente = Vente::firstOrFail();
+        $this->assertSame(1600, (int) $vente->reste_du);
+        $this->assertSame($this->client, $vente->client_id);
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 11000);
+    }
+
+    public function test_conditions_du_recu_et_historique_du_client(): void
+    {
+        $this->api()->putJson('/api/commandes-pressing/reglages', ['conditions_depot' => 'Remboursement : 10 fois le prix du lavage.'])->assertOk()
+            ->assertJsonPath('data.conditions_depot', 'Remboursement : 10 fois le prix du lavage.');
+        $this->deposer()->assertCreated();
+        $autre = Client::create(['nom' => 'Fanta', 'telephone' => '+22370000001'])->id;
+        $this->assertCount(1, $this->api()->getJson("/api/commandes-pressing?client_id={$this->client}")->json('data'));
+        $this->assertCount(0, $this->api()->getJson("/api/commandes-pressing?client_id={$autre}")->json('data'));
+    }
 }

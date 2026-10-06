@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\CommandePressing;
+use App\Models\EncaissementPressing;
 use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\ServicePressing;
@@ -23,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CommandesPressing
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly SessionCaisseService $sessions) {}
 
     public function boutique(): Boutique
     {
@@ -99,6 +100,7 @@ class CommandesPressing
                 'client_id' => $data['client_id'],
                 'user_id' => $agent->id,
                 'statut' => CommandePressing::DEPOSEE,
+                'historique' => [['quoi' => CommandePressing::DEPOSEE, 'le' => now()->toIso8601String(), 'par' => $agent->name]],
                 'express' => $express,
                 'total' => $total,
                 'acompte' => $acompte,
@@ -109,15 +111,37 @@ class CommandesPressing
                 'notes' => $data['notes'] ?? null,
             ]);
             $commande->lignes()->createMany($lignes);
+            // L'acompte est un vrai encaissement : il entre dans la caisse du jour (pas encore une vente).
+            if ($acompte > 0) {
+                $this->mouvement($commande, EncaissementPressing::ACOMPTE, $acompte, $commande->moyen_acompte, $agent);
+            }
 
             return $commande->load('lignes', 'client');
         });
     }
 
-    public function marquerPrete(CommandePressing $commande): CommandePressing
+    /** Une étape du travail (lavage, séchage, repassage, contrôle). */
+    public function etape(CommandePressing $commande, string $etape, User $agent): CommandePressing
     {
         $this->exigerOuverte($commande);
-        $commande->update(['statut' => CommandePressing::PRETE, 'prete_le' => now()]);
+        if (! array_key_exists($etape, CommandePressing::ETAPES)) {
+            throw ValidationException::withMessages(['etape' => ['Étape inconnue.']]);
+        }
+        $commande->update([
+            'statut' => CommandePressing::EN_TRAITEMENT, 'etape' => $etape, 'prete_le' => null,
+            'historique' => $commande->avecPas($etape, $agent),
+        ]);
+
+        return $commande;
+    }
+
+    public function marquerPrete(CommandePressing $commande, ?User $agent = null): CommandePressing
+    {
+        $this->exigerOuverte($commande);
+        $commande->update([
+            'statut' => CommandePressing::PRETE, 'etape' => null, 'prete_le' => now(),
+            'historique' => $commande->avecPas(CommandePressing::PRETE, $agent),
+        ]);
 
         return $commande;
     }
@@ -125,8 +149,9 @@ class CommandesPressing
     /**
      * Retrait : la vente naît, aux prix figés du dépôt, acompte compris ; la
      * commande est clôturée. [montant_donne] : ce que le client remet maintenant.
+     * [credit] : le reste passe sur le compte du client (vente à crédit existante).
      *
-     * @param  array{moyen_paiement: string, montant_donne?: ?int}  $data
+     * @param  array{moyen_paiement: string, montant_donne?: ?int, credit?: bool}  $data
      */
     public function retirer(CommandePressing $commande, array $data, User $caissier): CommandePressing
     {
@@ -134,6 +159,11 @@ class CommandesPressing
         $commande->loadMissing('lignes');
 
         $donne = $data['montant_donne'] ?? null;
+        $credit = (bool) ($data['credit'] ?? false) && $commande->reste() > 0;
+        // L'acompte est déjà dans la caisse (jour du dépôt) : la vente le note pour ne pas le recompter.
+        $paiement = $credit
+            ? ['moyen_paiement' => $commande->moyen_acompte ?? 'especes', 'montant_paye' => $commande->acompte, 'montant_recu' => $commande->acompte]
+            : ['moyen_paiement' => $data['moyen_paiement'], 'montant_recu' => $donne === null ? $commande->total : $commande->acompte + (int) $donne];
         $vente = app(VenteService::class)->encaisser([
             'client_id' => $commande->client_id,
             'express' => $commande->express,
@@ -141,29 +171,48 @@ class CommandesPressing
                 ? ['produit_id' => $l->produit_id, 'service_id' => $l->service_id, 'quantite' => $l->quantite, 'prix_fige' => $l->prix_unitaire]
                 // Habit supprimé depuis : la ligne garde son nom et son prix.
                 : ['libelle' => $l->nom.' · '.$l->service, 'prix_unitaire' => $l->prix_unitaire, 'quantite' => $l->quantite, 'taux_tva' => 0])->all(),
-            'moyen_paiement' => $data['moyen_paiement'],
-            // L'acompte a déjà été versé : le reçu compte l'acompte et ce qui est remis maintenant.
-            'montant_recu' => $donne === null ? $commande->total : $commande->acompte + (int) $donne,
+            ...$paiement,
+            'acompte_deduit' => $commande->acompte,
         ], $caissier);
 
         $commande->update([
-            'statut' => CommandePressing::RETIREE, 'retiree_le' => now(), 'retiree_par' => $caissier->id, 'vente_id' => $vente->id,
+            'statut' => CommandePressing::RETIREE, 'etape' => null, 'retiree_le' => now(), 'retiree_par' => $caissier->id, 'vente_id' => $vente->id,
+            'historique' => $commande->avecPas(CommandePressing::RETIREE, $caissier),
         ]);
 
         return $commande;
     }
 
-    public function annuler(CommandePressing $commande, ?string $motif): CommandePressing
+    /** Annulation ; [rembourser] : l'acompte est rendu au client et sort de la caisse du jour. */
+    public function annuler(CommandePressing $commande, ?string $motif, bool $rembourser = false, ?User $agent = null): CommandePressing
     {
         $this->exigerOuverte($commande);
-        $commande->update(['statut' => CommandePressing::ANNULEE, 'annulee_le' => now(), 'motif_annulation' => $motif]);
+        DB::transaction(function () use ($commande, $motif, $rembourser, $agent): void {
+            if ($rembourser && $commande->acompte > 0) {
+                $this->mouvement($commande, EncaissementPressing::REMBOURSEMENT, $commande->acompte, $commande->moyen_acompte ?? 'especes', $agent);
+            }
+            $commande->update([
+                'statut' => CommandePressing::ANNULEE, 'etape' => null, 'annulee_le' => now(), 'motif_annulation' => $motif,
+                'historique' => $commande->avecPas(CommandePressing::ANNULEE, $agent),
+            ]);
+        });
 
         return $commande;
     }
 
+    /** Acompte ou remboursement, rattaché à la séance de caisse de l'agent (le tiroir du jour). */
+    private function mouvement(CommandePressing $commande, string $type, int $montant, ?string $moyen, ?User $agent): void
+    {
+        EncaissementPressing::create([
+            'boutique_id' => $commande->boutique_id, 'commande_id' => $commande->id, 'user_id' => $agent?->id,
+            'session_caisse_id' => $agent === null ? null : $this->sessions->courante($agent)?->id,
+            'type' => $type, 'montant' => $montant, 'moyen_paiement' => $moyen ?? 'especes',
+        ]);
+    }
+
     private function exigerOuverte(CommandePressing $commande): void
     {
-        if (! in_array($commande->statut, [CommandePressing::DEPOSEE, CommandePressing::PRETE], true)) {
+        if (! in_array($commande->statut, CommandePressing::OUVERTES, true)) {
             throw ValidationException::withMessages(['commande' => ['Cette commande est déjà '.($commande->statut === CommandePressing::RETIREE ? 'retirée' : 'annulée').'.']]);
         }
     }
