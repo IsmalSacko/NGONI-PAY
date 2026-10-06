@@ -57,7 +57,9 @@ class Index extends Component
     {
         Auth::user()->can('boutique.update') || abort(403);
         in_array($activite, Boutique::ACTIVITES, true) || abort(422);
-        Boutique::findOrFail($this->boutiqueActiveId())->forceFill(['activite' => $activite])->save();
+        $boutique = Boutique::findOrFail($this->boutiqueActiveId());
+        $boutique->forceFill(['activite' => $activite])->save();
+        $boutique->preparerPressing();
         session()->flash('info', match ($activite) {
             'pharmacie' => 'Mode pharmacie activé : la caisse parle le langage de l’officine.',
             'pressing' => 'Mode pressing activé : la caisse parle de vêtements et de prestations, sans stock à compter.',

@@ -101,12 +101,26 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $boutique->fresh()]);
     }
 
-    /** Activité de la boutique : « pharmacie » adapte la caisse (mots, détail, lots, ordonnance). */
+    /**
+     * Activité de la boutique : « pharmacie » adapte la caisse (mots, détail,
+     * lots, ordonnance), « pressing » aussi (services, express, sans stock).
+     */
     public function activite(Request $request): JsonResponse
     {
         $data = $request->validate(['activite' => ['required', Rule::in(Boutique::ACTIVITES)]]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         $boutique->forceFill(['activite' => $data['activite']])->save();
+        $boutique->preparerPressing();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    /** Pressing : de combien l'express majore le prix classique (50 : +50 %). */
+    public function express(Request $request): JsonResponse
+    {
+        $data = $request->validate(['majoration_pct' => ['required', 'integer', 'min:0', 'max:300']]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->forceFill(['express_majoration_pct' => $data['majoration_pct']])->save();
 
         return response()->json(['data' => $boutique->fresh()]);
     }

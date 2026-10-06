@@ -62,6 +62,17 @@ class Boutique extends Model
         return ! $this->estPressing();
     }
 
+    /** Au passage en pressing : les services courants, si la boutique n'en a aucun. */
+    public function preparerPressing(): void
+    {
+        if (! $this->estPressing() || ServicePressing::withoutBoutiqueScope()->where('boutique_id', $this->id)->exists()) {
+            return;
+        }
+        foreach (ServicePressing::PAR_DEFAUT as $i => $nom) {
+            (new ServicePressing(['nom' => $nom, 'ordre' => $i]))->forceFill(['boutique_id' => $this->id])->save();
+        }
+    }
+
     protected function casts(): array
     {
         return [

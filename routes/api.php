@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\PublicationPlayController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\StatistiqueController;
+use App\Http\Controllers\Api\ServicePressingController;
 use App\Http\Controllers\Api\UniteController;
 use App\Http\Controllers\Api\VenteController;
 use App\Models\Boutique;
@@ -122,6 +123,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware(['permission:boutique.update', 'fonctionnalite:objectif_mois']);
     Route::put('boutique/activite', [BoutiqueController::class, 'activite'])->middleware('permission:boutique.update');
+    Route::put('boutique/express', [BoutiqueController::class, 'express'])->middleware('permission:boutique.update');
     Route::put('boutique/ventes', [BoutiqueController::class, 'ventes'])->middleware('permission:boutique.update');
     Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware(['permission:boutique.update', 'fonctionnalite:fidelite']);
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
@@ -172,6 +174,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('unites', [UniteController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('unites/{unite}', [UniteController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
     Route::delete('unites/{unite}', [UniteController::class, 'destroy'])->middleware(['permission:produits.update', 'abonnement']);
+    // Pressing : ses services (lavage + repassage, repassage seul…), chacun à son prix par habit.
+    Route::get('services', [ServicePressingController::class, 'index'])->middleware('permission:produits.view');
+    Route::post('services', [ServicePressingController::class, 'store'])->middleware(['permission:produits.create', 'abonnement']);
+    Route::put('services/{service}', [ServicePressingController::class, 'update'])->middleware(['permission:produits.update', 'abonnement']);
+    Route::delete('services/{service}', [ServicePressingController::class, 'destroy'])->middleware(['permission:produits.update', 'abonnement']);
     // Pharmacie : lots qui périment dans les 90 jours (ou déjà périmés).
     Route::get('stocks/peremption', [ProduitController::class, 'peremption'])->middleware('permission:produits.view');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).

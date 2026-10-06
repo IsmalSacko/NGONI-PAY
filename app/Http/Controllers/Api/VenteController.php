@@ -103,6 +103,10 @@ class VenteController extends Controller
             'lignes.*.quantite' => ['required', 'numeric', 'min:0.001', 'max:1000000', 'decimal:0,3'],
             // Pharmacie : le palier vendu (boîte, plaquette, comprimé).
             'lignes.*.palier' => ['nullable', 'string', 'max:40'],
+            // Pressing : le service de l'habit (lavage + repassage, repassage seul…).
+            'lignes.*.service_id' => ['nullable', 'uuid'],
+            // Pressing : tout le dépôt en express, au prix express.
+            'express' => ['nullable', 'boolean'],
             // Vente en gros : « gros » pour tout le panier (droit de remise).
             'tarif' => ['nullable', 'in:detail,gros'],
             'ordonnance' => ['nullable', 'array'],

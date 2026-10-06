@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\MouvementStock;
 use App\Models\Plan;
 use App\Models\Produit;
+use App\Models\ServicePressing;
 use App\Models\SessionCaisse;
 use App\Models\User;
 use App\Models\Vente;
@@ -81,6 +82,10 @@ class VenteService
                 ->get()
                 ->keyBy('id');
 
+            // Pressing : les services demandés, et l'express pour tout le dépôt.
+            $services = ServicePressing::whereIn('id', array_filter(array_column($data['lignes'], 'service_id')))->get()->keyBy('id');
+            $express = (bool) ($data['express'] ?? false);
+
             $lignes = [];
             $sousTotal = 0;
             /** @var array<string, int|float> $besoin unités de base demandées par article */
@@ -128,6 +133,36 @@ class VenteService
 
                 if ($produit === null) {
                     throw ValidationException::withMessages(['lignes' => ["Produit introuvable : {$ligne['produit_id']}."]]);
+                }
+
+                // Pressing : l'habit dans un service, au prix classique ou express.
+                // Pas de stock : une prestation ne se compte pas.
+                if (! empty($ligne['service_id'])) {
+                    $service = $services->get($ligne['service_id']);
+                    $prix = $service === null ? null : $produit->prixService($service->id, $express, (int) $boutique->express_majoration_pct);
+                    if ($prix === null) {
+                        throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » ne se fait pas dans ce service."]]);
+                    }
+                    $totalLigne = (int) round($prix * $ligne['quantite']);
+                    $sousTotal += $totalLigne;
+                    $lignes[] = [
+                        'produit' => $produit,
+                        'nom' => $produit->nom.' · '.$service->nom,
+                        'quantite' => $ligne['quantite'],
+                        'unite' => null,
+                        'contenance' => 1,
+                        'base' => $ligne['quantite'],
+                        'prix_unitaire' => $prix,
+                        'prix_gros' => false,
+                        'prix_detail' => null,
+                        'prix_achat' => null,
+                        'taux_tva' => $produit->taux_tva,
+                        'total_ligne' => $totalLigne,
+                        'service' => $service->nom,
+                        'express' => $express,
+                    ];
+
+                    continue;
                 }
 
                 // Au détail (pharmacie) : une boîte, une plaquette ou un
@@ -241,6 +276,7 @@ class VenteService
                 'synchronisee_le' => now(),
                 // Pharmacie : qui a prescrit, le numéro, pour qui.
                 'ordonnance' => array_filter($data['ordonnance'] ?? []) ?: null,
+                'express' => $express && collect($lignes)->contains(fn ($l) => isset($l['service'])),
             ]);
 
             foreach ($lignes as $l) {
@@ -256,12 +292,14 @@ class VenteService
                     'prix_gros' => $l['prix_gros'] ?? false,
                     'prix_detail' => $l['prix_detail'] ?? null,
                     // Le lot qui périme le plus tôt part le premier.
-                    'lots' => $l['produit'] === null ? null : (app(Lots::class)->prelever($l['produit'], $l['base']) ?: null),
+                    'lots' => $l['produit'] === null || isset($l['service']) ? null : (app(Lots::class)->prelever($l['produit'], $l['base']) ?: null),
                     'total_ligne' => $l['total_ligne'],
+                    'service' => $l['service'] ?? null,
+                    'express' => $l['express'] ?? false,
                 ]);
 
                 // Ligne libre, ou prestation d'un pressing : ni stock ni mouvement à écrire.
-                if ($l['produit'] === null || ! $boutique->suitLeStock()) {
+                if ($l['produit'] === null || isset($l['service']) || ! $boutique->suitLeStock()) {
                     continue;
                 }
 

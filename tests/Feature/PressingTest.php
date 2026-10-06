@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Boutique;
 use App\Models\MouvementStock;
 use App\Models\Produit;
+use App\Models\ServicePressing;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
@@ -107,5 +108,88 @@ class PressingTest extends TestCase
             ->assertJsonPath('produits_en_rupture', 0)
             ->assertJsonPath('produits_stock_faible', 0);
         $this->api()->getJson('/api/stocks/a-commander')->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @return array<string, string> nom du service → id */
+    private function passerEnPressing(): array
+    {
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'pressing'])->assertOk();
+
+        return collect($this->api()->getJson('/api/services')->assertOk()->json('data'))->pluck('id', 'nom')->all();
+    }
+
+    public function test_le_passage_en_pressing_propose_les_services_courants_une_seule_fois(): void
+    {
+        $services = $this->passerEnPressing();
+        $this->assertSame(ServicePressing::PAR_DEFAUT, array_keys($services));
+
+        // Revenir en commerce puis en pressing ne les recrée pas.
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'commerce'])->assertOk();
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'pressing'])->assertOk();
+        $this->assertSame(4, ServicePressing::count());
+    }
+
+    public function test_chaque_habit_a_son_prix_par_service_et_l_express_se_calcule_tout_seul(): void
+    {
+        $s = $this->passerEnPressing();
+        $chemise = $this->api()->postJson('/api/produits', [
+            'nom' => 'Chemise', 'prix_vente' => 300, 'taux_tva' => 0,
+            'tarifs' => [
+                ['service_id' => $s['Lavage + repassage'], 'prix' => 500],
+                ['service_id' => $s['Repassage seul'], 'prix' => 300, 'prix_express' => 400],
+            ],
+        ])->assertCreated()->json();
+
+        $depot = fn (bool $express) => $this->api()->postJson('/api/ventes', [
+            'lignes' => [
+                ['produit_id' => $chemise['id'], 'service_id' => $s['Lavage + repassage'], 'quantite' => 2],
+                ['produit_id' => $chemise['id'], 'service_id' => $s['Repassage seul'], 'quantite' => 1],
+            ],
+            'express' => $express,
+            'moyen_paiement' => 'especes',
+        ])->assertCreated();
+
+        $classique = $depot(false);
+        $this->assertSame(2 * 500 + 300, $classique->json('total'));
+        $this->assertSame(['Chemise · Lavage + repassage', 'Chemise · Repassage seul'], array_column($classique->json('lignes'), 'nom_produit'));
+        $this->assertFalse($classique->json('express'));
+
+        // Express : +50 % par défaut (500 → 750), sauf le prix express écrit sur l'habit (400).
+        $express = $depot(true);
+        $this->assertSame(2 * 750 + 400, $express->json('total'));
+        $this->assertTrue($express->json('express'));
+        $this->assertSame([true, true], array_column($express->json('lignes'), 'express'));
+
+        // La boutique règle sa majoration : +100 %.
+        $this->api()->putJson('/api/boutique/express', ['majoration_pct' => 100])->assertOk();
+        $this->assertSame(2 * 1000 + 400, $depot(true)->json('total'));
+    }
+
+    public function test_un_habit_ne_se_vend_pas_dans_un_service_qu_il_n_a_pas(): void
+    {
+        $s = $this->passerEnPressing();
+        $drap = $this->api()->postJson('/api/produits', [
+            'nom' => 'Drap', 'prix_vente' => 750, 'taux_tva' => 0,
+            'tarifs' => [['service_id' => $s['Lavage + repassage'], 'prix' => 750]],
+        ])->assertCreated()->json();
+
+        $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $drap['id'], 'service_id' => $s['Nettoyage à sec'], 'quantite' => 1]],
+            'moyen_paiement' => 'especes',
+        ])->assertUnprocessable();
+    }
+
+    public function test_supprimer_un_service_retire_ses_prix_des_habits(): void
+    {
+        $s = $this->passerEnPressing();
+        $bazin = $this->api()->postJson('/api/produits', [
+            'nom' => 'Bazin homme', 'prix_vente' => 750, 'taux_tva' => 0,
+            'tarifs' => [['service_id' => $s['Lavage + repassage'], 'prix' => 1250], ['service_id' => $s['Repassage seul'], 'prix' => 750]],
+        ])->assertCreated()->json();
+
+        $this->api()->putJson('/api/services/'.$s['Repassage seul'], ['nom' => 'Lavage + repassage'])->assertUnprocessable();
+        $this->api()->putJson('/api/services/'.$s['Repassage seul'], ['nom' => 'Repassage'])->assertOk();
+        $this->api()->deleteJson('/api/services/'.$s['Repassage seul'])->assertNoContent();
+        $this->assertSame([['service_id' => $s['Lavage + repassage'], 'prix' => 1250]], Produit::find($bazin['id'])->tarifs);
     }
 }

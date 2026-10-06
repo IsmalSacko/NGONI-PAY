@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'code', 'code_barre',
+    'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'tarifs', 'code', 'code_barre',
     'prix_achat', 'prix_vente', 'prix_gros', 'seuil_gros', 'taux_tva', 'stock', 'seuil_alerte', 'actif',
 ])]
 class Produit extends Model
@@ -49,6 +49,7 @@ class Produit extends Model
             'seuil_gros' => QuantiteCast::class,
             'sur_ordonnance' => 'boolean',
             'paliers' => 'array',
+            'tarifs' => 'array',
         ];
     }
 
@@ -90,6 +91,26 @@ class Produit extends Model
         foreach ($this->paliers ?? [] as $p) {
             if (($p['unite'] ?? null) === $unite) {
                 return ['unite' => $unite, 'contenance' => (int) $p['contenance'], 'prix' => (int) $p['prix'], 'prix_gros' => isset($p['prix_gros']) ? (int) $p['prix_gros'] : null];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Pressing : le prix de cet habit pour un service, express ou non. Null :
+     * l'habit ne se fait pas dans ce service. L'express prend le prix écrit
+     * sur l'habit, sinon le prix classique majoré du pourcentage de la boutique.
+     */
+    public function prixService(string $serviceId, bool $express, int $majorationPct): ?int
+    {
+        foreach ($this->tarifs ?? [] as $t) {
+            if (($t['service_id'] ?? null) === $serviceId) {
+                if (! $express) {
+                    return (int) $t['prix'];
+                }
+
+                return isset($t['prix_express']) ? (int) $t['prix_express'] : (int) round($t['prix'] * (100 + $majorationPct) / 100);
             }
         }
 

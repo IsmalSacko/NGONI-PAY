@@ -193,8 +193,21 @@ class ProduitController extends Controller
             'paliers.*.contenance' => ['required', 'integer', 'min:2', 'max:100000'],
             'paliers.*.prix' => ['required', 'integer', 'min:0', 'max:1000000000'],
             'paliers.*.prix_gros' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            // Pressing : un prix par service, et le prix express s'il n'est pas la majoration.
+            'tarifs' => ['nullable', 'array', 'max:20'],
+            'tarifs.*.service_id' => ['required', 'uuid', 'distinct', Rule::exists('services_pressing', 'id')->where('boutique_id', app(TenantContext::class)->boutiqueId())],
+            'tarifs.*.prix' => ['required', 'integer', 'min:1', 'max:1000000000'],
+            'tarifs.*.prix_express' => ['nullable', 'integer', 'min:1', 'max:1000000000'],
             'actif' => ['nullable', 'boolean'],
         ]);
+
+        if (array_key_exists('tarifs', $data)) {
+            $tarifs = collect($data['tarifs'] ?? [])
+                ->map(fn ($t) => array_filter(['service_id' => $t['service_id'], 'prix' => (int) $t['prix'],
+                    'prix_express' => isset($t['prix_express']) ? (int) $t['prix_express'] : null], fn ($v) => $v !== null))
+                ->values()->all();
+            $data['tarifs'] = $tarifs === [] ? null : $tarifs;
+        }
 
         // Du plus petit au plus grand ; aucun palier : pas de détail.
         if (array_key_exists('paliers', $data)) {
