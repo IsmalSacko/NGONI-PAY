@@ -140,7 +140,7 @@ class VenteService
                 $base = Quantite::normaliser($ligne['quantite'] * $palier['contenance']);
                 $besoin[$produit->id] = Quantite::normaliser(($besoin[$produit->id] ?? 0) + $base);
 
-                if (round($produit->stock - $besoin[$produit->id], 3) < 0) {
+                if ($boutique->suitLeStock() && round($produit->stock - $besoin[$produit->id], 3) < 0) {
                     $reste = Quantite::formater($produit->stock, $produit->unite);
                     throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$reste})."]]);
                 }
@@ -260,8 +260,8 @@ class VenteService
                     'total_ligne' => $l['total_ligne'],
                 ]);
 
-                // Ligne libre : ni stock ni mouvement à écrire.
-                if ($l['produit'] === null) {
+                // Ligne libre, ou prestation d'un pressing : ni stock ni mouvement à écrire.
+                if ($l['produit'] === null || ! $boutique->suitLeStock()) {
                     continue;
                 }
 
@@ -334,8 +334,11 @@ class VenteService
                 'motif_annulation' => $motif,
             ]);
 
+            // Le stock ne revient que là où la vente l'avait pris : pas pour
+            // les prestations d'un pressing, même s'il a changé d'activité depuis.
+            $sortis = MouvementStock::where('vente_id', $vente->id)->where('type', TypeMouvementStock::Sortie)->pluck('produit_id')->all();
             foreach ($vente->lignes()->whereNotNull('produit_id')->get() as $ligne) {
-                $produit = Produit::whereKey($ligne->produit_id)->lockForUpdate()->first();
+                $produit = in_array($ligne->produit_id, $sortis, true) ? Produit::whereKey($ligne->produit_id)->lockForUpdate()->first() : null;
                 if ($produit === null) {
                     continue;
                 }

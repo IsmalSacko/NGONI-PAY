@@ -58,7 +58,11 @@ class Index extends Component
         Auth::user()->can('boutique.update') || abort(403);
         in_array($activite, Boutique::ACTIVITES, true) || abort(422);
         Boutique::findOrFail($this->boutiqueActiveId())->forceFill(['activite' => $activite])->save();
-        session()->flash('info', $activite === 'pharmacie' ? 'Mode pharmacie activé : la caisse parle le langage de l’officine.' : 'Mode commerce : la caisse reprend ses réglages habituels.');
+        session()->flash('info', match ($activite) {
+            'pharmacie' => 'Mode pharmacie activé : la caisse parle le langage de l’officine.',
+            'pressing' => 'Mode pressing activé : la caisse parle de vêtements et de prestations, sans stock à compter.',
+            default => 'Mode commerce : la caisse reprend ses réglages habituels.',
+        });
     }
 
     /** Vos ventes : au détail, au détail et en gros (offre Pro), en gros uniquement. */

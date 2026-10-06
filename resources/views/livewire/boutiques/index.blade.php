@@ -28,7 +28,7 @@
     @if ($boutiqueActive)
         <x-charte.carte-heros icone="storefront" titre="Boutique active" :valeur="$boutiqueActive->nom">
             <span class="text-white/90">{{ \App\Enums\Country::tryFrom((string) $boutiqueActive->pays)?->label() }} · devise {{ $boutiqueActive->devise }}</span>
-            <span>{{ $boutiqueActive->estPharmacie() ? 'Pharmacie' : 'Commerce' }}@if ($boutiqueActive->fidelite_seuil) · fidélité : {{ $boutiqueActive->fidelite_remise_pct }} % après {{ $boutiqueActive->fidelite_seuil }} achats @endif</span>
+            <span>{{ match ($boutiqueActive->activite) { 'pharmacie' => 'Pharmacie', 'pressing' => 'Pressing', default => 'Commerce' } }}@if ($boutiqueActive->fidelite_seuil) · fidélité : {{ $boutiqueActive->fidelite_remise_pct }} % après {{ $boutiqueActive->fidelite_seuil }} achats @endif</span>
             @if ($peutRegler)
                 <x-slot:action>
                     <button wire:click="ouvrirReglages" class="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold">
@@ -44,7 +44,7 @@
             {{-- Activité : la caisse s'adapte au métier. --}}
             <x-charte.carte class="p-5 flex flex-col gap-3">
                 <x-charte.en-tete-section icone="work" titre="Activité" sous-titre="La caisse s’adapte à votre métier." />
-                @foreach (['commerce' => ['storefront', 'Commerce', 'Boutique, épicerie, quincaillerie, restaurant… La caisse telle quelle.'], 'pharmacie' => ['local_pharmacy', 'Pharmacie', 'Vente à la boîte, à la plaquette ou au comprimé, lots et péremption, ordonnance, recherche par molécule (DCI).']] as $code => [$icone, $titre, $texte])
+                @foreach (['commerce' => ['storefront', 'Commerce', 'Boutique, épicerie, quincaillerie, restaurant… La caisse telle quelle.'], 'pharmacie' => ['local_pharmacy', 'Pharmacie', 'Vente à la boîte, à la plaquette ou au comprimé, lots et péremption, ordonnance, recherche par molécule (DCI).'], 'pressing' => ['local_laundry_service', 'Pressing', 'Repassage, lavage, nettoyage à sec… La caisse parle de vêtements et de prestations, sans stock à compter.']] as $code => [$icone, $titre, $texte])
                     @php($choisie = ($boutiqueActive->activite ?: 'commerce') === $code)
                     <button wire:click="choisirActivite('{{ $code }}')" class="flex items-start gap-3 text-left rounded-2xl p-3 border-2 {{ $choisie ? 'bg-jaune-doux border-jaune' : 'bg-white border-border hover:border-border-strong' }}">
                         <x-charte.pastille :icone="$icone" :actif="$choisie" :taille="40" />

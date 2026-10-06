@@ -22,6 +22,8 @@ class DashboardController extends Controller
     {
         // Journée d'affaires en cours, comme le rapport et le ticket Z : après une
         // clôture, les ventes du soir comptent déjà pour le lendemain.
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $suitLeStock = $boutique->suitLeStock();
         $aujourdhui = Vente::valides()->where('jour_affaire', app(Journee::class)->courante()->toDateString());
 
         return response()->json([
@@ -37,13 +39,14 @@ class DashboardController extends Controller
                 ->select('moyen_paiement', DB::raw('count(*) as nombre'), DB::raw('sum(total) as total'))
                 ->groupBy('moyen_paiement')
                 ->get(),
-            'produits_en_rupture' => Produit::where('actif', true)->where('stock', '<=', 0)->count(),
-            'produits_stock_faible' => Produit::where('actif', true)
+            // Un pressing ne compte pas de stock : ni rupture ni stock faible.
+            'produits_en_rupture' => $suitLeStock ? Produit::where('actif', true)->where('stock', '<=', 0)->count() : 0,
+            'produits_stock_faible' => $suitLeStock ? Produit::where('actif', true)
                 ->where('stock', '>', 0)
                 ->whereColumn('stock', '<=', 'seuil_alerte')
-                ->count(),
+                ->count() : 0,
             // Objectif du mois et série de journées avec vente.
-            ...app(Elan::class)->pour($boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId())),
+            ...app(Elan::class)->pour($boutique),
             // Pharmacie : lots périmés ou qui périment sous 90 jours, et ce qu'ils ont coûté.
             ...($boutique->estPharmacie() ? ['a_perimer' => $this->aPerimer()] : []),
         ]);

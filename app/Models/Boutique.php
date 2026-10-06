@@ -29,8 +29,11 @@ class Boutique extends Model
     /** Adresse du logo, pour l'application et les tickets. */
     protected $appends = ['logo_url', 'logo_vignette_url'];
 
-    /** Activité choisie dans les réglages : la pharmacie adapte la caisse. */
-    public const ACTIVITES = ['commerce', 'pharmacie'];
+    /**
+     * Activité choisie dans les réglages : la pharmacie et le pressing
+     * adaptent la caisse.
+     */
+    public const ACTIVITES = ['commerce', 'pharmacie', 'pressing'];
 
     /** Vos ventes : au détail, au détail et en gros, en gros uniquement. */
     public const MODES_VENTE = ['detail', 'detail_gros', 'gros'];
@@ -43,6 +46,20 @@ class Boutique extends Model
     public function estPharmacie(): bool
     {
         return $this->activite === 'pharmacie';
+    }
+
+    public function estPressing(): bool
+    {
+        return $this->activite === 'pressing';
+    }
+
+    /**
+     * Un pressing vend des prestations (repassage, lavage…) : rien à compter
+     * en stock, ni rupture ni seuil d'alerte.
+     */
+    public function suitLeStock(): bool
+    {
+        return ! $this->estPressing();
     }
 
     protected function casts(): array

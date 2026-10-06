@@ -1,0 +1,111 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Models\Boutique;
+use App\Models\MouvementStock;
+use App\Models\Produit;
+use App\Models\User;
+use App\Services\BoutiqueRegistrationService;
+use App\Support\Tenancy\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Spatie\Permission\PermissionRegistrar;
+use Tests\TestCase;
+
+/**
+ * Mode pressing : des prestations (repassage, lavage…), pas de marchandise.
+ * Rien à compter en stock : jamais de refus à la vente, jamais de rupture.
+ */
+class PressingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $awa;
+
+    private Boutique $boutique;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Mail::fake();
+        ['user' => $this->awa, 'boutique' => $this->boutique] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Pressing Awa', 'pays' => 'ML', 'telephone' => '76008201', 'email' => null,
+            'password' => 'password123', 'nom_utilisateur' => 'Awa',
+        ]);
+        app(TenantContext::class)->setBoutique($this->boutique->id);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutique->id);
+        Produit::query()->delete();
+    }
+
+    private function api()
+    {
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+        app(TenantContext::class)->forget();
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+        return $this->withToken($this->awa->createToken('t')->plainTextToken);
+    }
+
+    private function article(string $nom, int $prix, int $stock = 0): array
+    {
+        return $this->api()->postJson('/api/produits', ['nom' => $nom, 'prix_vente' => $prix, 'taux_tva' => 0, 'stock' => $stock])
+            ->assertCreated()->json();
+    }
+
+    private function vendre(string $produitId, int $quantite)
+    {
+        return $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $produitId, 'quantite' => $quantite]],
+            'moyen_paiement' => 'especes',
+        ]);
+    }
+
+    public function test_le_pressing_se_choisit_dans_les_reglages(): void
+    {
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'pressing'])->assertOk()->assertJsonPath('data.activite', 'pressing');
+        $this->api()->getJson('/api/moi')->assertOk()->assertJsonPath('user.boutique.activite', 'pressing');
+    }
+
+    public function test_une_prestation_se_vend_sans_stock_et_l_annulation_n_en_invente_pas(): void
+    {
+        $this->boutique->forceFill(['activite' => 'pressing'])->save();
+        $chemise = $this->article('Chemise — repassage', 250);
+
+        $vente = $this->vendre($chemise['id'], 5)->assertCreated();
+        $this->assertSame(1250, $vente->json('total'));
+        $this->assertEquals(0, Produit::find($chemise['id'])->stock, 'le stock ne bouge pas');
+        $this->assertSame(0, MouvementStock::where('produit_id', $chemise['id'])->count(), 'aucun mouvement de stock');
+
+        $this->api()->postJson('/api/ventes/'.$vente->json('id').'/annuler', ['motif' => 'Erreur de saisie'])->assertOk();
+        $this->assertEquals(0, Produit::find($chemise['id'])->stock, 'l’annulation ne rend pas un stock jamais pris');
+    }
+
+    public function test_le_commerce_garde_son_stock_et_une_vente_d_avant_le_pressing_le_rend_a_l_annulation(): void
+    {
+        $savon = $this->article('Savon', 300, stock: 2);
+        $this->vendre($savon['id'], 3)->assertUnprocessable();
+        $vente = $this->vendre($savon['id'], 2)->assertCreated();
+        $this->assertEquals(0, Produit::find($savon['id'])->stock);
+
+        // La boutique passe en pressing : la vente d'avant avait pris du stock, il revient.
+        $this->boutique->forceFill(['activite' => 'pressing'])->save();
+        $this->api()->postJson('/api/ventes/'.$vente->json('id').'/annuler', ['motif' => 'Retour'])->assertOk();
+        $this->assertEquals(2, Produit::find($savon['id'])->stock);
+    }
+
+    public function test_ni_rupture_ni_article_a_racheter(): void
+    {
+        $this->article('Pantalon — lavage', 500);
+        $this->api()->getJson('/api/dashboard')->assertOk()->assertJsonPath('produits_en_rupture', 1);
+
+        $this->boutique->forceFill(['activite' => 'pressing'])->save();
+        $this->api()->getJson('/api/dashboard')->assertOk()
+            ->assertJsonPath('produits_en_rupture', 0)
+            ->assertJsonPath('produits_stock_faible', 0);
+        $this->api()->getJson('/api/stocks/a-commander')->assertOk()->assertJsonPath('data', []);
+    }
+}

@@ -75,7 +75,8 @@ class Dashboard extends Component
             ->limit(5)
             ->get();
 
-        $alertes = Produit::where('actif', true)
+        // Un pressing ne suit pas de stock : pas d'alerte.
+        $alertes = $boutique?->suitLeStock() === false ? collect() : Produit::where('actif', true)
             ->where(fn ($q) => $q->where('stock', '<=', 0)->orWhereColumn('stock', '<=', 'seuil_alerte'))
             ->orderBy('stock')
             ->limit(6)

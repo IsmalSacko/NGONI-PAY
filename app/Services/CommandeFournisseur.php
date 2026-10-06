@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Boutique;
 use App\Models\Fournisseur;
 use App\Models\Produit;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -29,6 +31,10 @@ class CommandeFournisseur
     {
         // Articles de la boutique active (portée tenant du modèle) : la table
         // des lignes, lue sans modèle, n'a pas cette portée.
+        // Un pressing n'a rien à racheter : ses articles sont des prestations.
+        if (Boutique::find(app(TenantContext::class)->boutiqueId())?->suitLeStock() === false) {
+            return [];
+        }
         $actifs = Produit::where('actif', true)->orderBy('nom')->get();
         if ($actifs->isEmpty()) {
             return [];
