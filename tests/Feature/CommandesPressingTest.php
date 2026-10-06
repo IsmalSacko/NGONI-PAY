@@ -87,7 +87,7 @@ class CommandesPressingTest extends TestCase
     {
         $commande = $this->deposer(['acompte' => 1000, 'moyen_acompte' => 'especes'])->assertCreated()->json('data');
 
-        $this->assertSame('C-0001', $commande['numero_lisible']);
+        $this->assertMatchesRegularExpression('/^[1-9]\d{5}$/', $commande['numero_lisible'], '6 chiffres au hasard');
         $this->assertSame(3 * 600 + 2 * 400, $commande['total']);
         $this->assertSame(1000, $commande['acompte']);
         $this->assertSame(1600, $commande['reste']);
@@ -96,8 +96,9 @@ class CommandesPressingTest extends TestCase
         $this->assertNotNull($commande['retrait_prevu_le']);
         $this->assertSame(0, Vente::count(), 'pas de vente au dépôt');
 
-        // Deux dépôts, deux numéros : jamais le même.
-        $this->assertSame('C-0002', $this->deposer()->assertCreated()->json('data.numero_lisible'));
+        // Jamais deux fois le même numéro dans la boutique.
+        $numeros = [$commande['numero'], ...array_map(fn () => $this->deposer()->assertCreated()->json('data.numero'), range(1, 20))];
+        $this->assertCount(21, array_unique($numeros));
     }
 
     public function test_le_retrait_cree_la_vente_aux_prix_figes_acompte_compris(): void
@@ -126,10 +127,10 @@ class CommandesPressingTest extends TestCase
     public function test_recherche_par_numero_nom_telephone_et_filtres(): void
     {
         $this->deposer();
-        $id = $this->deposer()->json('data.id');
+        ['id' => $id, 'numero' => $numero] = $this->deposer()->json('data');
         $this->api()->postJson("/api/commandes-pressing/{$id}/prete")->assertOk();
 
-        $this->api()->getJson('/api/commandes-pressing?q=C-0002')->assertJsonCount(1, 'data')->assertJsonPath('data.0.numero', 2);
+        $this->api()->getJson("/api/commandes-pressing?q={$numero}")->assertJsonCount(1, 'data')->assertJsonPath('data.0.numero', $numero);
         $this->api()->getJson('/api/commandes-pressing?q=Moussa')->assertJsonCount(2, 'data');
         $this->api()->getJson('/api/commandes-pressing?q=70112233')->assertJsonCount(2, 'data');
         $this->api()->getJson('/api/commandes-pressing?filtre=pretes')->assertJsonCount(1, 'data');

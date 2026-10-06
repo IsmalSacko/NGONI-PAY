@@ -40,7 +40,7 @@ class CommandePressingController extends Controller
             ->when($q !== '', function ($r) use ($q) {
                 $chiffres = preg_replace('/\D/', '', $q);
                 $r->where(function ($w) use ($q, $chiffres) {
-                    if ($chiffres !== '' && strlen($chiffres) <= 6) {
+                    if (strlen($chiffres) === 6) {
                         $w->orWhere('numero', (int) $chiffres);
                     }
                     $w->orWhere('casier', $q)->orWhereHas('client', fn ($c) => $c->where('nom', 'like', "%{$q}%")
@@ -108,6 +108,7 @@ class CommandePressingController extends Controller
             'moyen_acompte' => ['nullable', Rule::enum(MoyenPaiement::class)],
             'retrait_prevu_le' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'forfait_id' => ['nullable', 'uuid'],
             'collecte' => ['nullable', 'boolean'],
             'livraison' => ['nullable', 'boolean'],
             'adresse' => ['nullable', 'string', 'max:255'],
@@ -221,6 +222,7 @@ class CommandePressingController extends Controller
             'livraison' => $c->livraison,
             'adresse' => $c->adresse,
             'casier' => $c->casier,
+            'forfait_id' => $c->forfait_id,
             'photos' => count($c->photos ?? []),
             'total' => $c->total,
             'acompte' => $c->acompte,

@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * retrait — c'est là que naît la vente. Les prix sont figés au dépôt.
  */
 #[Fillable([
-    'boutique_id', 'numero', 'reference_locale', 'client_id', 'user_id', 'statut', 'etape', 'historique', 'express', 'collecte', 'livraison', 'adresse', 'casier', 'photos', 'total',
+    'boutique_id', 'numero', 'reference_locale', 'client_id', 'forfait_id', 'user_id', 'statut', 'etape', 'historique', 'express', 'collecte', 'livraison', 'adresse', 'casier', 'photos', 'total',
     'acompte', 'moyen_acompte', 'retrait_prevu_le', 'prete_le', 'retiree_le', 'retiree_par', 'vente_id',
     'annulee_le', 'motif_annulation', 'notes',
 ])]
@@ -64,13 +64,13 @@ class CommandePressing extends Model
         return [...($this->historique ?? []), ['quoi' => $quoi, 'le' => now()->toIso8601String(), 'par' => $par?->name]];
     }
 
-    /** « C-0012 ». */
     /** Rendez-vous passé depuis ce nombre de jours : linge considéré comme abandonné. */
     public const JOURS_ABANDON = 30;
 
+    /** « 482913 » : 6 chiffres tirés au hasard au dépôt. */
     public function numeroLisible(): string
     {
-        return 'C-'.str_pad((string) $this->numero, 4, '0', STR_PAD_LEFT);
+        return (string) $this->numero;
     }
 
     public function reste(): int

@@ -216,6 +216,18 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
     // Pressing : le registre des commandes (dépôt → prête → retrait, où naît la vente).
+    // Pressing, offre Pro : dépenses, fournitures, forfaits, relevé mensuel.
+    Route::get('pressing/depenses', [\App\Http\Controllers\Api\GestionPressingController::class, 'depenses'])->middleware('permission:rapports.view');
+    Route::post('pressing/depenses', [\App\Http\Controllers\Api\GestionPressingController::class, 'depenser'])->middleware(['permission:ventes.create', 'abonnement']);
+    Route::delete('pressing/depenses/{depense}', [\App\Http\Controllers\Api\GestionPressingController::class, 'supprimerDepense'])->middleware('permission:ventes.delete');
+    Route::get('pressing/fournitures', [\App\Http\Controllers\Api\GestionPressingController::class, 'fournitures'])->middleware('permission:produits.view');
+    Route::post('pressing/fournitures', [\App\Http\Controllers\Api\GestionPressingController::class, 'creerFourniture'])->middleware(['permission:produits.create', 'abonnement']);
+    Route::put('pressing/fournitures/{fourniture}', [\App\Http\Controllers\Api\GestionPressingController::class, 'modifierFourniture'])->middleware('permission:produits.update');
+    Route::delete('pressing/fournitures/{fourniture}', [\App\Http\Controllers\Api\GestionPressingController::class, 'supprimerFourniture'])->middleware('permission:produits.delete');
+    Route::post('pressing/fournitures/{fourniture}/mouvement', [\App\Http\Controllers\Api\GestionPressingController::class, 'mouvement'])->middleware(['permission:produits.view', 'abonnement']);
+    Route::get('pressing/forfaits', [\App\Http\Controllers\Api\GestionPressingController::class, 'forfaits'])->middleware('permission:ventes.view');
+    Route::post('pressing/forfaits', [\App\Http\Controllers\Api\GestionPressingController::class, 'vendreForfait'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    Route::get('pressing/releve/{client}', [\App\Http\Controllers\Api\GestionPressingController::class, 'releve'])->middleware('permission:clients.view');
     Route::get('commandes-pressing/reglages', [\App\Http\Controllers\Api\CommandePressingController::class, 'reglages'])->middleware('permission:ventes.view');
     Route::put('commandes-pressing/reglages', [\App\Http\Controllers\Api\CommandePressingController::class, 'majReglages'])->middleware('permission:boutique.update');
     Route::get('commandes-pressing/compteurs', [\App\Http\Controllers\Api\CommandePressingController::class, 'compteurs'])->middleware('permission:ventes.view');

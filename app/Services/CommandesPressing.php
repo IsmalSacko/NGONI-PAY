@@ -8,6 +8,7 @@ use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\CommandePressing;
 use App\Models\EncaissementPressing;
+use App\Models\ForfaitPressing;
 use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\ServicePressing;
@@ -68,6 +69,20 @@ class CommandesPressing
             throw ValidationException::withMessages(['client_id' => ['Choisissez le client qui dépose.']]);
         }
 
+        // Forfait (offre Pro) : les pièces sont déjà payées, déduites du forfait du client.
+        $forfait = null;
+        if (filled($data['forfait_id'] ?? null)) {
+            $this->exigerPro($boutique, 'Les forfaits font partie de l’offre Pro.');
+            $forfait = ForfaitPressing::whereKey($data['forfait_id'])->where('client_id', $data['client_id'])->first();
+            $pieces = array_sum(array_map(fn ($l) => (int) $l['quantite'], $data['lignes']));
+            if ($forfait === null || ! $forfait->actif()) {
+                throw ValidationException::withMessages(['forfait_id' => ['Ce forfait n’est plus valable.']]);
+            }
+            if ($forfait->restantes() < $pieces) {
+                throw ValidationException::withMessages(['forfait_id' => ["Il ne reste que {$forfait->restantes()} pièces sur le forfait."]]);
+            }
+        }
+
         // Les prix du jour, figés dans la commande : un tarif qui change ensuite ne la touche pas.
         $produits = Produit::whereIn('id', array_column($data['lignes'], 'produit_id'))->get()->keyBy('id');
         $services = ServicePressing::whereIn('id', array_column($data['lignes'], 'service_id'))->get()->keyBy('id');
@@ -77,6 +92,9 @@ class CommandesPressing
             $produit = $produits->get($ligne['produit_id']);
             $service = $services->get($ligne['service_id']);
             $prix = $produit === null || $service === null ? null : $produit->prixService($service->id, $express);
+            if ($prix !== null && $forfait !== null) {
+                $prix = 0;
+            }
             if ($prix === null) {
                 throw ValidationException::withMessages(['lignes' => ['« '.($produit?->nom ?? 'Cet habit').' » n’a pas de prix pour cette prestation.']]);
             }
@@ -94,17 +112,23 @@ class CommandesPressing
             throw ValidationException::withMessages(['acompte' => ['L’acompte dépasse le total de la commande.']]);
         }
 
-        return DB::transaction(function () use ($boutique, $data, $agent, $express, $collecte, $livraison, $lignes, $total, $acompte): CommandePressing {
-            // Un numéro par commande, jamais deux fois le même, même à plusieurs agents.
+        return DB::transaction(function () use ($boutique, $data, $agent, $express, $collecte, $livraison, $lignes, $total, $acompte, $forfait): CommandePressing {
+            if ($forfait !== null) {
+                $forfait->increment('pieces_utilisees', array_sum(array_column($lignes, 'quantite')));
+            }
+            // Un numéro au hasard à 6 chiffres, jamais deux fois le même dans la
+            // boutique, même à plusieurs agents (verrou ; l'index unique en dernier rempart).
             $boutique = Boutique::whereKey($boutique->id)->lockForUpdate()->first();
-            $numero = max((int) $boutique->dernier_numero_commande, (int) CommandePressing::withoutBoutiqueScope()->where('boutique_id', $boutique->id)->max('numero')) + 1;
-            $boutique->forceFill(['dernier_numero_commande' => $numero])->save();
+            do {
+                $numero = random_int(100000, 999999);
+            } while (CommandePressing::withoutBoutiqueScope()->where('boutique_id', $boutique->id)->where('numero', $numero)->exists());
 
             $commande = CommandePressing::create([
                 'boutique_id' => $boutique->id,
                 'numero' => $numero,
                 'reference_locale' => $data['reference_locale'] ?? null,
                 'client_id' => $data['client_id'],
+                'forfait_id' => $forfait?->id,
                 'user_id' => $agent->id,
                 'statut' => CommandePressing::DEPOSEE,
                 'historique' => [['quoi' => CommandePressing::DEPOSEE, 'le' => now()->toIso8601String(), 'par' => $agent->name]],
@@ -173,6 +197,16 @@ class CommandesPressing
         $this->exigerOuverte($commande);
         $commande->loadMissing('lignes');
 
+        // Tout est payé par forfait : rien à encaisser, pas de vente.
+        if ($commande->total === 0) {
+            $commande->update([
+                'statut' => CommandePressing::RETIREE, 'etape' => null, 'retiree_le' => now(), 'retiree_par' => $caissier->id,
+                'historique' => $commande->avecPas($commande->livraison ? 'livree' : CommandePressing::RETIREE, $caissier),
+            ]);
+
+            return $commande;
+        }
+
         $donne = $data['montant_donne'] ?? null;
         $credit = (bool) ($data['credit'] ?? false) && $commande->reste() > 0;
         // L'acompte est déjà dans la caisse (jour du dépôt) : la vente le note pour ne pas le recompter.
@@ -204,6 +238,10 @@ class CommandesPressing
     {
         $this->exigerOuverte($commande);
         DB::transaction(function () use ($commande, $motif, $rembourser, $agent): void {
+            // Les pièces reviennent sur le forfait.
+            if ($commande->forfait_id !== null) {
+                ForfaitPressing::whereKey($commande->forfait_id)->decrement('pieces_utilisees', (int) $commande->lignes()->sum('quantite'));
+            }
             if ($rembourser && $commande->acompte > 0) {
                 $this->mouvement($commande, EncaissementPressing::REMBOURSEMENT, $commande->acompte, $commande->moyen_acompte ?? 'especes', $agent);
             }
@@ -251,7 +289,7 @@ class CommandesPressing
         return $commande;
     }
 
-    private function exigerPro(Boutique $boutique, string $message): void
+    public function exigerPro(Boutique $boutique, string $message): void
     {
         if (! app(AbonnementService::class)->permet($boutique, Plan::PRESSING_AVANCE)) {
             throw new HttpResponseException(response()->json([
