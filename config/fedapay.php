@@ -19,9 +19,7 @@ return [
      */
     'moyens_par_pays' => [
         'NE' => ['airtel_ne' => 'Airtel Money'],
-        'SN' => ['orange_sn' => 'Orange Money', 'wave_sn' => 'Wave', 'free_sn' => 'Free Money'],
-        'ML' => ['orange_ml' => 'Orange Money'],
-        'BF' => ['orange_bf' => 'Orange Money', 'moov_bf' => 'Moov Money'],
+        'SN' => ['free_sn' => 'Free Money'],
         'BJ' => ['mtn_open' => 'MTN MoMo', 'moov' => 'Moov Money', 'sbin' => 'Celtiis Cash'],
         'TG' => ['moov_tg' => 'Moov Money', 'togocel' => 'Mixx by Yas'],
     ],
@@ -35,15 +33,5 @@ return [
         'mtn_open' => 1.2, 'moov' => 1.2, 'sbin' => 1.2,
         'mtn_ci' => 4.0, 'moov_tg' => 2.5, 'togocel' => 3.5,
         'free_sn' => 2.0, 'airtel_ne' => 4.0, 'carte' => 3.6,
-        // Hors contrat (documentation FedaPay) : taux à confirmer avec FedaPay,
-        // le plus élevé du contrat en attendant, pour recevoir le prix entier.
-        'orange_ml' => 4.0, 'orange_sn' => 4.0, 'wave_sn' => 4.0, 'orange_bf' => 4.0, 'moov_bf' => 4.0,
     ],
-
-    /*
-     * Modes que l'API FedaPay sait imposer (paiement sans choix sur la page).
-     * Les autres moyens (Orange Mali, Wave Sénégal…) ouvrent la page FedaPay
-     * sans mode imposé : le commerçant y choisit son opérateur.
-     */
-    'modes_api' => ['mtn_open', 'moov', 'sbin', 'moov_tg', 'togocel', 'mtn_ci', 'airtel_ne', 'free_sn'],
 ];

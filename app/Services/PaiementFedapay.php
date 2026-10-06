@@ -57,9 +57,9 @@ class PaiementFedapay
             'callback_url' => url('/paiement-abonnement').'?reference='.$reference,
             'custom_metadata' => ['reference' => $reference, 'demande' => $demande->id],
         ];
-        // Mobile Money à code API : l'opérateur est imposé, au taux annoncé.
-        // Carte, Orange Mali, Wave Sénégal… : la page FedaPay propose le choix.
-        if (in_array($moyen, config('fedapay.modes_api'), true)) {
+        // Mobile Money : l'opérateur choisi, au taux annoncé. Carte : la page
+        // de FedaPay demande les informations de la carte.
+        if ($moyen !== 'carte') {
             $corps['mode'] = $moyen;
         }
         if (filled($demandeur->email)) {
