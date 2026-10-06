@@ -20,7 +20,7 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'frais_mobile',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'frais_mobile',
         'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id',
     ];
 
@@ -79,5 +79,27 @@ class DemandeAbonnement extends Model
     public function preuveExiste(): bool
     {
         return $this->preuve_chemin !== null && Storage::disk('local')->exists($this->preuve_chemin);
+    }
+
+    /** Payée (ou en cours de paiement) en ligne : Jèko ou FedaPay. Elle s'approuve seule. */
+    public function paiementEnLigne(): bool
+    {
+        return $this->jeko_paiement_id !== null || $this->fedapay_transaction_id !== null;
+    }
+
+    /** « Wave via Jèko », « Airtel Money via FedaPay », ou null. */
+    public function libellePaiementEnLigne(): ?string
+    {
+        if ($this->jeko_paiement_id !== null) {
+            return (config('jeko.moyens')[substr((string) $this->moyen, 5)] ?? 'Mobile Money').' via Jèko';
+        }
+        if ($this->fedapay_transaction_id !== null) {
+            $code = substr((string) $this->moyen, 8);
+            $moyens = array_merge(config('fedapay.carte'), ...array_values(config('fedapay.moyens_par_pays')));
+
+            return ($moyens[$code] ?? 'paiement en ligne').' via FedaPay';
+        }
+
+        return null;
     }
 }

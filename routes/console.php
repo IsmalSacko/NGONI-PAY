@@ -4,7 +4,7 @@ use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
 use App\Services\DiffusionAnnonces;
 use App\Services\NettoyageOrphelins;
-use App\Services\PaiementJeko;
+use App\Services\PaiementMobile;
 use App\Services\RappelFinEssai;
 use App\Services\RestaurationBoutique;
 use Illuminate\Foundation\Inspiring;
@@ -25,14 +25,14 @@ Artisan::command('ecaisse:diffuser-annonces', function () {
 
 Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlapping();
 
-// Paiements Mobile Money (Jèko) restés en attente : relus chez Jèko, l'abonnement
+// Paiements en ligne (Jèko, FedaPay) restés en attente : relus chez leur prestataire, l'abonnement
 // s'active même si le commerçant n'est pas revenu et que le webhook s'est perdu.
 Artisan::command('ecaisse:verifier-paiements-mobile', function () {
-    $n = app(PaiementJeko::class)->verifierEnAttente();
+    $n = app(PaiementMobile::class)->verifierEnAttente();
     if ($n > 0) {
-        $this->info("{$n} paiement(s) Mobile Money relu(s).");
+        $this->info("{$n} paiement(s) en ligne relu(s).");
     }
-})->purpose('Relit chez Jèko les paiements d’abonnement restés en attente');
+})->purpose('Relit chez Jèko ou FedaPay les paiements d’abonnement restés en attente');
 
 Schedule::command('ecaisse:verifier-paiements-mobile')->everyTenMinutes()->withoutOverlapping();
 

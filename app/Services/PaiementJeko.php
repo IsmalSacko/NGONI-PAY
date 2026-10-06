@@ -51,7 +51,12 @@ class PaiementJeko
      */
     public static function frais(int $montant, ?string $moyen = null): int
     {
-        $taux = self::taux($moyen);
+        return self::fraisAuTaux($montant, self::taux($moyen));
+    }
+
+    /** Frais pour recevoir [montant] entier après une commission de [taux] %. */
+    public static function fraisAuTaux(int $montant, float $taux): int
+    {
         if ($taux <= 0 || $taux >= 100) {
             return 0;
         }
@@ -168,48 +173,6 @@ class PaiementJeko
 
             return $demande->fresh();
         });
-    }
-
-    /**
-     * Filet de sécurité (planifié) : les paiements restés en attente sont relus
-     * chez Jèko — commerçant parti sans revenir, webhook perdu. Sans paiement
-     * après le délai (30 min), la demande est annulée avec son motif, et le
-     * commerçant prévenu : elle n'encombre plus la console, il peut réessayer.
-     */
-    public function verifierEnAttente(): int
-    {
-        if (! $this->actif()) {
-            return 0;
-        }
-
-        $demandes = DemandeAbonnement::enAttente()->whereNotNull('jeko_paiement_id')->get();
-        foreach ($demandes as $demande) {
-            $demande = $this->verifier($demande);
-            if ($demande->statut === StatutDemande::EnAttente && $demande->created_at->lt(now()->subMinutes((int) config('jeko.delai_minutes')))) {
-                $this->annulerFauteDePaiement($demande);
-            }
-        }
-
-        return $demandes->count();
-    }
-
-    private function annulerFauteDePaiement(DemandeAbonnement $demande): void
-    {
-        $delai = (int) config('jeko.delai_minutes');
-        $motif = "Paiement Mobile Money non reçu dans les {$delai} minutes : demande annulée automatiquement.";
-        $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => $motif]);
-
-        $proprietaire = User::find($demande->user_id);
-        if ($proprietaire !== null) {
-            $plan = Plan::parCode($demande->plan)?->nom ?? $demande->plan;
-            app(NotifierCompte::class)->envoyer(
-                $proprietaire,
-                'Paiement de l’abonnement non reçu',
-                "Nous n’avons pas reçu le paiement de votre abonnement {$plan} par Mobile Money dans les {$delai} minutes : "
-                    .'la demande est annulée et rien n’a été prélevé. Vous pouvez réessayer depuis la page Abonnement.',
-                email: false,
-            );
-        }
     }
 
     /** Webhook : vrai seulement si la signature HMAC-SHA256 du corps brut est celle de Jèko. */

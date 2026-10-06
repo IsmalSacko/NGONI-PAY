@@ -11,7 +11,7 @@ use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\PlanTarif;
 use App\Services\AbonnementService;
-use App\Services\PaiementJeko;
+use App\Services\PaiementMobile;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -95,22 +95,31 @@ class AbonnementController extends Controller
                 'est_proprietaire' => $boutique->proprietaire_id === $request->user()->id,
                 'peut_demander' => $request->user()->can('abonnement.manage'),
                 'demande_en_attente' => $enAttente === null ? null : $this->demandeJson($enAttente),
-                // Paiement Mobile Money intégré (Jèko) : boutiques ivoiriennes seulement.
-                'paiement_mobile' => app(PaiementJeko::class)->proposeA($boutique)
-                    ? [
-                        'frais_pourcentage' => PaiementJeko::taux(),
-                        // Chaque moyen avec son taux : l'application affiche le total exact à payer.
-                        'moyens' => collect(config('jeko.moyens'))
-                            ->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle, 'frais_pourcentage' => PaiementJeko::taux($code)])
-                            ->values(),
-                    ]
-                    : null,
+                // Paiement en ligne (Jèko en Côte d'Ivoire, FedaPay ailleurs) : les
+                // moyens de la boutique, chacun avec sa commission. Null s'il n'y en a pas.
+                'paiement_mobile' => $this->paiementEnLigne($boutique),
             ],
         ]);
     }
 
-    /** Payer une offre par Mobile Money (Jèko) : la page de paiement où envoyer le commerçant. */
-    public function payerMobile(Request $request, PaiementJeko $jeko): JsonResponse
+    /** @return array<string, mixed>|null */
+    private function paiementEnLigne(Boutique $boutique): ?array
+    {
+        $moyens = app(PaiementMobile::class)->moyensPour($boutique);
+        if ($moyens === []) {
+            return null;
+        }
+        $carteSeule = count($moyens) === 1 && $moyens[0]['code'] === 'carte';
+
+        return [
+            'frais_pourcentage' => $moyens[0]['frais_pourcentage'],
+            'titre' => $carteSeule ? 'Payer par carte bancaire' : 'Payer par Mobile Money',
+            'moyens' => $moyens,
+        ];
+    }
+
+    /** Payer une offre en ligne (Jèko, FedaPay) : la page de paiement où envoyer le commerçant. */
+    public function payerMobile(Request $request, PaiementMobile $paiement): JsonResponse
     {
         $data = $request->validate([
             'plan' => ['required', 'string', 'max:30'],
@@ -118,7 +127,7 @@ class AbonnementController extends Controller
             'moyen' => ['required', 'string', 'max:20'],
         ]);
 
-        $resultat = $jeko->demarrer(
+        $resultat = $paiement->demarrer(
             Boutique::findOrFail(app(TenantContext::class)->boutiqueId()),
             $request->user(),
             $data['plan'],
@@ -130,12 +139,12 @@ class AbonnementController extends Controller
     }
 
     /** Au retour du commerçant : le paiement relu chez Jèko, l'abonnement activé s'il est payé. */
-    public function statutPaiementMobile(DemandeAbonnement $demande, PaiementJeko $jeko): JsonResponse
+    public function statutPaiementMobile(DemandeAbonnement $demande, PaiementMobile $paiement): JsonResponse
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
-        abort_unless($demande->user_id === $boutique->proprietaire_id && $demande->jeko_paiement_id !== null, 404);
+        abort_unless($demande->user_id === $boutique->proprietaire_id && $demande->paiementEnLigne(), 404);
 
-        return response()->json(['data' => $this->demandeJson($jeko->verifier($demande))]);
+        return response()->json(['data' => $this->demandeJson($paiement->verifier($demande))]);
     }
 
     public function demandes(): JsonResponse

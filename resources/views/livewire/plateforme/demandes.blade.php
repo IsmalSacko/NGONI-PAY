@@ -107,8 +107,8 @@
                         </p>
                         <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="text-muted">Abonnement actuel :</span> <x-statut-abonnement :abonnement="$demande->proprietaire?->abonnement" />
-                            @if ($demande->jeko_paiement_id)
-                                <span class="text-muted">· payé par <span class="font-semibold text-ink">{{ config('jeko.moyens')[substr((string) $demande->moyen, 5)] ?? 'Mobile Money' }}</span> via Jèko @if ($demande->frais_mobile > 0)(+ {{ number_format($demande->frais_mobile, 0, ',', ' ') }} F de frais)@endif</span>
+                            @if ($demande->paiementEnLigne())
+                                <span class="text-muted">· payé par <span class="font-semibold text-ink">{{ $demande->libellePaiementEnLigne() }}</span> @if ($demande->frais_mobile > 0)(+ {{ number_format($demande->frais_mobile, 0, ',', ' ') }} F de frais)@endif</span>
                                 @unless ($tranchee)<span class="ml-1 rounded-full bg-jaune-doux px-2 py-0.5 text-xs font-bold text-ink">paiement en cours chez l’opérateur</span>@endunless
                             @elseif ($demande->moyen)<span class="text-muted">· moyen annoncé : <span class="font-semibold text-ink">{{ $demande->moyen }}</span></span>@endif
                         </p>
@@ -128,7 +128,7 @@
                 </div>
 
                 {{-- Paiement Mobile Money : il s'approuve seul à la confirmation de Jèko. --}}
-                @unless ($tranchee || $demande->jeko_paiement_id)
+                @unless ($tranchee || $demande->paiementEnLigne())
                     <div class="flex gap-2 md:shrink-0 pl-13 md:pl-0">
                         <button wire:click="approuver({{ $demande->id }})" wire:confirm="Le paiement a bien été reçu ? Le plan s’active immédiatement."
                                 class="h-10 px-4 rounded-xl bg-accent text-white font-bold text-sm inline-flex items-center gap-1.5 shadow-sm hover:bg-accent-dark">

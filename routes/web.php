@@ -27,7 +27,7 @@ use App\Livewire\Ventes\Index as VentesIndex;
 use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Services\ConditionsUtilisation;
-use App\Services\PaiementJeko;
+use App\Services\PaiementMobile;
 use App\Support\Tenancy\BoutiqueActive;
 use App\Support\VersionApplication;
 use Illuminate\Http\Request;
@@ -80,7 +80,7 @@ Route::get('paiement-abonnement', function (Request $request) {
     $demande = str_starts_with($reference, 'NGONI-ABO-')
         ? DemandeAbonnement::find((int) substr($reference, strlen('NGONI-ABO-'))) : null;
     if ($demande !== null) {
-        $demande = app(PaiementJeko::class)->verifier($demande);
+        $demande = app(PaiementMobile::class)->verifier($demande);
     }
     $abonnement = $demande?->proprietaire?->abonnement()->first();
 
