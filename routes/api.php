@@ -223,6 +223,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('commandes-pressing/{commande}', [\App\Http\Controllers\Api\CommandePressingController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('commandes-pressing', [\App\Http\Controllers\Api\CommandePressingController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     Route::post('commandes-pressing/{commande}/etape', [\App\Http\Controllers\Api\CommandePressingController::class, 'etape'])->middleware('permission:ventes.create');
+    Route::post('commandes-pressing/{commande}/casier', [\App\Http\Controllers\Api\CommandePressingController::class, 'casier'])->middleware('permission:ventes.create');
+    Route::post('commandes-pressing/{commande}/photos', [\App\Http\Controllers\Api\CommandePressingController::class, 'ajouterPhoto'])->middleware('permission:ventes.create');
+    Route::get('commandes-pressing/{commande}/photos/{index}', [\App\Http\Controllers\Api\CommandePressingController::class, 'photo'])->whereNumber('index')->middleware('permission:ventes.view');
+    Route::delete('commandes-pressing/{commande}/photos/{index}', [\App\Http\Controllers\Api\CommandePressingController::class, 'retirerPhoto'])->whereNumber('index')->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/prete', [\App\Http\Controllers\Api\CommandePressingController::class, 'prete'])->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/retrait', [\App\Http\Controllers\Api\CommandePressingController::class, 'retrait'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     Route::post('commandes-pressing/{commande}/annuler', [\App\Http\Controllers\Api\CommandePressingController::class, 'annuler'])->middleware('permission:ventes.delete');

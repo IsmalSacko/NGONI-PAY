@@ -8,9 +8,12 @@ use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
 use App\Models\CommandePressing;
 use App\Services\CommandesPressing;
+use App\Services\Images;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /** Pressing : le registre des commandes (dépôt, prête, retrait, annulation). */
 class CommandePressingController extends Controller
@@ -27,6 +30,7 @@ class CommandePressingController extends Controller
                 'en_cours' => $r->whereIn('statut', [CommandePressing::DEPOSEE, CommandePressing::EN_TRAITEMENT]),
                 'pretes' => $r->where('statut', CommandePressing::PRETE),
                 'aujourdhui', 'retard', 'abandon' => $this->filtrer($r, $f),
+                'a_livrer' => $r->where('statut', CommandePressing::PRETE)->where('livraison', true),
                 'retirees' => $r->where('statut', CommandePressing::RETIREE),
                 'annulees' => $r->where('statut', CommandePressing::ANNULEE),
                 default => $r,
@@ -39,7 +43,7 @@ class CommandePressingController extends Controller
                     if ($chiffres !== '' && strlen($chiffres) <= 6) {
                         $w->orWhere('numero', (int) $chiffres);
                     }
-                    $w->orWhereHas('client', fn ($c) => $c->where('nom', 'like', "%{$q}%")
+                    $w->orWhere('casier', $q)->orWhereHas('client', fn ($c) => $c->where('nom', 'like', "%{$q}%")
                         ->when($chiffres !== '', fn ($c) => $c->orWhere('telephone', 'like', "%{$chiffres}%")))
                         ->orWhereHas('lignes', fn ($l) => $l->where('service', 'like', "%{$q}%")->orWhere('nom', 'like', "%{$q}%"));
                 });
@@ -104,6 +108,9 @@ class CommandePressingController extends Controller
             'moyen_acompte' => ['nullable', Rule::enum(MoyenPaiement::class)],
             'retrait_prevu_le' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'collecte' => ['nullable', 'boolean'],
+            'livraison' => ['nullable', 'boolean'],
+            'adresse' => ['nullable', 'string', 'max:255'],
         ]);
 
         return response()->json(['data' => $this->json($this->commandes->deposer($data, $request->user()))], 201);
@@ -113,7 +120,43 @@ class CommandePressingController extends Controller
     {
         $this->commandes->boutique();
 
-        return response()->json(['data' => $this->json($this->commandes->marquerPrete($commande, $request->user())->load('lignes', 'client', 'agent'))]);
+        $data = $request->validate(['casier' => ['nullable', 'string', 'max:40']]);
+
+        return response()->json(['data' => $this->json($this->commandes->marquerPrete($commande, $request->user(), $data['casier'] ?? null)->load('lignes', 'client', 'agent'))]);
+    }
+
+    /** Casier ou rayon du linge (offre Pro). */
+    public function casier(Request $request, CommandePressing $commande): JsonResponse
+    {
+        $data = $request->validate(['casier' => ['nullable', 'string', 'max:40']]);
+
+        return response()->json(['data' => $this->json($this->commandes->ranger($commande, $data['casier'] ?? null)->load('lignes', 'client', 'agent'))]);
+    }
+
+    /** Photo d'un défaut (offre Pro). */
+    public function ajouterPhoto(Request $request, CommandePressing $commande): JsonResponse
+    {
+        $this->commandes->boutique();
+        $request->validate(['photo' => Images::REGLES]);
+
+        return response()->json(['data' => $this->json($this->commandes->ajouterPhoto($commande, $request->file('photo'))->load('lignes', 'client', 'agent'))]);
+    }
+
+    public function retirerPhoto(CommandePressing $commande, int $index): JsonResponse
+    {
+        $this->commandes->boutique();
+
+        return response()->json(['data' => $this->json($this->commandes->retirerPhoto($commande, $index)->load('lignes', 'client', 'agent'))]);
+    }
+
+    /** Une photo, servie à la boutique seulement (données du client). */
+    public function photo(CommandePressing $commande, int $index): Response
+    {
+        $this->commandes->boutique();
+        $chemin = ($commande->photos ?? [])[$index]['chemin'] ?? null;
+        abort_if($chemin === null || ! Storage::disk('local')->exists($chemin), 404);
+
+        return Storage::disk('local')->response($chemin, null, ['Cache-Control' => 'private, max-age=86400']);
     }
 
     /** Une étape du travail : lavage, séchage, repassage, contrôle. */
@@ -174,6 +217,11 @@ class CommandePressingController extends Controller
             'rembourse' => (int) $c->encaissements()->where('type', 'remboursement')->sum('montant'),
             'en_retard' => $c->enRetard(),
             'express' => $c->express,
+            'collecte' => $c->collecte,
+            'livraison' => $c->livraison,
+            'adresse' => $c->adresse,
+            'casier' => $c->casier,
+            'photos' => count($c->photos ?? []),
             'total' => $c->total,
             'acompte' => $c->acompte,
             'reste' => $c->reste(),

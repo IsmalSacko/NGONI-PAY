@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * retrait — c'est là que naît la vente. Les prix sont figés au dépôt.
  */
 #[Fillable([
-    'boutique_id', 'numero', 'reference_locale', 'client_id', 'user_id', 'statut', 'etape', 'historique', 'express', 'total',
+    'boutique_id', 'numero', 'reference_locale', 'client_id', 'user_id', 'statut', 'etape', 'historique', 'express', 'collecte', 'livraison', 'adresse', 'casier', 'photos', 'total',
     'acompte', 'moyen_acompte', 'retrait_prevu_le', 'prete_le', 'retiree_le', 'retiree_par', 'vente_id',
     'annulee_le', 'motif_annulation', 'notes',
 ])]
@@ -35,6 +35,9 @@ class CommandePressing extends Model
 
     public const ANNULEE = 'annulee';
 
+    /** Photos de défauts gardées par commande. */
+    public const PHOTOS_MAX = 6;
+
     /** Les commandes pas encore rendues. */
     public const OUVERTES = [self::DEPOSEE, self::EN_TRAITEMENT, self::PRETE];
 
@@ -47,7 +50,7 @@ class CommandePressing extends Model
     {
         return [
             'numero' => 'integer', 'express' => 'boolean', 'total' => 'integer', 'acompte' => 'integer',
-            'historique' => 'array', 'retrait_prevu_le' => 'datetime', 'prete_le' => 'datetime', 'retiree_le' => 'datetime', 'annulee_le' => 'datetime',
+            'historique' => 'array', 'photos' => 'array', 'collecte' => 'boolean', 'livraison' => 'boolean', 'retrait_prevu_le' => 'datetime', 'prete_le' => 'datetime', 'retiree_le' => 'datetime', 'annulee_le' => 'datetime',
         ];
     }
 

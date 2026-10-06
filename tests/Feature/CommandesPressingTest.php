@@ -12,7 +12,9 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -242,5 +244,39 @@ class CommandesPressingTest extends TestCase
         $autre = Client::create(['nom' => 'Fanta', 'telephone' => '+22370000001'])->id;
         $this->assertCount(1, $this->api()->getJson("/api/commandes-pressing?client_id={$this->client}")->json('data'));
         $this->assertCount(0, $this->api()->getJson("/api/commandes-pressing?client_id={$autre}")->json('data'));
+    }
+
+    public function test_collecte_livraison_casier_et_photos(): void
+    {
+        Storage::fake('local');
+        $this->deposer(['livraison' => true])->assertUnprocessable()->assertJsonValidationErrors('adresse');
+        $c = $this->deposer(['collecte' => true, 'livraison' => true, 'adresse' => 'Hamdallaye ACI, rue 30'])->assertCreated()->json('data');
+        $this->assertTrue($c['collecte']);
+        $this->assertSame('Hamdallaye ACI, rue 30', $c['adresse']);
+
+        $this->api()->post("/api/commandes-pressing/{$c['id']}/photos", ['photo' => UploadedFile::fake()->image('tache.jpg', 800, 600)])
+            ->assertOk()->assertJsonPath('data.photos', 1);
+        $this->api()->get("/api/commandes-pressing/{$c['id']}/photos/0")->assertOk();
+        $this->api()->get("/api/commandes-pressing/{$c['id']}/photos/3")->assertNotFound();
+
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/prete", ['casier' => 'B12'])->assertOk()->assertJsonPath('data.casier', 'B12');
+        $this->assertSame([$c['numero']], array_column($this->api()->getJson('/api/commandes-pressing?filtre=a_livrer')->json('data'), 'numero'));
+        $this->assertCount(1, $this->api()->getJson('/api/commandes-pressing?q=B12')->json('data'), 'on retrouve le linge par son casier');
+
+        $fini = $this->api()->postJson("/api/commandes-pressing/{$c['id']}/retrait", ['moyen_paiement' => 'especes'])->assertOk()->json('data');
+        $this->assertSame('livree', end($fini['historique'])['quoi']);
+
+        $this->api()->deleteJson("/api/commandes-pressing/{$c['id']}/photos/0")->assertOk()->assertJsonPath('data.photos', 0);
+    }
+
+    public function test_hors_pro_collecte_casier_et_photos_refuses(): void
+    {
+        $c = $this->deposer()->assertCreated()->json('data');
+        $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
+        $this->deposer(['collecte' => true, 'adresse' => 'Badalabougou'])->assertForbidden();
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/casier", ['casier' => 'A1'])->assertForbidden();
+        $this->api()->post("/api/commandes-pressing/{$c['id']}/photos", ['photo' => UploadedFile::fake()->image('t.jpg')])->assertForbidden();
+        // Sans casier, « prête » reste ouvert à tous.
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/prete")->assertOk();
     }
 }

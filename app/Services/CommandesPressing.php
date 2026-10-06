@@ -14,6 +14,7 @@ use App\Models\ServicePressing;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -51,10 +52,16 @@ class CommandesPressing
         }
 
         $express = (bool) ($data['express'] ?? false);
-        if ($express && ! app(AbonnementService::class)->permet($boutique, Plan::PRESSING_AVANCE)) {
-            throw new HttpResponseException(response()->json([
-                'message' => 'Le service express fait partie de l’offre Pro.', 'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => Plan::PRESSING_AVANCE,
-            ], 403));
+        $collecte = (bool) ($data['collecte'] ?? false);
+        $livraison = (bool) ($data['livraison'] ?? false);
+        if ($express) {
+            $this->exigerPro($boutique, 'Le service express fait partie de l’offre Pro.');
+        }
+        if ($collecte || $livraison) {
+            $this->exigerPro($boutique, 'La collecte et la livraison font partie de l’offre Pro.');
+            if (! filled($data['adresse'] ?? null)) {
+                throw ValidationException::withMessages(['adresse' => ['Indiquez l’adresse de collecte ou de livraison.']]);
+            }
         }
 
         if (! Client::whereKey($data['client_id'])->exists()) {
@@ -87,7 +94,7 @@ class CommandesPressing
             throw ValidationException::withMessages(['acompte' => ['L’acompte dépasse le total de la commande.']]);
         }
 
-        return DB::transaction(function () use ($boutique, $data, $agent, $express, $lignes, $total, $acompte): CommandePressing {
+        return DB::transaction(function () use ($boutique, $data, $agent, $express, $collecte, $livraison, $lignes, $total, $acompte): CommandePressing {
             // Un numéro par commande, jamais deux fois le même, même à plusieurs agents.
             $boutique = Boutique::whereKey($boutique->id)->lockForUpdate()->first();
             $numero = max((int) $boutique->dernier_numero_commande, (int) CommandePressing::withoutBoutiqueScope()->where('boutique_id', $boutique->id)->max('numero')) + 1;
@@ -102,6 +109,9 @@ class CommandesPressing
                 'statut' => CommandePressing::DEPOSEE,
                 'historique' => [['quoi' => CommandePressing::DEPOSEE, 'le' => now()->toIso8601String(), 'par' => $agent->name]],
                 'express' => $express,
+                'collecte' => $collecte,
+                'livraison' => $livraison,
+                'adresse' => $collecte || $livraison ? trim((string) $data['adresse']) : null,
                 'total' => $total,
                 'acompte' => $acompte,
                 'moyen_acompte' => $acompte > 0 ? ($data['moyen_acompte'] ?? 'especes') : null,
@@ -135,11 +145,16 @@ class CommandesPressing
         return $commande;
     }
 
-    public function marquerPrete(CommandePressing $commande, ?User $agent = null): CommandePressing
+    /** [casier] : où le linge prêt est rangé (offre Pro). */
+    public function marquerPrete(CommandePressing $commande, ?User $agent = null, ?string $casier = null): CommandePressing
     {
         $this->exigerOuverte($commande);
+        if (filled($casier)) {
+            $this->exigerPro($this->boutique(), 'Les casiers font partie de l’offre Pro.');
+        }
         $commande->update([
             'statut' => CommandePressing::PRETE, 'etape' => null, 'prete_le' => now(),
+            'casier' => filled($casier) ? trim($casier) : $commande->casier,
             'historique' => $commande->avecPas(CommandePressing::PRETE, $agent),
         ]);
 
@@ -177,7 +192,8 @@ class CommandesPressing
 
         $commande->update([
             'statut' => CommandePressing::RETIREE, 'etape' => null, 'retiree_le' => now(), 'retiree_par' => $caissier->id, 'vente_id' => $vente->id,
-            'historique' => $commande->avecPas(CommandePressing::RETIREE, $caissier),
+            // Livrée chez le client, ou retirée au comptoir.
+            'historique' => $commande->avecPas($commande->livraison ? 'livree' : CommandePressing::RETIREE, $caissier),
         ]);
 
         return $commande;
@@ -198,6 +214,50 @@ class CommandesPressing
         });
 
         return $commande;
+    }
+
+    /** Casier ou rayon où le linge est rangé (offre Pro). */
+    public function ranger(CommandePressing $commande, ?string $casier): CommandePressing
+    {
+        $this->exigerOuverte($commande);
+        $this->exigerPro($this->boutique(), 'Les casiers font partie de l’offre Pro.');
+        $commande->update(['casier' => filled($casier) ? trim($casier) : null]);
+
+        return $commande;
+    }
+
+    /** Photo d'un défaut, prise au dépôt (offre Pro). */
+    public function ajouterPhoto(CommandePressing $commande, UploadedFile $fichier): CommandePressing
+    {
+        $this->exigerPro($this->boutique(), 'Les photos des défauts font partie de l’offre Pro.');
+        $photos = $commande->photos ?? [];
+        if (count($photos) >= CommandePressing::PHOTOS_MAX) {
+            throw ValidationException::withMessages(['photo' => ['Six photos au plus par commande.']]);
+        }
+        $chemin = app(Images::class)->enregistrer($fichier, "pressing/{$commande->boutique_id}", $commande->id);
+        $commande->update(['photos' => [...$photos, ['chemin' => $chemin, 'le' => now()->toIso8601String()]]]);
+
+        return $commande;
+    }
+
+    public function retirerPhoto(CommandePressing $commande, int $index): CommandePressing
+    {
+        $photos = $commande->photos ?? [];
+        abort_unless(isset($photos[$index]), 404);
+        app(Images::class)->supprimer($photos[$index]['chemin']);
+        array_splice($photos, $index, 1);
+        $commande->update(['photos' => $photos]);
+
+        return $commande;
+    }
+
+    private function exigerPro(Boutique $boutique, string $message): void
+    {
+        if (! app(AbonnementService::class)->permet($boutique, Plan::PRESSING_AVANCE)) {
+            throw new HttpResponseException(response()->json([
+                'message' => $message, 'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => Plan::PRESSING_AVANCE,
+            ], 403));
+        }
     }
 
     /** Acompte ou remboursement, rattaché à la séance de caisse de l'agent (le tiroir du jour). */
