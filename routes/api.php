@@ -123,7 +123,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware(['permission:boutique.update', 'fonctionnalite:objectif_mois']);
     Route::put('boutique/activite', [BoutiqueController::class, 'activite'])->middleware('permission:boutique.update');
-    Route::put('boutique/express', [BoutiqueController::class, 'express'])->middleware('permission:boutique.update');
     Route::put('boutique/ventes', [BoutiqueController::class, 'ventes'])->middleware('permission:boutique.update');
     Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware(['permission:boutique.update', 'fonctionnalite:fidelite']);
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');

@@ -115,16 +115,6 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $boutique->fresh()]);
     }
 
-    /** Pressing : de combien l'express majore le prix classique (50 : +50 %). */
-    public function express(Request $request): JsonResponse
-    {
-        $data = $request->validate(['majoration_pct' => ['required', 'integer', 'min:0', 'max:300']]);
-        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
-        $boutique->forceFill(['express_majoration_pct' => $data['majoration_pct']])->save();
-
-        return response()->json(['data' => $boutique->fresh()]);
-    }
-
     /** Programme de fidélité : seuil d'achats et remise (seuil null : aucun). */
     public function fidelite(Request $request, Fidelite $fidelite): JsonResponse
     {

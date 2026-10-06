@@ -129,7 +129,7 @@ class PressingTest extends TestCase
         $this->assertSame(4, ServicePressing::count());
     }
 
-    public function test_chaque_habit_a_son_prix_par_service_et_l_express_se_calcule_tout_seul(): void
+    public function test_chaque_habit_a_son_prix_par_service_classique_et_express(): void
     {
         $s = $this->passerEnPressing();
         $chemise = $this->api()->postJson('/api/produits', [
@@ -154,15 +154,11 @@ class PressingTest extends TestCase
         $this->assertSame(['Chemise · Lavage + repassage', 'Chemise · Repassage seul'], array_column($classique->json('lignes'), 'nom_produit'));
         $this->assertFalse($classique->json('express'));
 
-        // Express : +50 % par défaut (500 → 750), sauf le prix express écrit sur l'habit (400).
+        // Express : le prix express écrit (400) ; sans prix express, le prix classique (500).
         $express = $depot(true);
-        $this->assertSame(2 * 750 + 400, $express->json('total'));
+        $this->assertSame(2 * 500 + 400, $express->json('total'));
         $this->assertTrue($express->json('express'));
         $this->assertSame([true, true], array_column($express->json('lignes'), 'express'));
-
-        // La boutique règle sa majoration : +100 %.
-        $this->api()->putJson('/api/boutique/express', ['majoration_pct' => 100])->assertOk();
-        $this->assertSame(2 * 1000 + 400, $depot(true)->json('total'));
     }
 
     public function test_un_habit_ne_se_vend_pas_dans_un_service_qu_il_n_a_pas(): void

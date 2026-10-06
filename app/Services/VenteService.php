@@ -139,7 +139,7 @@ class VenteService
                 // Pas de stock : une prestation ne se compte pas.
                 if (! empty($ligne['service_id'])) {
                     $service = $services->get($ligne['service_id']);
-                    $prix = $service === null ? null : $produit->prixService($service->id, $express, (int) $boutique->express_majoration_pct);
+                    $prix = $service === null ? null : $produit->prixService($service->id, $express);
                     if ($prix === null) {
                         throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » ne se fait pas dans ce service."]]);
                     }

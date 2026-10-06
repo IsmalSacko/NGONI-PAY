@@ -193,7 +193,7 @@ class ProduitController extends Controller
             'paliers.*.contenance' => ['required', 'integer', 'min:2', 'max:100000'],
             'paliers.*.prix' => ['required', 'integer', 'min:0', 'max:1000000000'],
             'paliers.*.prix_gros' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
-            // Pressing : un prix par service, et le prix express s'il n'est pas la majoration.
+            // Pressing : un prix par service, classique et express (vide : le classique).
             'tarifs' => ['nullable', 'array', 'max:20'],
             'tarifs.*.service_id' => ['required', 'uuid', 'distinct', Rule::exists('services_pressing', 'id')->where('boutique_id', app(TenantContext::class)->boutiqueId())],
             'tarifs.*.prix' => ['required', 'integer', 'min:1', 'max:1000000000'],

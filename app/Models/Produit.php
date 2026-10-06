@@ -98,19 +98,15 @@ class Produit extends Model
     }
 
     /**
-     * Pressing : le prix de cet habit pour un service, express ou non. Null :
-     * l'habit ne se fait pas dans ce service. L'express prend le prix écrit
-     * sur l'habit, sinon le prix classique majoré du pourcentage de la boutique.
+     * Pressing : le prix de cet habit pour un service, express ou non, tel que
+     * le pressing l'a fixé. Null : l'habit ne se fait pas dans ce service.
+     * Sans prix express écrit, l'express coûte le prix classique.
      */
-    public function prixService(string $serviceId, bool $express, int $majorationPct): ?int
+    public function prixService(string $serviceId, bool $express): ?int
     {
         foreach ($this->tarifs ?? [] as $t) {
             if (($t['service_id'] ?? null) === $serviceId) {
-                if (! $express) {
-                    return (int) $t['prix'];
-                }
-
-                return isset($t['prix_express']) ? (int) $t['prix_express'] : (int) round($t['prix'] * (100 + $majorationPct) / 100);
+                return (int) ($express && isset($t['prix_express']) ? $t['prix_express'] : $t['prix']);
             }
         }
 
