@@ -104,19 +104,30 @@ class PaiementFedapayTest extends TestCase
             && $r->hasHeader('Authorization', 'Bearer sk_sandbox_test'));
     }
 
-    public function test_au_mali_seule_la_carte_est_proposee(): void
+    public function test_au_mali_orange_money_et_la_carte_sont_proposes(): void
     {
         $this->boutique->update(['pays' => 'ML']);
+
+        $this->api()->getJson('/api/abonnement')
+            ->assertJsonPath('data.paiement_mobile.titre', 'Payer par Mobile Money')
+            ->assertJsonPath('data.paiement_mobile.moyens.0.code', 'orange_ml')
+            ->assertJsonPath('data.paiement_mobile.moyens.1.code', 'carte');
+        $this->api()->postJson('/api/abonnement/paiement-mobile', ['plan' => 'pro', 'moyen' => 'airtel_ne'])->assertUnprocessable();
+
+        // Orange Mali n'a pas de mode API : la page FedaPay propose le choix.
+        $demande = $this->payer('orange_ml');
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://sandbox-api.fedapay.com/v1/transactions' && ! isset($r['mode']));
+        $this->assertSame(PaiementJeko::fraisAuTaux($demande->montant, 4.0), $demande->frais_mobile);
+    }
+
+    public function test_la_ou_seule_la_carte_existe_le_titre_le_dit(): void
+    {
+        $this->boutique->update(['pays' => 'CM']);
 
         $this->api()->getJson('/api/abonnement')
             ->assertJsonPath('data.paiement_mobile.titre', 'Payer par carte bancaire')
             ->assertJsonCount(1, 'data.paiement_mobile.moyens')
             ->assertJsonPath('data.paiement_mobile.moyens.0.frais_pourcentage', 3.6);
-        $this->api()->postJson('/api/abonnement/paiement-mobile', ['plan' => 'pro', 'moyen' => 'airtel_ne'])->assertUnprocessable();
-
-        $demande = $this->payer('carte');
-        Http::assertSent(fn (Request $r) => $r->url() === 'https://sandbox-api.fedapay.com/v1/transactions' && ! isset($r['mode']));
-        $this->assertSame(PaiementJeko::fraisAuTaux($demande->montant, 3.6), $demande->frais_mobile);
     }
 
     public function test_le_webhook_signe_active_l_abonnement_apres_relecture_chez_fedapay(): void
