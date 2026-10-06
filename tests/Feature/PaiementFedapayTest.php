@@ -156,6 +156,27 @@ class PaiementFedapayTest extends TestCase
         $this->api()->getJson("/api/abonnement/paiement-mobile/{$demande->id}")->assertOk()->assertJsonPath('data.statut', 'annulee');
     }
 
+    public function test_page_fermee_sans_payer_puis_annulation_par_le_commercant(): void
+    {
+        $demande = $this->payer();
+
+        $this->get('/paiement-abonnement?reference=NGONI-ABO-'.$demande->id.'&status=pending&close=true&id=777')
+            ->assertOk()->assertSee('Paiement abandonné');
+        $this->assertSame(StatutDemande::EnAttente, $demande->fresh()->statut, 'encore payable : rien n’est tranché');
+
+        $this->api()->deleteJson("/api/abonnement/demandes/{$demande->id}")->assertOk();
+        $this->assertSame(StatutDemande::Annulee, $demande->fresh()->statut);
+    }
+
+    public function test_annuler_une_demande_deja_payee_l_active_au_lieu_de_l_annuler(): void
+    {
+        $demande = $this->payer();
+        $this->statutFedapay = 'approved';
+
+        $this->api()->deleteJson("/api/abonnement/demandes/{$demande->id}")->assertOk()->assertJsonPath('data.statut', 'approuvee');
+        $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
+    }
+
     public function test_sans_paiement_apres_30_minutes_la_demande_s_annule(): void
     {
         $demande = $this->payer();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\CycleFacturation;
+use App\Enums\StatutDemande;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
@@ -195,6 +196,15 @@ class AbonnementController extends Controller
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         abort_unless($demande->user_id === $boutique->proprietaire_id, 404);
+
+        // Paiement en ligne : relu d'abord chez le prestataire. Payé entre-temps,
+        // il s'active au lieu d'être annulé — l'argent versé n'est jamais perdu.
+        if ($demande->paiementEnLigne()) {
+            $demande = app(PaiementMobile::class)->verifier($demande);
+            if ($demande->statut === StatutDemande::Approuvee) {
+                return response()->json(['message' => 'Le paiement était déjà reçu : votre abonnement est activé.', 'data' => $this->demandeJson($demande)]);
+            }
+        }
 
         $this->abonnements->annuler($demande);
 

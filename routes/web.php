@@ -88,7 +88,8 @@ Route::get('paiement-abonnement', function (Request $request) {
         'etat' => match ($demande?->statut) {
             StatutDemande::Approuvee => 'paye',
             StatutDemande::Annulee, StatutDemande::Refusee => 'echec',
-            default => $request->query('issue') === 'echec' ? 'echec' : 'attente',
+            // Page FedaPay fermée sans payer (« close=true ») : abandonné, rien de prélevé.
+            default => $request->query('issue') === 'echec' ? 'echec' : ($request->boolean('close') ? 'abandon' : 'attente'),
         },
         'plan' => Plan::parCode((string) $demande?->plan)?->nom ?? '',
         'fin' => $abonnement?->fin?->format('d/m/Y'),
