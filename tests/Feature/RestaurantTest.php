@@ -385,4 +385,19 @@ class RestaurantTest extends TestCase
         $d = $this->commander(['type' => 'emporter', 'table' => null, 'heure_prevue' => now()->addHours(2)->toIso8601String()])->json('data');
         $this->api()->postJson("/api/restaurant/commandes/{$d['id']}/envoyer")->assertOk()->assertJsonPath('data.etape', 'en_attente');
     }
+
+    public function test_a_emporter_rien_ne_sort_sans_paiement_a_table_on_paie_a_la_fin(): void
+    {
+        $this->commander(['table' => null])->assertUnprocessable()->assertJsonValidationErrors('table');
+
+        $emporter = $this->commander(['type' => 'emporter', 'table' => null])->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$emporter['id']}/prets")->assertOk();
+        $this->api()->postJson("/api/restaurant/commandes/{$emporter['id']}/servir")->assertUnprocessable();
+        $this->api()->postJson("/api/restaurant/commandes/{$emporter['id']}/payer", ['moyen_paiement' => 'wave'])->assertOk();
+        $this->api()->postJson("/api/restaurant/commandes/{$emporter['id']}/servir")->assertOk()->assertJsonPath('data.etape', 'terminee');
+
+        $table = $this->commander()->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$table['id']}/servir")->assertOk()
+            ->assertJsonPath('data.etape', 'servie')->assertJsonPath('data.paiement', 'non_payee');
+    }
 }

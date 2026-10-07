@@ -73,6 +73,10 @@ class CommandesRestaurant
         if (! empty($data['client_id']) && ! Client::whereKey($data['client_id'])->exists()) {
             throw ValidationException::withMessages(['client_id' => ['Client introuvable.']]);
         }
+        // Sur place : on sait à quelle table servir.
+        if ($type === 'sur_place' && ! filled($data['table'] ?? null)) {
+            throw ValidationException::withMessages(['table' => ['Choisissez la table.']]);
+        }
         if ($type === 'livraison' && ! filled($data['adresse'] ?? null)) {
             throw ValidationException::withMessages(['adresse' => ['Indiquez l’adresse de livraison.']]);
         }
@@ -333,6 +337,11 @@ class CommandesRestaurant
     public function servir(CommandeRestaurant $commande, ?array $ids, ?User $agent): CommandeRestaurant
     {
         $this->exigerEnCours($commande);
+        // À emporter : rien ne sort sans passer par la caisse. (À table, on paie à la fin ;
+        // en livraison, le livreur peut encaisser et rapporter l'argent à la caisse.)
+        if ($commande->type === 'emporter' && $commande->reste() > 0) {
+            throw ValidationException::withMessages(['commande' => ['Commande à emporter non payée : encaissez-la à la caisse avant de la remettre.']]);
+        }
         $aServir = $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE]);
         if ($ids !== null) {
             $aServir->whereIn('id', $ids);
