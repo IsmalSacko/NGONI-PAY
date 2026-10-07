@@ -460,8 +460,8 @@ class CommandesRestaurant
 
             return ! $aServir && $c->reste() > 0 ? 'a_payer' : 'occupee';
         };
-        $place = fn (string $nom, ?string $zone, ?int $places) => [
-            'nom' => $nom, 'zone' => $zone, 'places' => $places,
+        $place = fn (string $nom, ?string $zone, ?int $places, ?string $id = null) => [
+            'table_id' => $id, 'nom' => $nom, 'zone' => $zone, 'places' => $places,
             'etat' => $etat($c = $ouvertes->get($nom)?->first(), $r = $reservees->get($nom)),
             'commande_id' => $c?->id, 'numero' => $c === null ? null : (string) $c->numero, 'couverts' => $c?->couverts,
             'total' => $c?->total, 'reste' => $c?->reste(), 'depuis' => $c?->created_at?->toIso8601String(),
@@ -474,7 +474,7 @@ class CommandesRestaurant
         $tables = $toutes->filter(fn ($t) => ! $t->rangee || $ouvertes->has($t->nom));
 
         return [
-            ...$tables->map(fn ($t) => $place($t->nom, $t->zone, $t->places))->all(),
+            ...$tables->map(fn ($t) => $place($t->nom, $t->zone, $t->places, $t->id))->values()->all(),
             // Une table tapée à la main (pas dans la liste) apparaît tant qu'elle est occupée.
             ...$ouvertes->keys()->reject(fn ($nom) => in_array($nom, $connues, true))->map(fn ($nom) => $place((string) $nom, null, null))->values()->all(),
         ];
