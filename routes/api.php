@@ -245,6 +245,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('restaurant/commandes/{commande}/lignes/{ligne}', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'annulerLigne'])->middleware('permission:ventes.create');
     Route::post('restaurant/commandes/{commande}/envoyer', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'envoyer'])->middleware('permission:ventes.create');
     Route::post('restaurant/commandes/{commande}/commencer', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'commencer'])->middleware('permission:ventes.create');
+    Route::post('restaurant/commandes/{commande}/livraison', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'livraison'])->middleware('permission:ventes.create');
     Route::post('restaurant/commandes/{commande}/prets', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'prets'])->middleware('permission:ventes.create');
     Route::post('restaurant/commandes/{commande}/servir', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'servir'])->middleware('permission:ventes.create');
     Route::post('restaurant/commandes/{commande}/payer', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'payer'])->middleware(['permission:ventes.create', 'abonnement:caisse']);

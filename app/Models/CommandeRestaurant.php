@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * l'addition (une ou plusieurs, si l'addition est partagée).
  */
 #[Fillable([
-    'boutique_id', 'numero', 'reference_locale', 'type', 'telephone', 'table', 'couverts', 'client_id', 'adresse', 'heure_prevue',
+    'boutique_id', 'numero', 'reference_locale', 'type', 'telephone', 'table', 'couverts', 'client_id', 'adresse', 'heure_prevue', 'prete_vers', 'en_livraison_le',
     'user_id', 'statut', 'total', 'paye', 'acompte', 'moyen_acompte', 'pourboire', 'envois', 'payee_le', 'terminee_le',
     'annulee_le', 'motif_annulation', 'notes', 'historique',
 ])]
@@ -40,7 +40,7 @@ class CommandeRestaurant extends Model
         return [
             'numero' => 'integer', 'telephone' => 'boolean', 'couverts' => 'integer', 'total' => 'integer', 'paye' => 'integer',
             'acompte' => 'integer', 'pourboire' => 'integer', 'envois' => 'integer', 'historique' => 'array',
-            'heure_prevue' => 'datetime', 'payee_le' => 'datetime', 'terminee_le' => 'datetime', 'annulee_le' => 'datetime',
+            'heure_prevue' => 'datetime', 'prete_vers' => 'datetime', 'en_livraison_le' => 'datetime', 'payee_le' => 'datetime', 'terminee_le' => 'datetime', 'annulee_le' => 'datetime',
         ];
     }
 
@@ -48,6 +48,47 @@ class CommandeRestaurant extends Model
     public function reste(): int
     {
         return max(0, $this->total - $this->acompte - $this->paye);
+    }
+
+    /**
+     * Où en est la commande, dans l'ordre de la chaîne : enregistree (prise,
+     * pas encore partie) → en_attente (reçue en cuisine) → en_preparation →
+     * prete → en_livraison (livraison) → servie (ou remise, livrée) →
+     * terminee (servie et payée) ; ou annulee. Avec plusieurs envois, c'est
+     * le plat le moins avancé qui compte : rien n'est servi tant qu'il manque.
+     */
+    public function etape(): string
+    {
+        if ($this->statut === self::ANNULEE) {
+            return 'annulee';
+        }
+        if ($this->terminee_le !== null) {
+            return 'terminee';
+        }
+        $ordre = [
+            LigneCommandeRestaurant::ATTENTE => 'enregistree',
+            LigneCommandeRestaurant::EN_CUISINE => 'en_attente',
+            LigneCommandeRestaurant::EN_PREPARATION => 'en_preparation',
+            LigneCommandeRestaurant::PRETE => 'prete',
+        ];
+        $etats = $this->lignes->where('etat', '!=', LigneCommandeRestaurant::ANNULEE)->pluck('etat');
+        foreach ($ordre as $etat => $etape) {
+            if ($etats->contains($etat)) {
+                return $etape === 'prete' && $this->en_livraison_le !== null ? 'en_livraison' : $etape;
+            }
+        }
+
+        return $etats->isEmpty() ? 'enregistree' : 'servie';
+    }
+
+    /** Le paiement, à part de l'avancement : non_payee, partielle (acompte, addition partagée), payee. */
+    public function etatPaiement(): string
+    {
+        if ($this->total > 0 && $this->reste() === 0) {
+            return 'payee';
+        }
+
+        return $this->paye > 0 || $this->acompte > 0 ? 'partielle' : 'non_payee';
     }
 
     /** Toujours à suivre : pas annulée, et pas à la fois payée et entièrement servie. */

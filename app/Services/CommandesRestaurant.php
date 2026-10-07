@@ -207,12 +207,31 @@ class CommandesRestaurant
      *
      * @param  list<string>|null  $ids
      */
-    public function commencer(CommandeRestaurant $commande, ?array $ids): CommandeRestaurant
+    public function commencer(CommandeRestaurant $commande, ?array $ids, ?int $minutes = null): CommandeRestaurant
     {
         $this->exigerEnCours($commande);
         $commande->lignes()->where('etat', LigneCommandeRestaurant::EN_CUISINE)
             ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))
             ->update(['etat' => LigneCommandeRestaurant::EN_PREPARATION]);
+        // « Prête dans 10 min » : l'heure annoncée aux serveurs (la plus tardive si plusieurs envois).
+        if ($minutes !== null && $minutes > 0) {
+            $vers = now()->addMinutes($minutes);
+            if ($commande->prete_vers === null || $commande->prete_vers->isPast() || $vers->gt($commande->prete_vers)) {
+                $commande->update(['prete_vers' => $vers]);
+            }
+        }
+
+        return $commande->fresh();
+    }
+
+    /** Livraison : la commande prête part chez le client. */
+    public function partirEnLivraison(CommandeRestaurant $commande, ?User $agent): CommandeRestaurant
+    {
+        $this->exigerEnCours($commande);
+        if ($commande->type !== 'livraison') {
+            throw ValidationException::withMessages(['commande' => ['Ce n’est pas une livraison.']]);
+        }
+        $commande->update(['en_livraison_le' => now(), 'historique' => $commande->avecPas('en_livraison', $agent)]);
 
         return $commande->fresh();
     }

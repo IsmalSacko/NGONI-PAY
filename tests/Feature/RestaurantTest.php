@@ -15,6 +15,7 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -310,5 +311,37 @@ class RestaurantTest extends TestCase
         $c = $this->commander()->json('data');
         $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/payer", ['moyen_paiement' => 'especes'])->assertOk();
         $this->assertSame(1, Vente::count());
+    }
+
+    public function test_la_chaine_d_une_commande_et_son_paiement_a_part(): void
+    {
+        // Au comptoir : payée tout de suite, la cuisine continue.
+        $c = $this->commander(['type' => 'emporter', 'table' => null, 'envoyer' => false])->assertCreated()
+            ->assertJsonPath('data.etape', 'enregistree')->assertJsonPath('data.paiement', 'non_payee')->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/payer", ['moyen_paiement' => 'especes'])->assertOk()
+            ->assertJsonPath('data.paiement', 'payee')->assertJsonPath('data.etape', 'enregistree');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/envoyer")->assertOk()->assertJsonPath('data.etape', 'en_attente');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/commencer", ['minutes' => 15])->assertOk()
+            ->assertJsonPath('data.etape', 'en_preparation');
+        $this->assertEqualsWithDelta(15, now()->diffInMinutes(Carbon::parse($this->api()->getJson("/api/restaurant/commandes/{$c['id']}")->json('data.prete_vers'))), 1);
+        $this->assertSame('payee', $this->api()->getJson('/api/restaurant/cuisine')->json('data.0.paiement'), 'la cuisine voit qu’elle est payée');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/prets")->assertJsonPath('data.etape', 'prete');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/servir")->assertJsonPath('data.etape', 'terminee');
+
+        // Par téléphone, en livraison : non payée jusqu'au bout, puis en livraison.
+        $tel = $this->commander(['type' => 'livraison', 'telephone' => true, 'client_id' => $this->client, 'adresse' => 'ACI 2000', 'table' => null])->json('data');
+        $this->assertSame('non_payee', $tel['paiement']);
+        $this->api()->postJson("/api/restaurant/commandes/{$tel['id']}/prets")->assertOk();
+        $this->api()->postJson("/api/restaurant/commandes/{$tel['id']}/livraison")->assertJsonPath('data.etape', 'en_livraison');
+        $this->api()->postJson("/api/restaurant/commandes/{$tel['id']}/servir")->assertJsonPath('data.etape', 'servie')
+            ->assertJsonPath('data.paiement', 'non_payee')->assertJsonPath('data.en_cours', true);
+    }
+
+    public function test_les_commandes_en_cours_par_ordre_d_arrivee(): void
+    {
+        $premiere = $this->commander(['table' => 'T1'])->json('data.numero');
+        $this->travel(2)->minutes();
+        $deuxieme = $this->commander(['table' => 'T2'])->json('data.numero');
+        $this->assertSame([$premiere, $deuxieme], array_column($this->api()->getJson('/api/restaurant/commandes')->json('data'), 'numero'));
     }
 }

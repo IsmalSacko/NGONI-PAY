@@ -43,7 +43,9 @@ class CommandeRestaurantController extends Controller
                             ->when(strlen($chiffres) >= 4, fn ($c) => $c->orWhere('telephone', 'like', "%{$chiffres}%")));
                 });
             })
+            // En cours : par ordre d'arrivée (la plus ancienne d'abord) ; les terminées, les plus récentes d'abord.
             ->orderByRaw('case when terminee_le is null and statut != ? then 0 else 1 end', [CommandeRestaurant::ANNULEE])
+            ->orderByRaw('case when terminee_le is null and statut != ? then created_at end asc', [CommandeRestaurant::ANNULEE])
             ->orderByDesc('created_at');
 
         return response()->json(['data' => $requete->limit(200)->get()->map(fn ($c) => $this->json($c))->values()]);
@@ -100,6 +102,7 @@ class CommandeRestaurantController extends Controller
 
             return [
                 'commande_id' => $c->id, 'numero' => (string) $c->numero, 'type' => $c->type, 'table' => $c->table,
+                'paiement' => $c->etatPaiement(), 'prete_vers' => $c->prete_vers?->toIso8601String(),
                 'envoi' => $groupe->first()->envoi, 'envoyee_le' => $groupe->first()->envoyee_le?->toIso8601String(),
                 'heure_prevue' => $c->heure_prevue?->toIso8601String(),
                 'lignes' => $groupe->map(fn ($l) => $this->ligne($l))->values(),
@@ -187,9 +190,16 @@ class CommandeRestaurantController extends Controller
     public function commencer(Request $request, CommandeRestaurant $commande): JsonResponse
     {
         $this->commandes->boutique();
-        $data = $request->validate(['lignes' => ['nullable', 'array'], 'lignes.*' => ['uuid']]);
+        $data = $request->validate(['lignes' => ['nullable', 'array'], 'lignes.*' => ['uuid'], 'minutes' => ['nullable', 'integer', 'min:1', 'max:240']]);
 
-        return response()->json(['data' => $this->json($this->commandes->commencer($commande, $data['lignes'] ?? null))]);
+        return response()->json(['data' => $this->json($this->commandes->commencer($commande, $data['lignes'] ?? null, $data['minutes'] ?? null))]);
+    }
+
+    public function livraison(Request $request, CommandeRestaurant $commande): JsonResponse
+    {
+        $this->commandes->boutique();
+
+        return response()->json(['data' => $this->json($this->commandes->partirEnLivraison($commande, $request->user()))]);
     }
 
     public function prets(Request $request, CommandeRestaurant $commande): JsonResponse
@@ -304,6 +314,10 @@ class CommandeRestaurantController extends Controller
             'adresse' => $c->adresse,
             'heure_prevue' => $c->heure_prevue?->toIso8601String(),
             'statut' => $c->statut,
+            'etape' => $c->etape(),
+            'paiement' => $c->etatPaiement(),
+            'prete_vers' => $c->prete_vers?->toIso8601String(),
+            'en_livraison_le' => $c->en_livraison_le?->toIso8601String(),
             'en_cours' => $c->enCours(),
             'total' => $c->total,
             'paye' => $c->paye,
