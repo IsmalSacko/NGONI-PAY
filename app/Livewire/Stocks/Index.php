@@ -82,7 +82,7 @@ class Index extends Component
     {
         // Nom, code-barres ou molécule ; 25 par page.
         $terme = '%'.trim($this->recherche).'%';
-        $produits = Produit::with('categorie')->where('actif', true)
+        $produits = Produit::with('categorie')->pourActivite()->where('actif', true)
             ->when(trim($this->recherche) !== '', fn ($q) => $q->where(fn ($q) => $q->where('nom', 'like', $terme)->orWhere('code_barre', 'like', $terme)->orWhere('dci', 'like', $terme)))
             ->when($this->filtre === 'rupture', fn ($q) => $q->where('stock', '<=', 0))
             ->when($this->filtre === 'bas', fn ($q) => $q->where('stock', '>', 0)->whereColumn('stock', '<=', 'seuil_alerte'))
@@ -102,9 +102,9 @@ class Index extends Component
                     ->whereHas('produit', fn ($q) => $q->where('actif', true))
                     ->orderBy('peremption')->get()
                 : collect(),
-            'nTous' => Produit::where('actif', true)->count(),
-            'nRupture' => Produit::where('actif', true)->where('stock', '<=', 0)->count(),
-            'nBas' => Produit::where('actif', true)->where('stock', '>', 0)->whereColumn('stock', '<=', 'seuil_alerte')->count(),
+            'nTous' => Produit::pourActivite()->where('actif', true)->count(),
+            'nRupture' => Produit::pourActivite()->where('actif', true)->where('stock', '<=', 0)->count(),
+            'nBas' => Produit::pourActivite()->where('actif', true)->where('stock', '>', 0)->whereColumn('stock', '<=', 'seuil_alerte')->count(),
             'valeur' => $this->valeur(),
         ]);
     }
@@ -123,7 +123,7 @@ class Index extends Component
             return null;
         }
 
-        $enStock = Produit::where('actif', true)->where('stock', '>', 0);
+        $enStock = Produit::pourActivite()->where('actif', true)->where('stock', '>', 0);
         $achat = (int) (clone $enStock)->sum(DB::raw('stock * COALESCE(prix_achat, prix_vente)'));
         $vente = (int) (clone $enStock)->sum(DB::raw('stock * prix_vente'));
 

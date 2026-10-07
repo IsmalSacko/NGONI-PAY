@@ -35,7 +35,7 @@ class CommandeFournisseur
         if (Boutique::find(app(TenantContext::class)->boutiqueId())?->suitLeStock() === false) {
             return [];
         }
-        $actifs = Produit::where('actif', true)->orderBy('nom')->get();
+        $actifs = Produit::pourActivite()->where('actif', true)->orderBy('nom')->get();
         if ($actifs->isEmpty()) {
             return [];
         }

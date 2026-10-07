@@ -315,7 +315,7 @@ class Index extends Component
 
     public function render()
     {
-        $produits = Produit::with('categorie')
+        $produits = Produit::with('categorie')->pourActivite()
             ->when(trim($this->recherche) !== '', fn ($q) => $q->where(fn ($q) => $q->where('nom', 'like', '%'.trim($this->recherche).'%')
                 ->orWhere('code_barre', 'like', '%'.trim($this->recherche).'%')->orWhere('dci', 'like', '%'.trim($this->recherche).'%')))
             ->orderBy('nom')
@@ -327,9 +327,9 @@ class Index extends Component
             'categories' => CategorieProduit::orderBy('nom')->get(),
             'marge' => $this->marge(),
             // En tête, comme l'application : le catalogue en un chiffre.
-            'nArticles' => Produit::where('actif', true)->count(),
-            'nSansPhoto' => Produit::where('actif', true)->whereNull('photo')->count(),
-            'nSansPrixAchat' => Produit::where('actif', true)->whereNull('prix_achat')->count(),
+            'nArticles' => Produit::pourActivite()->where('actif', true)->count(),
+            'nSansPhoto' => Produit::pourActivite()->where('actif', true)->whereNull('photo')->count(),
+            'nSansPrixAchat' => Produit::pourActivite()->where('actif', true)->whereNull('prix_achat')->count(),
         ]);
     }
 

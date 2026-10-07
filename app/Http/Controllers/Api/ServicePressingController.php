@@ -46,7 +46,8 @@ class ServicePressingController extends Controller
             Produit::whereNotNull('tarifs')->get()->each(function (Produit $p) use ($service): void {
                 $tarifs = collect($p->tarifs)->reject(fn ($t) => $t['service_id'] === $service->id)->values()->all();
                 if (count($tarifs) !== count($p->tarifs)) {
-                    $p->update(['tarifs' => $tarifs ?: null]);
+                    // Liste vide plutôt que rien : l'habit reste un tarif du pressing, à chiffrer.
+                    $p->update(['tarifs' => $tarifs]);
                 }
             });
             $service->delete();

@@ -161,7 +161,7 @@ class PressingTest extends TestCase
         $this->assertSame([true, true], array_column($express->json('lignes'), 'express'));
     }
 
-    public function test_hors_pro_le_classique_passe_et_l_express_est_refuse(): void
+    public function test_en_basic_l_express_passe_aussi(): void
     {
         $s = $this->passerEnPressing();
         $chemise = $this->api()->postJson('/api/produits', [
@@ -177,8 +177,9 @@ class PressingTest extends TestCase
         ]);
 
         $depot(false)->assertCreated()->assertJsonPath('total', 500);
-        $depot(true)->assertForbidden()->assertJsonPath('fonctionnalite', 'pressing_avance');
-        $this->api()->getJson('/api/abonnement')->assertJsonMissing(['pressing_avance']);
+        $depot(true)->assertCreated()->assertJsonPath('total', 800);
+        // Annoncé à toutes les offres : les apps ≤ 4.10.10 ôtent leur cadenas.
+        $this->api()->getJson('/api/abonnement')->assertJsonFragment(['pressing_avance']);
     }
 
     public function test_un_habit_ne_se_vend_pas_dans_un_service_qu_il_n_a_pas(): void
@@ -207,5 +208,37 @@ class PressingTest extends TestCase
         $this->api()->putJson('/api/services/'.$s['Repassage seul'], ['nom' => 'Repassage'])->assertOk();
         $this->api()->deleteJson('/api/services/'.$s['Repassage seul'])->assertNoContent();
         $this->assertSame([['service_id' => $s['Lavage + repassage'], 'prix' => 1250]], Produit::find($bazin['id'])->tarifs);
+    }
+
+    public function test_changer_d_activite_ne_melange_pas_tarifs_et_marchandise(): void
+    {
+        $savon = $this->article('Savon', 300, stock: 5);
+        $s = $this->passerEnPressing();
+        $chemise = $this->api()->postJson('/api/produits', [
+            'nom' => 'Chemise', 'prix_vente' => 500, 'taux_tva' => 0,
+            'tarifs' => [['service_id' => $s['Lavage + repassage'], 'prix' => 500]],
+        ])->assertCreated()->json();
+
+        // Pressing : ses tarifs seulement.
+        $this->assertSame(['Chemise'], array_column($this->api()->getJson('/api/produits')->assertOk()->json(), 'nom'));
+
+        // Retour en commerce : la marchandise, sans les tarifs ni leur « rupture ».
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'commerce'])->assertOk();
+        $this->assertSame(['Savon'], array_column($this->api()->getJson('/api/produits')->assertOk()->json(), 'nom'));
+        $this->api()->getJson('/api/dashboard')->assertOk()->assertJsonPath('produits_en_rupture', 0);
+
+        // Rien n'est perdu : la chemise et son prix reviennent avec le pressing.
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'pressing'])->assertOk();
+        $this->assertSame([$chemise['id']], array_column($this->api()->getJson('/api/produits')->json(), 'id'));
+        $this->assertNotNull(Produit::find($savon['id']));
+    }
+
+    public function test_un_habit_cree_sans_prix_reste_visible_dans_les_tarifs(): void
+    {
+        $this->passerEnPressing();
+        $coo = $this->api()->postJson('/api/produits', ['nom' => 'Costume', 'prix_vente' => 0, 'taux_tva' => 0])->assertCreated()->json();
+
+        $this->assertSame([], $coo['tarifs']);
+        $this->assertSame(['Costume'], array_column($this->api()->getJson('/api/produits')->json(), 'nom'));
     }
 }

@@ -217,9 +217,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
     // Pressing : le registre des commandes (dépôt → prête → retrait, où naît la vente).
     // Pressing, offre Pro : dépenses, fournitures, forfaits, relevé mensuel.
-    Route::get('pressing/depenses', [\App\Http\Controllers\Api\GestionPressingController::class, 'depenses'])->middleware('permission:rapports.view');
-    Route::post('pressing/depenses', [\App\Http\Controllers\Api\GestionPressingController::class, 'depenser'])->middleware(['permission:ventes.create', 'abonnement']);
-    Route::delete('pressing/depenses/{depense}', [\App\Http\Controllers\Api\GestionPressingController::class, 'supprimerDepense'])->middleware('permission:ventes.delete');
+    // Dépenses de la boutique et bilan (recettes − dépenses) : toutes les activités, offre Pro.
+    Route::get('depenses', [\App\Http\Controllers\Api\DepenseController::class, 'index'])->middleware(['permission:rapports.view', 'fonctionnalite:depenses']);
+    Route::post('depenses', [\App\Http\Controllers\Api\DepenseController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement', 'fonctionnalite:depenses']);
+    Route::delete('depenses/{depense}', [\App\Http\Controllers\Api\DepenseController::class, 'destroy'])->middleware(['permission:ventes.delete', 'fonctionnalite:depenses']);
+    Route::get('bilan', [\App\Http\Controllers\Api\DepenseController::class, 'bilan'])->middleware(['permission:rapports.view', 'fonctionnalite:depenses']);
     Route::get('pressing/fournitures', [\App\Http\Controllers\Api\GestionPressingController::class, 'fournitures'])->middleware('permission:produits.view');
     Route::post('pressing/fournitures', [\App\Http\Controllers\Api\GestionPressingController::class, 'creerFourniture'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('pressing/fournitures/{fourniture}', [\App\Http\Controllers\Api\GestionPressingController::class, 'modifierFourniture'])->middleware('permission:produits.update');
@@ -240,6 +242,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('commandes-pressing/{commande}/photos/{index}', [\App\Http\Controllers\Api\CommandePressingController::class, 'photo'])->whereNumber('index')->middleware('permission:ventes.view');
     Route::delete('commandes-pressing/{commande}/photos/{index}', [\App\Http\Controllers\Api\CommandePressingController::class, 'retirerPhoto'])->whereNumber('index')->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/prete', [\App\Http\Controllers\Api\CommandePressingController::class, 'prete'])->middleware('permission:ventes.create');
+    Route::post('commandes-pressing/{commande}/express', [\App\Http\Controllers\Api\CommandePressingController::class, 'express'])->middleware('permission:ventes.create');
     Route::post('commandes-pressing/{commande}/retrait', [\App\Http\Controllers\Api\CommandePressingController::class, 'retrait'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     Route::post('commandes-pressing/{commande}/annuler', [\App\Http\Controllers\Api\CommandePressingController::class, 'annuler'])->middleware('permission:ventes.delete');
     Route::post('ventes', [VenteController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement:caisse'])->name('ventes.store');

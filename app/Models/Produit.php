@@ -7,8 +7,10 @@ namespace App\Models;
 use App\Casts\QuantiteCast;
 use App\Models\Concerns\BelongsToBoutique;
 use App\Services\Images;
+use App\Support\Tenancy\TenantContext;
 use Database\Factories\ProduitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -111,6 +113,24 @@ class Produit extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Ce que l'activité de la boutique voit : un pressing, ses tarifs (les
+     * habits qui ont des prix par prestation) ; un commerce ou une pharmacie,
+     * leur marchandise. Changer d'activité ne supprime rien : en revenant,
+     * chacun retrouve les siens.
+     *
+     * @param  Builder<Produit>  $query
+     */
+    public function scopePourActivite(Builder $query, ?Boutique $boutique = null): void
+    {
+        $boutique ??= Boutique::find(app(TenantContext::class)->boutiqueId());
+        if ($boutique?->estPressing()) {
+            $query->whereNotNull('tarifs');
+        } else {
+            $query->whereNull('tarifs');
+        }
     }
 
     public function estEnRupture(): bool

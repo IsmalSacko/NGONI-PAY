@@ -40,8 +40,8 @@ class DashboardController extends Controller
                 ->groupBy('moyen_paiement')
                 ->get(),
             // Un pressing ne compte pas de stock : ni rupture ni stock faible.
-            'produits_en_rupture' => $suitLeStock ? Produit::where('actif', true)->where('stock', '<=', 0)->count() : 0,
-            'produits_stock_faible' => $suitLeStock ? Produit::where('actif', true)
+            'produits_en_rupture' => $suitLeStock ? Produit::pourActivite()->where('actif', true)->where('stock', '<=', 0)->count() : 0,
+            'produits_stock_faible' => $suitLeStock ? Produit::pourActivite()->where('actif', true)
                 ->where('stock', '>', 0)
                 ->whereColumn('stock', '<=', 'seuil_alerte')
                 ->count() : 0,

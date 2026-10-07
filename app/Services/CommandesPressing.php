@@ -9,12 +9,10 @@ use App\Models\Client;
 use App\Models\CommandePressing;
 use App\Models\EncaissementPressing;
 use App\Models\ForfaitPressing;
-use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\ServicePressing;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -55,14 +53,8 @@ class CommandesPressing
         $express = (bool) ($data['express'] ?? false);
         $collecte = (bool) ($data['collecte'] ?? false);
         $livraison = (bool) ($data['livraison'] ?? false);
-        if ($express) {
-            $this->exigerPro($boutique, 'Le service express fait partie de l’offre Pro.');
-        }
-        if ($collecte || $livraison) {
-            $this->exigerPro($boutique, 'La collecte et la livraison font partie de l’offre Pro.');
-            if (! filled($data['adresse'] ?? null)) {
-                throw ValidationException::withMessages(['adresse' => ['Indiquez l’adresse de collecte ou de livraison.']]);
-            }
+        if (($collecte || $livraison) && ! filled($data['adresse'] ?? null)) {
+            throw ValidationException::withMessages(['adresse' => ['Indiquez l’adresse de collecte ou de livraison.']]);
         }
 
         if (! Client::whereKey($data['client_id'])->exists()) {
@@ -72,7 +64,6 @@ class CommandesPressing
         // Forfait (offre Pro) : les pièces sont déjà payées, déduites du forfait du client.
         $forfait = null;
         if (filled($data['forfait_id'] ?? null)) {
-            $this->exigerPro($boutique, 'Les forfaits font partie de l’offre Pro.');
             $forfait = ForfaitPressing::whereKey($data['forfait_id'])->where('client_id', $data['client_id'])->first();
             $pieces = array_sum(array_map(fn ($l) => (int) $l['quantite'], $data['lignes']));
             if ($forfait === null || ! $forfait->actif()) {
@@ -169,13 +160,10 @@ class CommandesPressing
         return $commande;
     }
 
-    /** [casier] : où le linge prêt est rangé (offre Pro). */
+    /** [casier] : où le linge prêt est rangé. */
     public function marquerPrete(CommandePressing $commande, ?User $agent = null, ?string $casier = null): CommandePressing
     {
         $this->exigerOuverte($commande);
-        if (filled($casier)) {
-            $this->exigerPro($this->boutique(), 'Les casiers font partie de l’offre Pro.');
-        }
         $commande->update([
             'statut' => CommandePressing::PRETE, 'etape' => null, 'prete_le' => now(),
             'casier' => filled($casier) ? trim($casier) : $commande->casier,
@@ -183,6 +171,38 @@ class CommandesPressing
         ]);
 
         return $commande;
+    }
+
+    /**
+     * Classique ou express, choisi au retrait : les lignes reprennent les prix
+     * du tarif (le prix express écrit, sinon le classique). Un habit supprimé
+     * depuis garde son prix ; une commande au forfait ne change pas.
+     */
+    public function changerExpress(CommandePressing $commande, bool $express): CommandePressing
+    {
+        $this->exigerOuverte($commande);
+        if ($commande->forfait_id !== null || $commande->express === $express) {
+            return $commande;
+        }
+        $commande->loadMissing('lignes');
+        $produits = Produit::whereIn('id', $commande->lignes->pluck('produit_id')->filter())->get()->keyBy('id');
+
+        return DB::transaction(function () use ($commande, $express, $produits): CommandePressing {
+            $total = 0;
+            foreach ($commande->lignes as $ligne) {
+                $prix = $ligne->service_id === null ? null : $produits->get($ligne->produit_id)?->prixService($ligne->service_id, $express);
+                if ($prix !== null) {
+                    $ligne->update(['prix_unitaire' => $prix, 'total_ligne' => $prix * $ligne->quantite]);
+                }
+                $total += $ligne->total_ligne;
+            }
+            if ($commande->acompte > $total) {
+                throw ValidationException::withMessages(['express' => ['L’acompte déjà versé dépasse le nouveau total.']]);
+            }
+            $commande->update(['express' => $express, 'total' => $total]);
+
+            return $commande;
+        });
     }
 
     /**
@@ -254,20 +274,18 @@ class CommandesPressing
         return $commande;
     }
 
-    /** Casier ou rayon où le linge est rangé (offre Pro). */
+    /** Casier ou rayon où le linge est rangé. */
     public function ranger(CommandePressing $commande, ?string $casier): CommandePressing
     {
         $this->exigerOuverte($commande);
-        $this->exigerPro($this->boutique(), 'Les casiers font partie de l’offre Pro.');
         $commande->update(['casier' => filled($casier) ? trim($casier) : null]);
 
         return $commande;
     }
 
-    /** Photo d'un défaut, prise au dépôt (offre Pro). */
+    /** Photo d'un défaut, prise au dépôt. */
     public function ajouterPhoto(CommandePressing $commande, UploadedFile $fichier): CommandePressing
     {
-        $this->exigerPro($this->boutique(), 'Les photos des défauts font partie de l’offre Pro.');
         $photos = $commande->photos ?? [];
         if (count($photos) >= CommandePressing::PHOTOS_MAX) {
             throw ValidationException::withMessages(['photo' => ['Six photos au plus par commande.']]);
@@ -287,15 +305,6 @@ class CommandesPressing
         $commande->update(['photos' => $photos]);
 
         return $commande;
-    }
-
-    public function exigerPro(Boutique $boutique, string $message): void
-    {
-        if (! app(AbonnementService::class)->permet($boutique, Plan::PRESSING_AVANCE)) {
-            throw new HttpResponseException(response()->json([
-                'message' => $message, 'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => Plan::PRESSING_AVANCE,
-            ], 403));
-        }
     }
 
     /** Acompte ou remboursement, rattaché à la séance de caisse de l'agent (le tiroir du jour). */

@@ -238,7 +238,7 @@ class Statistiques
             ->pluck(DB::raw('SUM(quantite * contenance)'), 'produit_id');
 
         $recents = $vendus(self::JOURS_VITESSE);
-        $enStock = Produit::where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'unite', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte', 'created_at']);
+        $enStock = Produit::pourActivite()->where('actif', true)->where('stock', '>', 0)->get(['id', 'nom', 'unite', 'stock', 'prix_achat', 'prix_vente', 'seuil_alerte', 'created_at']);
 
         // Dernier retour en rayon après une rupture (stock passé de 0 à plus
         // de 0) : une marchandise arrivée hier n'a pas encore eu le temps de

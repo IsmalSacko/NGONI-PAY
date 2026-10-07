@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\MoyenPaiement;
-use App\Models\DepensePressing;
+use App\Models\Depense;
 use App\Models\EncaissementPressing;
 use App\Models\ReglementCredit;
 use App\Models\SessionCaisse;
@@ -74,10 +74,9 @@ class SessionCaisseService
             ->where('moyen_paiement', MoyenPaiement::Especes->value)
             ->get()->sum(fn (EncaissementPressing $e) => $e->signe());
 
-        // Pressing : une dépense payée en espèces sort du tiroir.
-        $depenses = (int) DepensePressing::where('session_caisse_id', $session->id)
-            ->where('moyen_paiement', MoyenPaiement::Especes->value)
-            ->sum('montant');
+        // Toute dépense sort du tiroir, quel que soit le moyen : payée par
+        // Orange Money, son équivalent est repris dans la caisse.
+        $depenses = (int) Depense::where('session_caisse_id', $session->id)->sum('montant');
 
         return $ventes + $remboursements + $acomptes - $depenses;
     }

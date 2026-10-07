@@ -46,8 +46,15 @@ class Plan extends Model
     /** Deux prix par article, détail et gros (réglage « Vos ventes »). */
     public const VENTE_GROS = 'vente_gros';
 
-    /** Pressing : le service express et la grille des tarifs (le pressing de base reste dans tous les plans). */
+    /**
+     * Ancienne fonction du pressing : tout le pressing est désormais dans tous
+     * les plans. Toujours annoncée comme incluse, pour les apps ≤ 4.10.10 qui
+     * mettaient un cadenas sur l'express sans elle.
+     */
     public const PRESSING_AVANCE = 'pressing_avance';
+
+    /** Dépenses de la boutique et bilan (recettes − dépenses). */
+    public const DEPENSES = 'depenses';
 
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
@@ -66,7 +73,7 @@ class Plan extends Model
         self::FACTURES_EXPORTS => 'Factures A4, exports, bilan mensuel',
         self::OBJECTIF_MOIS => 'Objectif du mois',
         self::VENTE_GROS => 'Vente en gros (deux prix)',
-        self::PRESSING_AVANCE => 'Pressing : express et grille des tarifs',
+        self::DEPENSES => 'Dépenses et bilan',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */
@@ -122,7 +129,7 @@ class Plan extends Model
     /** @return list<string> */
     public function fonctionnalitesIncluses(): array
     {
-        return array_values(array_filter(array_keys(self::FONCTIONNALITES), fn (string $f) => $this->inclut($f)));
+        return [...array_values(array_filter(array_keys(self::FONCTIONNALITES), fn (string $f) => $this->inclut($f))), self::PRESSING_AVANCE];
     }
 
     public function joursEssai(): int

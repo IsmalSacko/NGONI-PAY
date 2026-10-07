@@ -69,14 +69,14 @@ class GestionPressingTest extends TestCase
         ]);
     }
 
-    public function test_une_depense_en_especes_sort_de_la_caisse_du_jour(): void
+    public function test_une_depense_sort_de_la_caisse_du_jour_quel_que_soit_le_moyen(): void
     {
         $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
-        $this->api()->postJson('/api/pressing/depenses', ['libelle' => 'Électricité', 'categorie' => 'energie', 'montant' => 3000])->assertCreated();
-        $this->api()->postJson('/api/pressing/depenses', ['libelle' => 'Taxi', 'categorie' => 'transport', 'montant' => 500, 'moyen_paiement' => 'orange_money'])->assertCreated();
+        $this->api()->postJson('/api/depenses', ['libelle' => 'Électricité', 'categorie' => 'energie', 'montant' => 3000])->assertCreated();
+        $this->api()->postJson('/api/depenses', ['libelle' => 'Taxi', 'categorie' => 'transport', 'montant' => 500, 'moyen_paiement' => 'orange_money'])->assertCreated();
 
-        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 7000);
-        $this->api()->getJson('/api/pressing/depenses')->assertOk()->assertJsonPath('total', 3500)->assertJsonCount(2, 'data');
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 6500); // le taxi payé par Orange Money sort aussi du tiroir
+        $this->api()->getJson('/api/depenses')->assertOk()->assertJsonPath('total', 3500)->assertJsonCount(2, 'data');
         $jour = now()->toDateString();
         $this->api()->getJson("/api/rapports?du={$jour}&au={$jour}")->assertJsonPath('encaisse.depenses', 3500);
     }
@@ -88,7 +88,7 @@ class GestionPressingTest extends TestCase
         $this->api()->postJson("/api/pressing/fournitures/{$id}/mouvement", ['quantite' => 10, 'montant' => 7500])->assertOk()
             ->assertJsonPath('data.quantite', 12)->assertJsonPath('data.a_racheter', false);
         $this->api()->postJson("/api/pressing/fournitures/{$id}/mouvement", ['quantite' => -20])->assertUnprocessable();
-        $this->api()->getJson('/api/pressing/depenses')->assertJsonPath('data.0.libelle', 'Achat : Lessive')->assertJsonPath('total', 7500);
+        $this->api()->getJson('/api/depenses')->assertJsonPath('data.0.libelle', 'Achat : Lessive')->assertJsonPath('total', 7500);
     }
 
     public function test_forfait_vendu_puis_deduit_aux_depots_sans_vente_au_retrait(): void
@@ -125,11 +125,13 @@ class GestionPressingTest extends TestCase
         $this->assertSame(3000, $releve['solde_du']);
     }
 
-    public function test_hors_pro_ou_hors_pressing_refuse(): void
+    public function test_basic_garde_le_pressing_mais_pas_les_depenses_hors_pressing_refuse(): void
     {
         $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
-        $this->api()->getJson('/api/pressing/depenses')->assertForbidden();
-        $this->api()->getJson('/api/pressing/fournitures')->assertForbidden();
+        // Les dépenses et le bilan sont Pro ; fournitures et forfaits, à tous les pressings.
+        $this->api()->getJson('/api/depenses')->assertForbidden()->assertJsonPath('fonctionnalite', 'depenses');
+        $this->api()->getJson('/api/bilan')->assertForbidden();
+        $this->api()->getJson('/api/pressing/fournitures')->assertOk();
         $this->api()->putJson('/api/boutique/activite', ['activite' => 'commerce'])->assertOk();
         $this->api()->getJson('/api/pressing/forfaits')->assertUnprocessable();
     }

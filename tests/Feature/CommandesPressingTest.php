@@ -124,6 +124,29 @@ class CommandesPressingTest extends TestCase
         $this->api()->postJson("/api/commandes-pressing/{$id}/annuler")->assertUnprocessable();
     }
 
+    public function test_express_choisi_au_retrait_les_prix_suivent_le_tarif(): void
+    {
+        $id = $this->deposer(['acompte' => 1000])->json('data.id');
+        $this->api()->postJson("/api/commandes-pressing/{$id}/prete")->assertOk();
+
+        // Express : le prix express écrit (1 000), sinon le classique (400).
+        $commande = $this->api()->postJson("/api/commandes-pressing/{$id}/express", ['express' => true])->assertOk()->json('data');
+        $this->assertTrue($commande['express']);
+        $this->assertSame(3 * 1000 + 2 * 400, $commande['total']);
+        $this->assertSame(3800 - 1000, $commande['reste']);
+        $this->assertSame([1000, 400], array_column($commande['lignes'], 'prix_unitaire'));
+
+        // Retour au classique, puis la vente naît à ces prix.
+        $this->api()->postJson("/api/commandes-pressing/{$id}/express", ['express' => false])->assertOk()->assertJsonPath('data.total', 2600);
+        $this->api()->postJson("/api/commandes-pressing/{$id}/express", ['express' => true])->assertOk();
+        $vente = $this->api()->postJson("/api/commandes-pressing/{$id}/retrait", ['moyen_paiement' => 'especes'])->assertOk()->json('data.vente_id');
+        $this->assertSame(3800, Vente::findOrFail($vente)->total);
+        $this->assertTrue((bool) Vente::findOrFail($vente)->express);
+
+        // Retirée : on ne la change plus.
+        $this->api()->postJson("/api/commandes-pressing/{$id}/express", ['express' => false])->assertUnprocessable();
+    }
+
     public function test_recherche_par_numero_nom_telephone_et_filtres(): void
     {
         $this->deposer();
@@ -157,16 +180,22 @@ class CommandesPressingTest extends TestCase
         $this->deposer()->assertUnprocessable();
     }
 
-    public function test_hors_pro_le_depot_express_est_refuse(): void
+    public function test_tout_le_pressing_est_dans_l_offre_basic(): void
     {
+        $c = $this->deposer()->assertCreated()->json('data');
         $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
 
-        $this->deposer(['express' => true])->assertForbidden();
-        $this->deposer()->assertCreated();
+        $this->deposer(['express' => true])->assertCreated()->assertJsonPath('data.total', 3 * 1000 + 2 * 400);
+        $this->deposer(['collecte' => true, 'adresse' => 'Badalabougou'])->assertCreated();
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/casier", ['casier' => 'A1'])->assertOk();
+        $this->api()->post("/api/commandes-pressing/{$c['id']}/photos", ['photo' => UploadedFile::fake()->image('t.jpg')])->assertOk();
+        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/express", ['express' => true])->assertOk();
     }
 
     public function test_alertes_aujourdhui_retard_et_linge_abandonne(): void
     {
+        // Midi : « aujourd'hui à 23 h » reste à venir (le soir, le test le comptait en retard).
+        $this->travelTo(today()->setTime(12, 0));
         $this->deposer(['retrait_prevu_le' => now()->setTime(23, 0)->toIso8601String()])->assertCreated();
         $this->deposer(['retrait_prevu_le' => now()->subDays(2)->toIso8601String()])->assertCreated();
         $vieille = $this->deposer(['retrait_prevu_le' => now()->subDays(40)->toIso8601String()])->assertCreated()->json('data');
@@ -268,16 +297,5 @@ class CommandesPressingTest extends TestCase
         $this->assertSame('livree', end($fini['historique'])['quoi']);
 
         $this->api()->deleteJson("/api/commandes-pressing/{$c['id']}/photos/0")->assertOk()->assertJsonPath('data.photos', 0);
-    }
-
-    public function test_hors_pro_collecte_casier_et_photos_refuses(): void
-    {
-        $c = $this->deposer()->assertCreated()->json('data');
-        $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
-        $this->deposer(['collecte' => true, 'adresse' => 'Badalabougou'])->assertForbidden();
-        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/casier", ['casier' => 'A1'])->assertForbidden();
-        $this->api()->post("/api/commandes-pressing/{$c['id']}/photos", ['photo' => UploadedFile::fake()->image('t.jpg')])->assertForbidden();
-        // Sans casier, « prête » reste ouvert à tous.
-        $this->api()->postJson("/api/commandes-pressing/{$c['id']}/prete")->assertOk();
     }
 }

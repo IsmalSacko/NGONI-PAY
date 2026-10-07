@@ -85,14 +85,6 @@ class VenteService
             // Pressing : les services demandés, et l'express pour tout le dépôt.
             $services = ServicePressing::whereIn('id', array_filter(array_column($data['lignes'], 'service_id')))->get()->keyBy('id');
             $express = (bool) ($data['express'] ?? false);
-            // L'express est une fonction de l'offre Pro (le pressing de base est dans tous les plans).
-            if ($express && ! app(AbonnementService::class)->permet($boutique, Plan::PRESSING_AVANCE)) {
-                throw new HttpResponseException(response()->json([
-                    'message' => 'Le service express fait partie de l’offre Pro.',
-                    'code' => 'FONCTIONNALITE_NON_INCLUSE',
-                    'fonctionnalite' => Plan::PRESSING_AVANCE,
-                ], 403));
-            }
 
             $lignes = [];
             $sousTotal = 0;

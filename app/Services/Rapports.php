@@ -6,7 +6,7 @@ namespace App\Services;
 
 use App\Enums\MoyenPaiement;
 use App\Models\Client;
-use App\Models\DepensePressing;
+use App\Models\Depense;
 use App\Models\EncaissementPressing;
 use App\Models\LigneVente;
 use App\Models\ReglementCredit;
@@ -121,7 +121,7 @@ class Rapports
                 'acomptes' => $acomptes = (int) EncaissementPressing::whereBetween('created_at', [$debut, $fin])->get()->sum(fn (EncaissementPressing $e) => $e->signe()),
                 'total' => $payeVentes + $rembourse + $acomptes,
                 // Pressing : dépenses de la période (sorties, hors chiffre des ventes).
-                'depenses' => (int) DepensePressing::whereDate('jour', '>=', $debut)->whereDate('jour', '<=', $fin)->sum('montant'),
+                'depenses' => (int) Depense::whereDate('jour', '>=', $debut)->whereDate('jour', '<=', $fin)->sum('montant'),
                 'a_recevoir' => $encoreDu,
             ],
         ];

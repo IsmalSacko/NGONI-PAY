@@ -6,7 +6,7 @@ namespace App\Services;
 
 use App\Models\Client;
 use App\Models\CommandePressing;
-use App\Models\DepensePressing;
+use App\Models\Depense;
 use App\Models\ForfaitPressing;
 use App\Models\FourniturePressing;
 use App\Models\User;
@@ -23,25 +23,16 @@ class GestionPressing
 {
     public function __construct(private readonly CommandesPressing $commandes, private readonly SessionCaisseService $sessions) {}
 
-    /** Pressing et offre Pro, sinon refus. */
+    /** Réservé aux pressings, sinon refus. */
     public function exiger(): void
     {
-        $this->commandes->exigerPro($this->commandes->boutique(), 'La gestion du pressing (dépenses, fournitures, forfaits) fait partie de l’offre Pro.');
+        $this->commandes->boutique();
     }
 
-    /** @param  array{libelle: string, categorie: string, montant: int, moyen_paiement?: ?string, jour?: ?string}  $data */
-    public function depenser(array $data, User $auteur): DepensePressing
+    /** Une fourniture payée devient une dépense de la boutique (voir Depenses). */
+    public function depenser(array $data, User $auteur): Depense
     {
-        return DepensePressing::create([
-            'user_id' => $auteur->id,
-            // Payée maintenant : elle sort du tiroir de la séance en cours.
-            'session_caisse_id' => $this->sessions->courante($auteur)?->id,
-            'libelle' => trim($data['libelle']),
-            'categorie' => $data['categorie'],
-            'montant' => (int) $data['montant'],
-            'moyen_paiement' => $data['moyen_paiement'] ?? 'especes',
-            'jour' => $data['jour'] ?? now()->toDateString(),
-        ]);
+        return app(Depenses::class)->depenser($data, $auteur);
     }
 
     /**

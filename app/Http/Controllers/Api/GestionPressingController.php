@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Api;
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Models\DepensePressing;
 use App\Models\ForfaitPressing;
 use App\Models\FourniturePressing;
 use App\Services\GestionPressing;
@@ -20,46 +19,6 @@ use Illuminate\Validation\Rule;
 class GestionPressingController extends Controller
 {
     public function __construct(private readonly GestionPressing $gestion) {}
-
-    /** Les dépenses d'un mois (par défaut le mois en cours), les plus récentes d'abord. */
-    public function depenses(Request $request): JsonResponse
-    {
-        $this->gestion->exiger();
-        $mois = Carbon::parse($request->query('mois', now()->format('Y-m')).'-01');
-        $depenses = DepensePressing::with('auteur')->whereBetween('jour', [$mois->copy()->startOfMonth(), $mois->copy()->endOfMonth()])
-            ->orderByDesc('jour')->orderByDesc('created_at')->get();
-
-        return response()->json([
-            'data' => $depenses->map(fn (DepensePressing $d) => [
-                'id' => $d->id, 'libelle' => $d->libelle, 'categorie' => $d->categorie, 'montant' => $d->montant,
-                'moyen_paiement' => $d->moyen_paiement, 'jour' => $d->jour->toDateString(), 'par' => $d->auteur?->name,
-            ])->values(),
-            'total' => (int) $depenses->sum('montant'),
-            'categories' => DepensePressing::CATEGORIES,
-        ]);
-    }
-
-    public function depenser(Request $request): JsonResponse
-    {
-        $this->gestion->exiger();
-        $data = $request->validate([
-            'libelle' => ['required', 'string', 'max:120'],
-            'categorie' => ['required', Rule::in(array_keys(DepensePressing::CATEGORIES))],
-            'montant' => ['required', 'integer', 'min:1'],
-            'moyen_paiement' => ['nullable', Rule::enum(MoyenPaiement::class)],
-            'jour' => ['nullable', 'date'],
-        ]);
-
-        return response()->json(['data' => ['id' => $this->gestion->depenser($data, $request->user())->id]], 201);
-    }
-
-    public function supprimerDepense(DepensePressing $depense): JsonResponse
-    {
-        $this->gestion->exiger();
-        $depense->delete();
-
-        return response()->json(['ok' => true]);
-    }
 
     public function fournitures(): JsonResponse
     {

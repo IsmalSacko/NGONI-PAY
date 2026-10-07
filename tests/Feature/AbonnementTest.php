@@ -356,14 +356,14 @@ class AbonnementTest extends TestCase
 
     public function test_les_seances_de_caisse_sont_reservees_au_pro(): void
     {
-        // Essai : tout est inclus.
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', array_keys(Plan::FONCTIONNALITES));
+        // Essai : tout est inclus (pressing_avance : toujours annoncé, pour les anciennes apps).
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', [...array_keys(Plan::FONCTIONNALITES), Plan::PRESSING_AVANCE]);
         $session = $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])->assertCreated();
 
         // Passé en Basic : plus de nouvelle séance, mais la vente passe sans,
         // et la séance ouverte pendant l'essai se clôture.
         $this->awa->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', ['vente_credit', 'backoffice_web']);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.fonctionnalites', ['vente_credit', 'backoffice_web', 'pressing_avance']);
         $this->api()->putJson("/api/sessions-caisse/{$session->json('id')}/fermer", ['fond_final' => 5000])->assertOk();
         $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 5000])
             ->assertForbidden()->assertJsonPath('code', 'FONCTION_PRO');

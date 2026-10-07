@@ -184,6 +184,15 @@ class CommandePressingController extends Controller
         return $this->reglages();
     }
 
+    /** Classique ou express, au retrait : les prix suivent le tarif. */
+    public function express(Request $request, CommandePressing $commande): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['express' => ['required', 'boolean']]);
+
+        return response()->json(['data' => $this->json($this->commandes->changerExpress($commande, (bool) $data['express'])->load('lignes', 'client', 'agent'))]);
+    }
+
     public function retrait(Request $request, CommandePressing $commande): JsonResponse
     {
         $this->commandes->boutique();

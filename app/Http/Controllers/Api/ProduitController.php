@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Boutique;
 use App\Models\LigneVente;
 use App\Models\Lot;
 use App\Models\Produit;
@@ -24,7 +25,8 @@ class ProduitController extends Controller
     public function index(Request $request): JsonResponse
     {
         // Pharmacie : la date du lot qui périme le plus tôt, pour l'alerte en caisse.
-        $query = Produit::with('categorie')->where('actif', true)
+        // Pressing : ses tarifs ; ailleurs : la marchandise (voir Produit::pourActivite).
+        $query = Produit::with('categorie')->pourActivite()->where('actif', true)
             ->withMin(['lots as prochaine_peremption' => fn ($q) => $q->where('quantite', '>', 0)], 'peremption');
 
         if ($request->filled('categorie_produit_id')) {
@@ -207,6 +209,14 @@ class ProduitController extends Controller
                     'prix_express' => isset($t['prix_express']) ? (int) $t['prix_express'] : null], fn ($v) => $v !== null))
                 ->values()->all();
             $data['tarifs'] = $tarifs === [] ? null : $tarifs;
+        }
+
+        // Pressing : un habit reste un tarif du pressing même sans prix encore
+        // (liste vide, à chiffrer dans Tarifs) — sinon il ne serait vu nulle
+        // part (voir Produit::pourActivite). Ailleurs, la marchandise n'en a pas.
+        if (Boutique::find(app(TenantContext::class)->boutiqueId())?->estPressing()
+            && (! $sometimes || array_key_exists('tarifs', $data))) {
+            $data['tarifs'] ??= [];
         }
 
         // Du plus petit au plus grand ; aucun palier : pas de détail.
