@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\MoyenPaiement;
 use App\Models\Depense;
 use App\Models\EncaissementPressing;
+use App\Models\EncaissementRestaurant;
 use App\Models\ReglementCredit;
 use App\Models\SessionCaisse;
 use App\Models\User;
@@ -73,6 +74,10 @@ class SessionCaisseService
         $acomptes = EncaissementPressing::where('session_caisse_id', $session->id)
             ->where('moyen_paiement', MoyenPaiement::Especes->value)
             ->get()->sum(fn (EncaissementPressing $e) => $e->signe());
+        // Restaurant : acompte d'une commande par téléphone, son remboursement, le pourboire.
+        $acomptes += EncaissementRestaurant::where('session_caisse_id', $session->id)
+            ->where('moyen_paiement', MoyenPaiement::Especes->value)
+            ->get()->sum(fn (EncaissementRestaurant $e) => $e->signe());
 
         // Toute dépense sort du tiroir, quel que soit le moyen : payée par
         // Orange Money, son équivalent est repris dans la caisse.

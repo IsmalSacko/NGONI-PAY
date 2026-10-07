@@ -30,10 +30,10 @@ class Boutique extends Model
     protected $appends = ['logo_url', 'logo_vignette_url'];
 
     /**
-     * Activité choisie dans les réglages : la pharmacie et le pressing
-     * adaptent la caisse.
+     * Activité choisie dans les réglages : la pharmacie, le pressing et le
+     * restaurant adaptent la caisse.
      */
-    public const ACTIVITES = ['commerce', 'pharmacie', 'pressing'];
+    public const ACTIVITES = ['commerce', 'pharmacie', 'pressing', 'restaurant'];
 
     /** Vos ventes : au détail, au détail et en gros, en gros uniquement. */
     public const MODES_VENTE = ['detail', 'detail_gros', 'gros'];
@@ -53,13 +53,19 @@ class Boutique extends Model
         return $this->activite === 'pressing';
     }
 
+    public function estRestaurant(): bool
+    {
+        return $this->activite === 'restaurant';
+    }
+
     /**
      * Un pressing vend des prestations (repassage, lavage…) : rien à compter
-     * en stock, ni rupture ni seuil d'alerte.
+     * en stock, ni rupture ni seuil d'alerte. Un restaurant non plus : un plat
+     * ne se compte pas, ce sont ses ingrédients qui se suivent (à part).
      */
     public function suitLeStock(): bool
     {
-        return ! $this->estPressing();
+        return ! $this->estPressing() && ! $this->estRestaurant();
     }
 
     /** Au passage en pressing : les services courants, si la boutique n'en a aucun. */

@@ -8,6 +8,7 @@ use App\Enums\MoyenPaiement;
 use App\Models\Client;
 use App\Models\Depense;
 use App\Models\EncaissementPressing;
+use App\Models\EncaissementRestaurant;
 use App\Models\LigneVente;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
@@ -118,8 +119,11 @@ class Rapports
             'encaisse' => [
                 'ventes' => $payeVentes = (int) $valides()->sum(DB::raw('montant_paye - acompte_deduit')),
                 'remboursements' => $rembourse,
-                'acomptes' => $acomptes = (int) EncaissementPressing::whereBetween('created_at', [$debut, $fin])->get()->sum(fn (EncaissementPressing $e) => $e->signe()),
-                'total' => $payeVentes + $rembourse + $acomptes,
+                'acomptes' => $acomptes = (int) EncaissementPressing::whereBetween('created_at', [$debut, $fin])->get()->sum(fn (EncaissementPressing $e) => $e->signe())
+                    + (int) EncaissementRestaurant::whereBetween('created_at', [$debut, $fin])->where('type', '!=', EncaissementRestaurant::POURBOIRE)->get()->sum(fn (EncaissementRestaurant $e) => $e->signe()),
+                // Restaurant : pourboires reçus (argent du personnel, hors chiffre des ventes).
+                'pourboires' => $pourboires = (int) EncaissementRestaurant::whereBetween('created_at', [$debut, $fin])->where('type', EncaissementRestaurant::POURBOIRE)->sum('montant'),
+                'total' => $payeVentes + $rembourse + $acomptes + $pourboires,
                 // Pressing : dépenses de la période (sorties, hors chiffre des ventes).
                 'depenses' => (int) Depense::whereDate('jour', '>=', $debut)->whereDate('jour', '<=', $fin)->sum('montant'),
                 'a_recevoir' => $encoreDu,

@@ -135,6 +135,31 @@ class VenteService
                     throw ValidationException::withMessages(['lignes' => ["Produit introuvable : {$ligne['produit_id']}."]]);
                 }
 
+                // Addition d'une commande de restaurant : le plat (options et
+                // formule dans son nom) au prix figé à la commande. Jamais
+                // fourni par une requête : la validation de la caisse l'écarte.
+                if (isset($ligne['restaurant'])) {
+                    $prix = (int) $ligne['prix_fige'];
+                    $totalLigne = (int) round($prix * $ligne['quantite']);
+                    $sousTotal += $totalLigne;
+                    $lignes[] = [
+                        'produit' => $produit,
+                        'nom' => (string) $ligne['restaurant'],
+                        'quantite' => $ligne['quantite'],
+                        'unite' => null,
+                        'contenance' => 1,
+                        'base' => $ligne['quantite'],
+                        'prix_unitaire' => $prix,
+                        'prix_gros' => false,
+                        'prix_detail' => null,
+                        'prix_achat' => $produit->prix_achat,
+                        'taux_tva' => $produit->taux_tva,
+                        'total_ligne' => $totalLigne,
+                    ];
+
+                    continue;
+                }
+
                 // Pressing : l'habit dans un service, au prix classique ou express.
                 // Pas de stock : une prestation ne se compte pas.
                 if (! empty($ligne['service_id'])) {
@@ -270,6 +295,8 @@ class VenteService
                 'montant_paye' => $paye,
                 // Pressing : acompte déjà encaissé au dépôt, à ne pas recompter dans la caisse.
                 'acompte_deduit' => min($paye, (int) ($data['acompte_deduit'] ?? 0)),
+                // Restaurant : la commande réglée par cette vente (table, numéro sur le ticket).
+                'commande_restaurant_id' => $data['commande_restaurant_id'] ?? null,
                 'reste_du' => $reste,
                 'moyen_paiement' => $moyenPaiement,
                 'montant_recu' => $montantRecu,

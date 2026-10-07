@@ -80,6 +80,10 @@ class VenteController extends Controller
     public function show(Request $request, Vente $vente): JsonResponse
     {
         abort_unless($vente->user_id === $request->user()->id || $request->user()->can('ventes.view_all'), 404);
+        // Restaurant : la table et le numéro de la commande, pour le ticket.
+        if ($vente->commande_restaurant_id !== null) {
+            $vente->load('commandeRestaurant:id,numero,table,type,couverts');
+        }
 
         return response()->json($vente->load(['lignes', 'client', 'caissier']));
     }

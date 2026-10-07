@@ -63,6 +63,7 @@ class Index extends Component
         session()->flash('info', match ($activite) {
             'pharmacie' => 'Mode pharmacie activé : la caisse parle le langage de l’officine.',
             'pressing' => 'Mode pressing activé : la caisse parle de vêtements et de prestations, sans stock à compter.',
+            'restaurant' => 'Mode restaurant activé : commandes à table ou à emporter, cuisine, addition, réservations.',
             default => 'Mode commerce : la caisse reprend ses réglages habituels.',
         });
     }
