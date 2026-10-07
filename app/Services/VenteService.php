@@ -76,6 +76,10 @@ class VenteService
             // numéro de ticket entre caisses concurrentes de la même
             // boutique, sans bloquer les autres boutiques.
             $boutique = Boutique::whereKey($boutiqueId)->lockForUpdate()->first();
+            // Restaurant : rien ne se vend hors d'une commande — la caisse encaisse les additions.
+            if ($boutique?->estRestaurant() && empty($data['commande_restaurant_id'])) {
+                throw ValidationException::withMessages(['lignes' => ['Au restaurant, tout passe par une commande : encaissez son addition.']]);
+            }
 
             $produits = Produit::whereIn('id', array_filter(array_column($data['lignes'], 'produit_id')))
                 ->lockForUpdate()

@@ -300,4 +300,15 @@ class RestaurantTest extends TestCase
         $this->assertSame('reservee', $salle['Table 4']['etat']);
         $this->assertSame('occupee', $salle['Terrasse']['etat'], 'une table tapée à la main apparaît aussi');
     }
+
+    public function test_au_restaurant_rien_ne_se_vend_hors_d_une_commande(): void
+    {
+        $this->api()->postJson('/api/ventes', ['lignes' => [['produit_id' => $this->bissap, 'quantite' => 1]], 'moyen_paiement' => 'especes'])
+            ->assertUnprocessable()->assertJsonValidationErrors('lignes');
+        $this->assertSame(0, Vente::count());
+        // L'addition d'une commande, elle, passe.
+        $c = $this->commander()->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/payer", ['moyen_paiement' => 'especes'])->assertOk();
+        $this->assertSame(1, Vente::count());
+    }
 }
