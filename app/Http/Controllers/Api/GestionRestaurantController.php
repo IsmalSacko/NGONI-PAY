@@ -38,7 +38,76 @@ class GestionRestaurantController extends Controller
     {
         $this->commandes->boutique();
 
-        return response()->json(['data' => TableRestaurant::orderBy('ordre')->orderBy('nom')->get(['id', 'nom', 'zone', 'places', 'ordre'])]);
+        return response()->json(['data' => TableRestaurant::orderBy('ordre')->orderBy('nom')->get(['id', 'nom', 'zone', 'places', 'ordre', 'rangee'])]);
+    }
+
+    /**
+     * Les tables d'un coup : « 12 tables de 4 places » donne Table 1 à Table 12
+     * (la numérotation continue après les tables existantes).
+     */
+    public function generer(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate([
+            'nombre' => ['required', 'integer', 'min:1', 'max:200'],
+            'places' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'zone' => ['nullable', 'string', 'max:40'],
+        ]);
+        $existantes = TableRestaurant::pluck('nom')->all();
+        $ordre = (int) TableRestaurant::max('ordre');
+        $prefixe = filled($data['zone'] ?? null) ? trim($data['zone']) : 'Table';
+        $n = 0;
+        $creees = 0;
+        while ($creees < $data['nombre']) {
+            $nom = $prefixe.' '.(++$n);
+            if (in_array($nom, $existantes, true)) {
+                continue;
+            }
+            TableRestaurant::create(['nom' => $nom, 'zone' => $data['zone'] ?? null, 'places' => $data['places'] ?? null, 'ordre' => ++$ordre]);
+            $creees++;
+        }
+
+        return $this->tables();
+    }
+
+    /** Ranger (cacher du plan) ou ressortir une table. */
+    public function ranger(Request $request, TableRestaurant $table): JsonResponse
+    {
+        $this->commandes->boutique();
+        $table->update(['rangee' => $request->validate(['rangee' => ['required', 'boolean']])['rangee']]);
+
+        return $this->tables();
+    }
+
+    /** Ranger ou ressortir toutes les tables. */
+    public function rangerTout(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        TableRestaurant::query()->update(['rangee' => $request->validate(['rangee' => ['required', 'boolean']])['rangee']]);
+
+        return $this->tables();
+    }
+
+    /** Libérer une table (les clients sont partis), ou toutes (?toutes=1) ; rend celles restées bloquées par une addition. */
+    public function liberer(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['table' => ['nullable', 'string', 'max:40'], 'toutes' => ['nullable', 'boolean']]);
+        $noms = ($data['toutes'] ?? false)
+            ? \App\Models\CommandeRestaurant::where('type', 'sur_place')->whereNull('terminee_le')
+                ->where('statut', '!=', \App\Models\CommandeRestaurant::ANNULEE)->whereNotNull('table')->distinct()->pluck('table')->all()
+            : array_filter([$data['table'] ?? null]);
+        $bloquees = [];
+        foreach ($noms as $nom) {
+            if (! $this->commandes->liberer($nom, $request->user())) {
+                $bloquees[] = $nom;
+            }
+        }
+        if (! ($data['toutes'] ?? false) && $bloquees !== []) {
+            throw ValidationException::withMessages(['table' => ['Addition non réglée : encaissez-la à la caisse avant de libérer la table.']]);
+        }
+
+        return response()->json(['liberees' => count($noms) - count($bloquees), 'bloquees' => $bloquees]);
     }
 
     public function creerTable(Request $request): JsonResponse
@@ -111,8 +180,13 @@ class GestionRestaurantController extends Controller
             throw ValidationException::withMessages(['reservation' => ['Cette réservation n’est plus prévue.']]);
         }
         $data = $request->validate(['table' => ['nullable', 'string', 'max:40']]);
+        // Une vraie table : celle choisie maintenant, sinon celle réservée (jamais le nom du client).
+        $table = $data['table'] ?? $reservation->table;
+        if (! filled($table)) {
+            throw ValidationException::withMessages(['table' => ['Choisissez la table où installer les clients.']]);
+        }
         $commande = $this->commandes->creer([
-            'type' => 'sur_place', 'table' => $data['table'] ?? $reservation->table ?? $reservation->nom,
+            'type' => 'sur_place', 'table' => $table,
             'couverts' => $reservation->couverts, 'client_id' => $reservation->client_id, 'lignes' => [],
             'notes' => $reservation->note,
         ], $request->user());

@@ -400,4 +400,45 @@ class RestaurantTest extends TestCase
         $this->api()->postJson("/api/restaurant/commandes/{$table['id']}/servir")->assertOk()
             ->assertJsonPath('data.etape', 'servie')->assertJsonPath('data.paiement', 'non_payee');
     }
+
+    public function test_tables_generees_rangees_et_liberees(): void
+    {
+        $tables = $this->api()->postJson('/api/restaurant/tables/generer', ['nombre' => 4, 'places' => 4])->assertOk()->json('data');
+        $this->assertSame(['Table 1', 'Table 2', 'Table 3', 'Table 4'], array_column($tables, 'nom'));
+        $this->api()->postJson('/api/restaurant/tables/generer', ['nombre' => 2])->assertOk()->assertJsonCount(6, 'data');
+        $this->assertSame('Table 6', collect($this->api()->getJson('/api/restaurant/tables')->json('data'))->last()['nom']);
+
+        // Ranger : la table disparaît du plan ; ressortir : elle revient.
+        $t6 = collect($tables)->firstWhere('nom', 'Table 4')['id'];
+        $this->api()->postJson("/api/restaurant/tables/{$t6}/ranger", ['rangee' => true])->assertOk();
+        $this->assertNotContains('Table 4', array_column($this->api()->getJson('/api/restaurant/salle')->json('data'), 'nom'));
+        $this->api()->postJson('/api/restaurant/tables/ranger', ['rangee' => true])->assertOk();
+        $this->assertSame([], $this->api()->getJson('/api/restaurant/salle')->json('data'));
+        $this->api()->postJson('/api/restaurant/tables/ranger', ['rangee' => false])->assertOk();
+        $this->assertCount(6, $this->api()->getJson('/api/restaurant/salle')->json('data'));
+
+        // Libérer : une table ouverte sans plat se libère ; une addition non réglée bloque ; payée, elle se clôture.
+        $vide = $this->api()->postJson('/api/restaurant/commandes', ['table' => 'Table 1', 'lignes' => []])->json('data');
+        $this->api()->postJson('/api/restaurant/salle/liberer', ['table' => 'Table 1'])->assertOk();
+        $this->api()->getJson("/api/restaurant/commandes/{$vide['id']}")->assertJsonPath('data.statut', 'annulee');
+        $due = $this->commander(['table' => 'Table 2'])->json('data');
+        $this->api()->postJson('/api/restaurant/salle/liberer', ['table' => 'Table 2'])->assertUnprocessable();
+        $this->api()->postJson("/api/restaurant/commandes/{$due['id']}/payer", ['moyen_paiement' => 'especes'])->assertOk();
+        $this->api()->postJson('/api/restaurant/salle/liberer', ['table' => 'Table 2'])->assertOk();
+        $this->api()->getJson("/api/restaurant/commandes/{$due['id']}")->assertJsonPath('data.etape', 'terminee');
+
+        // Toutes : celles qui doivent encore de l'argent restent.
+        $this->commander(['table' => 'Table 3']);
+        $this->api()->postJson('/api/restaurant/commandes', ['table' => 'Table 5', 'lignes' => []]);
+        $this->api()->postJson('/api/restaurant/salle/liberer', ['toutes' => true])->assertOk()
+            ->assertJsonPath('liberees', 1)->assertJsonPath('bloquees', ['Table 3']);
+    }
+
+    public function test_une_reservation_arrive_a_une_vraie_table(): void
+    {
+        $r = $this->api()->postJson('/api/restaurant/reservations', ['nom' => 'Oumou Diarra', 'le' => now()->addHour()->toIso8601String()])->json('data');
+        $this->api()->postJson("/api/restaurant/reservations/{$r['id']}/arrivee")->assertUnprocessable()->assertJsonValidationErrors('table');
+        $id = $this->api()->postJson("/api/restaurant/reservations/{$r['id']}/arrivee", ['table' => 'Table 7'])->assertOk()->json('commande_id');
+        $this->api()->getJson("/api/restaurant/commandes/{$id}")->assertJsonPath('data.table', 'Table 7');
+    }
 }

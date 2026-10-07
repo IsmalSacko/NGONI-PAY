@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /** Une table de la salle (« Table 4 », « Terrasse 2 »), avec sa zone et ses places. */
-#[Fillable(['boutique_id', 'nom', 'zone', 'places', 'ordre'])]
+#[Fillable(['boutique_id', 'nom', 'zone', 'places', 'ordre', 'rangee'])]
 class TableRestaurant extends Model
 {
     use BelongsToBoutique, HasUuids;
@@ -19,6 +19,6 @@ class TableRestaurant extends Model
 
     protected function casts(): array
     {
-        return ['places' => 'integer', 'ordre' => 'integer'];
+        return ['places' => 'integer', 'ordre' => 'integer', 'rangee' => 'boolean'];
     }
 }

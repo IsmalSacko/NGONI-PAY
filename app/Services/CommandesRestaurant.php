@@ -468,14 +468,49 @@ class CommandesRestaurant
             'pretes' => $c === null ? 0 : (int) $c->lignes->where('etat', LigneCommandeRestaurant::PRETE)->sum('quantite'),
             'reservation' => $r === null ? null : ['nom' => $r->nom, 'le' => $r->le->toIso8601String(), 'couverts' => $r->couverts],
         ];
-        $tables = TableRestaurant::orderBy('ordre')->orderBy('nom')->get();
-        $connues = $tables->pluck('nom')->all();
+        $toutes = TableRestaurant::orderBy('ordre')->orderBy('nom')->get();
+        $connues = $toutes->pluck('nom')->all();
+        // Une table rangée disparaît du plan, sauf si des clients y sont encore.
+        $tables = $toutes->filter(fn ($t) => ! $t->rangee || $ouvertes->has($t->nom));
 
         return [
             ...$tables->map(fn ($t) => $place($t->nom, $t->zone, $t->places))->all(),
             // Une table tapée à la main (pas dans la liste) apparaît tant qu'elle est occupée.
             ...$ouvertes->keys()->reject(fn ($nom) => in_array($nom, $connues, true))->map(fn ($nom) => $place((string) $nom, null, null))->values()->all(),
         ];
+    }
+
+    /**
+     * Les clients sont partis : la table se libère. Sans plat commandé, la
+     * commande est annulée ; payée, elle est clôturée (servie). Une addition
+     * non réglée bloque : l'argent passe d'abord par la caisse.
+     *
+     * @return bool true si la table est libre
+     */
+    public function liberer(string $table, ?User $agent): bool
+    {
+        $this->boutique();
+        $commandes = CommandeRestaurant::with('lignes')->where('type', 'sur_place')->where('table', $table)
+            ->whereNull('terminee_le')->where('statut', '!=', CommandeRestaurant::ANNULEE)->get();
+        foreach ($commandes as $c) {
+            $actives = $c->lignes->where('etat', '!=', LigneCommandeRestaurant::ANNULEE);
+            if ($actives->isEmpty()) {
+                $this->annuler($c, 'Table libérée sans commande', false, $agent);
+            } elseif ($c->reste() === 0) {
+                $this->servir($c, null, $agent);
+                $c->refresh();
+                if ($c->terminee_le === null) {
+                    // Des plats encore en cuisine : servis d'office, la table se vide.
+                    $c->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE])
+                        ->update(['etat' => LigneCommandeRestaurant::SERVIE, 'servie_le' => now()]);
+                    $this->terminerSiFini($c);
+                }
+            } else {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Annulation : seulement si rien n'est payé ; [rembourser] rend l'acompte. */
