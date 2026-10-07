@@ -119,6 +119,7 @@ class RestaurantTest extends TestCase
     public function test_commande_par_telephone_acompte_puis_paiement_au_retrait(): void
     {
         $this->commander(['telephone' => true, 'type' => 'emporter'])->assertUnprocessable()->assertJsonValidationErrors('client_id');
+        $this->commander(['telephone' => true, 'client_id' => $this->client])->assertUnprocessable()->assertJsonValidationErrors('type');
         $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
         $c = $this->commander([
             'telephone' => true, 'type' => 'emporter', 'client_id' => $this->client, 'heure_prevue' => now()->addHour()->toIso8601String(),

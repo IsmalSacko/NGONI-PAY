@@ -58,6 +58,9 @@ class CommandesRestaurant
 
         $type = $data['type'] ?? 'sur_place';
         $telephone = (bool) ($data['telephone'] ?? false);
+        if ($telephone && $type === 'sur_place') {
+            throw ValidationException::withMessages(['type' => ['Une commande par téléphone est à emporter ou en livraison.']]);
+        }
         // Par téléphone ou en livraison : on doit savoir qui rappeler.
         if (($telephone || $type === 'livraison') && empty($data['client_id'])) {
             throw ValidationException::withMessages(['client_id' => ['Choisissez le client (commande par téléphone ou livraison).']]);
