@@ -29,6 +29,7 @@ class PaiementMobile
     public function __construct(
         private readonly PaiementJeko $jeko,
         private readonly PaiementFedapay $fedapay,
+        private readonly PaiementPawapay $pawapay,
         private readonly AbonnementService $abonnements,
     ) {}
 
@@ -45,8 +46,10 @@ class PaiementMobile
                 ->values()->all();
         }
 
-        return collect($this->fedapay->moyensPour($boutique))
-            ->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle, 'frais_pourcentage' => PaiementFedapay::taux($code)])
+        $prestataire = $this->pawapay->proposeA($boutique) ? $this->pawapay : $this->fedapay;
+
+        return collect($prestataire->moyensPour($boutique))
+            ->map(fn (string $libelle, string $code) => ['code' => $code, 'libelle' => $libelle, 'frais_pourcentage' => $prestataire::taux($code)])
             ->values()->all();
     }
 
@@ -57,7 +60,11 @@ class PaiementMobile
             return $this->jeko->demarrer($boutique, $demandeur, $plan, $cycle, $moyen);
         }
 
-        $moyens = $this->fedapay->moyensPour($boutique);
+        // pawaPay là où il opère (Sénégal, Burkina, Bénin), FedaPay ailleurs.
+        [$prestataire, $colonne, $prefixe] = $this->pawapay->proposeA($boutique)
+            ? [$this->pawapay, 'pawapay_deposit_id', 'pawapay_']
+            : [$this->fedapay, 'fedapay_transaction_id', 'fedapay_'];
+        $moyens = $prestataire->moyensPour($boutique);
         if ($moyens === []) {
             throw ValidationException::withMessages(['moyen' => ['Le paiement en ligne n’est pas disponible pour votre boutique.']]);
         }
@@ -67,21 +74,21 @@ class PaiementMobile
 
         // Une tentative précédente restée en route : payée entre-temps, elle
         // s'active ; sinon elle est annulée et laisse la place.
-        foreach (DemandeAbonnement::where('user_id', $boutique->proprietaire_id)->enAttente()->whereNotNull('fedapay_transaction_id')->get() as $ancienne) {
+        foreach (DemandeAbonnement::where('user_id', $boutique->proprietaire_id)->enAttente()->whereNotNull($colonne)->get() as $ancienne) {
             if ($this->verifier($ancienne)->statut === StatutDemande::EnAttente) {
                 $ancienne->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => 'Paiement en ligne non terminé']);
             }
         }
 
-        $demande = $this->abonnements->soumettre($boutique, $demandeur, $plan, $cycle, moyen: 'fedapay_'.$moyen, prevenir: false);
+        $demande = $this->abonnements->soumettre($boutique, $demandeur, $plan, $cycle, moyen: $prefixe.$moyen, prevenir: false);
         if ($demande->devise !== 'XOF') {
             $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => 'Devise non prise en charge']);
             throw ValidationException::withMessages(['moyen' => ['Le paiement en ligne n’accepte que le franc CFA (XOF).']]);
         }
 
-        $demande->update(['frais_mobile' => PaiementJeko::fraisAuTaux($demande->montant, PaiementFedapay::taux($moyen))]);
+        $demande->update(['frais_mobile' => PaiementJeko::fraisAuTaux($demande->montant, $prestataire::taux($moyen))]);
         try {
-            $url = $this->fedapay->creer($demande, $moyen, $demandeur);
+            $url = $prestataire === $this->pawapay ? $this->pawapay->creer($demande, $moyen) : $this->fedapay->creer($demande, $moyen, $demandeur);
         } catch (ValidationException $e) {
             $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => 'Paiement en ligne indisponible']);
             throw $e;
@@ -96,11 +103,11 @@ class PaiementMobile
         if ($demande->jeko_paiement_id !== null) {
             return $this->jeko->verifier($demande);
         }
-        if ($demande->fedapay_transaction_id === null || $demande->statut->estTranchee()) {
+        if (($demande->fedapay_transaction_id === null && $demande->pawapay_deposit_id === null) || $demande->statut->estTranchee()) {
             return $demande;
         }
 
-        $statut = $this->fedapay->statut($demande);
+        $statut = $demande->pawapay_deposit_id !== null ? $this->pawapay->statut($demande) : $this->fedapay->statut($demande);
         if ($statut === null) {
             return $demande;
         }
@@ -118,7 +125,7 @@ class PaiementMobile
             }
 
             $moyen = $demande->libellePaiementEnLigne() ?? 'paiement en ligne';
-            $abonnement = $this->abonnements->approuver($demande, null, "Payé par {$moyen} ({$demande->fedapay_transaction_id})");
+            $abonnement = $this->abonnements->approuver($demande, null, "Payé par {$moyen} (".($demande->pawapay_deposit_id ?? $demande->fedapay_transaction_id).')');
             $this->prevenirExploitant($demande, $moyen, $abonnement->fin?->format('d/m/Y'));
 
             return $demande->fresh();
@@ -133,7 +140,7 @@ class PaiementMobile
     public function verifierEnAttente(): int
     {
         $demandes = DemandeAbonnement::enAttente()
-            ->where(fn ($q) => $q->whereNotNull('jeko_paiement_id')->orWhereNotNull('fedapay_transaction_id'))
+            ->where(fn ($q) => $q->whereNotNull('jeko_paiement_id')->orWhereNotNull('fedapay_transaction_id')->orWhereNotNull('pawapay_deposit_id'))
             ->get();
 
         foreach ($demandes as $demande) {

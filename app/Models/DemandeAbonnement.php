@@ -20,7 +20,7 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'frais_mobile',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'pawapay_deposit_id', 'frais_mobile',
         'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id', 'recu_numero', 'periode_debut', 'periode_fin',
     ];
 
@@ -86,7 +86,7 @@ class DemandeAbonnement extends Model
     /** Payée (ou en cours de paiement) en ligne : Jèko ou FedaPay. Elle s'approuve seule. */
     public function paiementEnLigne(): bool
     {
-        return $this->jeko_paiement_id !== null || $this->fedapay_transaction_id !== null;
+        return $this->jeko_paiement_id !== null || $this->fedapay_transaction_id !== null || $this->pawapay_deposit_id !== null;
     }
 
     /** « Wave via Jèko », « Airtel Money via FedaPay », ou null. */
@@ -100,6 +100,12 @@ class DemandeAbonnement extends Model
             $moyens = array_merge(config('fedapay.carte'), ...array_values(config('fedapay.moyens_par_pays')));
 
             return ($moyens[$code] ?? 'paiement en ligne').' via FedaPay';
+        }
+        if ($this->pawapay_deposit_id !== null) {
+            $code = substr((string) $this->moyen, 8);
+            $moyens = array_merge(...array_values(array_column(config('pawapay.pays'), 'moyens')));
+
+            return ($moyens[$code] ?? 'Mobile Money').' via pawaPay';
         }
 
         return null;

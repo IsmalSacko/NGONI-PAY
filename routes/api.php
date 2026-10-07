@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\FedapayWebhookController;
 use App\Http\Controllers\Api\JekoWebhookController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PawapayWebhookController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\PlateformeController;
 use App\Http\Controllers\Api\ProduitController;
@@ -54,6 +55,7 @@ Route::post('publication-play', PublicationPlayController::class)->middleware('t
 // Jèko : paiement Mobile Money confirmé (signature HMAC vérifiée dans le contrôleur).
 Route::post('webhooks/jeko', JekoWebhookController::class)->middleware('throttle:120,1');
 Route::post('webhooks/fedapay', FedapayWebhookController::class)->middleware('throttle:120,1');
+Route::post('webhooks/pawapay', PawapayWebhookController::class)->middleware('throttle:120,1');
 
 // Catalogue public des plans : l'écran d'abonnement s'affiche même abonnement expiré.
 Route::get('plans', [AbonnementController::class, 'plans']);
