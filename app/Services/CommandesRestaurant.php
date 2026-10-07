@@ -20,8 +20,10 @@ use App\Models\TableRestaurant;
 use App\Models\User;
 use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -82,7 +84,14 @@ class CommandesRestaurant
             throw ValidationException::withMessages(['acompte' => ['L’acompte dépasse le total de la commande.']]);
         }
 
-        $commande = DB::transaction(function () use ($boutique, $data, $serveur, $type, $telephone, $lignes, $total, $acompte): CommandeRestaurant {
+        // Différée : prévue plus tard que le temps de la cuisine (appel à 20 h pour 22 h),
+        // elle partira seule en cuisine 30 minutes avant l'heure.
+        $heure = filled($data['heure_prevue'] ?? null) ? Carbon::parse($data['heure_prevue']) : null;
+        $envoyer = (bool) ($data['envoyer'] ?? true);
+        $envoiPrevu = $envoyer && $heure !== null && $lignes !== [] && $heure->gt(now()->addMinutes(CommandeRestaurant::MINUTES_AVANT_DIFFEREE))
+            ? $heure->copy()->subMinutes(CommandeRestaurant::MINUTES_AVANT_DIFFEREE) : null;
+
+        $commande = DB::transaction(function () use ($boutique, $data, $serveur, $type, $telephone, $lignes, $total, $acompte, $envoiPrevu): CommandeRestaurant {
             // Un numéro au hasard à 6 chiffres, jamais deux fois le même dans la boutique.
             Boutique::whereKey($boutique->id)->lockForUpdate()->first();
             do {
@@ -100,6 +109,8 @@ class CommandesRestaurant
                 'client_id' => $data['client_id'] ?? null,
                 'adresse' => $type === 'livraison' ? trim((string) $data['adresse']) : null,
                 'heure_prevue' => $data['heure_prevue'] ?? null,
+                'envoi_prevu_le' => $envoiPrevu,
+                'entree_file_le' => $envoiPrevu === null ? now() : null,
                 'user_id' => $serveur->id,
                 'statut' => CommandeRestaurant::OUVERTE,
                 'total' => $total,
@@ -116,7 +127,7 @@ class CommandesRestaurant
             return $commande;
         });
 
-        if ($data['envoyer'] ?? true) {
+        if ($envoyer && $envoiPrevu === null) {
             $this->envoyerEnCuisine($commande, $serveur);
         }
 
@@ -195,7 +206,11 @@ class CommandesRestaurant
             $envoi = $commande->envois + 1;
             LigneCommandeRestaurant::whereIn('id', $lignes->pluck('id'))
                 ->update(['etat' => LigneCommandeRestaurant::EN_CUISINE, 'envoi' => $envoi, 'envoyee_le' => now()]);
-            $commande->update(['envois' => $envoi, 'historique' => $commande->avecPas("envoi_{$envoi}", $agent)]);
+            // Une différée envoyée (à son heure, ou plus tôt à la main) entre dans la file maintenant.
+            $commande->update([
+                'envois' => $envoi, 'envoi_prevu_le' => null, 'entree_file_le' => $commande->entree_file_le ?? now(),
+                'historique' => $commande->avecPas("envoi_{$envoi}", $agent),
+            ]);
             $this->consommerIngredients($lignes);
 
             return $lignes->each(fn ($l) => $l->forceFill(['etat' => LigneCommandeRestaurant::EN_CUISINE, 'envoi' => $envoi]));
@@ -234,6 +249,39 @@ class CommandesRestaurant
         $commande->update(['en_livraison_le' => now(), 'historique' => $commande->avecPas('en_livraison', $agent)]);
 
         return $commande->fresh();
+    }
+
+    /**
+     * Les commandes différées dont l'heure est venue partent en cuisine (30 min
+     * avant l'heure prévue) ; le serveur qui l'a prise est prévenu. Sans
+     * [toutes] : la boutique active seulement. Rend le nombre de commandes lancées.
+     */
+    public function lancerDifferees(bool $toutes = false): int
+    {
+        $dues = ($toutes ? CommandeRestaurant::withoutBoutiqueScope() : CommandeRestaurant::query())
+            ->whereNotNull('envoi_prevu_le')->where('envoi_prevu_le', '<=', now())
+            ->where('statut', '!=', CommandeRestaurant::ANNULEE)->get();
+        $avant = $this->tenant->boutiqueId();
+        foreach ($dues as $commande) {
+            // La boutique de la commande : recettes et ingrédients sont les siens.
+            $this->tenant->setBoutique($commande->boutique_id);
+            try {
+                $this->envoyerEnCuisine($commande, null);
+                if ($serveur = $commande->serveur) {
+                    $ou = $commande->type === 'livraison' ? 'Livraison' : ($commande->type === 'emporter' ? 'À emporter' : ($commande->table ?? 'Sur place'));
+                    app(NotifierCompte::class)->envoyer($serveur, "{$ou} : commande différée en cuisine", "Commande {$commande->numero}, prévue à {$commande->heure_prevue?->format('H:i')}, est partie en cuisine.", '/salle', 'restaurant', email: false);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Commande différée non lancée', ['commande' => $commande->id, 'erreur' => $e->getMessage()]);
+            }
+        }
+        if ($avant !== null) {
+            $this->tenant->setBoutique($avant);
+        } else {
+            $this->tenant->forget();
+        }
+
+        return $dues->count();
     }
 
     /**
@@ -390,6 +438,7 @@ class CommandesRestaurant
     public function salle(): array
     {
         $this->boutique();
+        $this->lancerDifferees();
         $ouvertes = CommandeRestaurant::with('lignes')->where('type', 'sur_place')->whereNull('terminee_le')
             ->where('statut', '!=', CommandeRestaurant::ANNULEE)->whereNotNull('table')->get()->groupBy('table');
         $reservees = ReservationRestaurant::where('statut', ReservationRestaurant::PREVUE)->whereNotNull('table')

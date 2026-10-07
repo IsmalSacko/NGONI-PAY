@@ -28,6 +28,7 @@ class CommandeRestaurantController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->commandes->boutique();
+        $this->commandes->lancerDifferees();
         $q = trim((string) $request->query('q', ''));
         $requete = CommandeRestaurant::with('lignes', 'client', 'serveur')
             ->when($q === '', fn ($r) => $this->filtrer($r, (string) $request->query('filtre', 'en_cours')))
@@ -43,9 +44,10 @@ class CommandeRestaurantController extends Controller
                             ->when(strlen($chiffres) >= 4, fn ($c) => $c->orWhere('telephone', 'like', "%{$chiffres}%")));
                 });
             })
-            // En cours : par ordre d'arrivée (la plus ancienne d'abord) ; les terminées, les plus récentes d'abord.
-            ->orderByRaw('case when terminee_le is null and statut != ? then 0 else 1 end', [CommandeRestaurant::ANNULEE])
-            ->orderByRaw('case when terminee_le is null and statut != ? then created_at end asc', [CommandeRestaurant::ANNULEE])
+            // En cours : par ordre d'arrivée dans la file (la plus ancienne d'abord), les différées
+            // ensuite, par heure ; les terminées, les plus récentes d'abord.
+            ->orderByRaw('case when terminee_le is null and statut != ? then (case when envoi_prevu_le is null then 0 else 1 end) else 2 end', [CommandeRestaurant::ANNULEE])
+            ->orderByRaw('case when terminee_le is null and statut != ? then coalesce(envoi_prevu_le, entree_file_le, created_at) end asc', [CommandeRestaurant::ANNULEE])
             ->orderByDesc('created_at');
 
         return response()->json(['data' => $requete->limit(200)->get()->map(fn ($c) => $this->json($c))->values()]);
@@ -58,6 +60,7 @@ class CommandeRestaurantController extends Controller
 
         return match ($filtre) {
             'a_payer' => $r->where('statut', CommandeRestaurant::OUVERTE)->where('total', '>', 0),
+            'differees' => $enCours($r)->whereNotNull('envoi_prevu_le'),
             'en_cuisine' => $enCours($r)->whereHas('lignes', fn ($l) => $l->whereIn('etat', LigneCommandeRestaurant::EN_COURS)),
             'pretes' => $enCours($r)->whereHas('lignes', fn ($l) => $l->where('etat', LigneCommandeRestaurant::PRETE)),
             'emporter' => $enCours($r)->whereIn('type', ['emporter', 'livraison']),
@@ -72,6 +75,7 @@ class CommandeRestaurantController extends Controller
     public function compteurs(): JsonResponse
     {
         $this->commandes->boutique();
+        $this->commandes->lancerDifferees();
         $enCours = fn () => CommandeRestaurant::whereNull('terminee_le')->where('statut', '!=', CommandeRestaurant::ANNULEE);
 
         return response()->json(['data' => [
@@ -80,6 +84,7 @@ class CommandeRestaurantController extends Controller
             'en_cuisine' => (int) LigneCommandeRestaurant::whereIn('commande_id', $enCours()->select('id'))->whereIn('etat', LigneCommandeRestaurant::EN_COURS)->sum('quantite'),
             'pretes' => (int) LigneCommandeRestaurant::whereIn('commande_id', $enCours()->select('id'))->where('etat', LigneCommandeRestaurant::PRETE)->sum('quantite'),
             'emporter' => $enCours()->whereIn('type', ['emporter', 'livraison'])->count(),
+            'differees' => $enCours()->whereNotNull('envoi_prevu_le')->count(),
             'reservations' => ReservationRestaurant::where('statut', ReservationRestaurant::PREVUE)->whereBetween('le', [now()->startOfDay(), now()->endOfDay()])->count(),
         ]]);
     }
@@ -91,6 +96,7 @@ class CommandeRestaurantController extends Controller
     public function cuisine(Request $request): JsonResponse
     {
         $this->commandes->boutique();
+        $this->commandes->lancerDifferees();
         $lignes = LigneCommandeRestaurant::with('commande')
             ->whereIn('etat', [...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE])
             ->when($request->query('poste'), fn ($q, string $poste) => $q->where('poste', $poste))
@@ -313,6 +319,7 @@ class CommandeRestaurantController extends Controller
             'couverts' => $c->couverts,
             'adresse' => $c->adresse,
             'heure_prevue' => $c->heure_prevue?->toIso8601String(),
+            'envoi_prevu_le' => $c->envoi_prevu_le?->toIso8601String(),
             'statut' => $c->statut,
             'etape' => $c->etape(),
             'paiement' => $c->etatPaiement(),

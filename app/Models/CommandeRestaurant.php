@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * l'addition (une ou plusieurs, si l'addition est partagée).
  */
 #[Fillable([
-    'boutique_id', 'numero', 'reference_locale', 'type', 'telephone', 'table', 'couverts', 'client_id', 'adresse', 'heure_prevue', 'prete_vers', 'en_livraison_le',
+    'boutique_id', 'numero', 'reference_locale', 'type', 'telephone', 'table', 'couverts', 'client_id', 'adresse', 'heure_prevue', 'envoi_prevu_le', 'entree_file_le', 'prete_vers', 'en_livraison_le',
     'user_id', 'statut', 'total', 'paye', 'acompte', 'moyen_acompte', 'pourboire', 'envois', 'payee_le', 'terminee_le',
     'annulee_le', 'motif_annulation', 'notes', 'historique',
 ])]
@@ -33,6 +33,9 @@ class CommandeRestaurant extends Model
 
     public const TYPES = ['sur_place', 'emporter', 'livraison'];
 
+    /** Une commande différée part en cuisine ce temps avant son heure. */
+    public const MINUTES_AVANT_DIFFEREE = 30;
+
     protected $table = 'commandes_restaurant';
 
     protected function casts(): array
@@ -40,7 +43,7 @@ class CommandeRestaurant extends Model
         return [
             'numero' => 'integer', 'telephone' => 'boolean', 'couverts' => 'integer', 'total' => 'integer', 'paye' => 'integer',
             'acompte' => 'integer', 'pourboire' => 'integer', 'envois' => 'integer', 'historique' => 'array',
-            'heure_prevue' => 'datetime', 'prete_vers' => 'datetime', 'en_livraison_le' => 'datetime', 'payee_le' => 'datetime', 'terminee_le' => 'datetime', 'annulee_le' => 'datetime',
+            'heure_prevue' => 'datetime', 'envoi_prevu_le' => 'datetime', 'entree_file_le' => 'datetime', 'prete_vers' => 'datetime', 'en_livraison_le' => 'datetime', 'payee_le' => 'datetime', 'terminee_le' => 'datetime', 'annulee_le' => 'datetime',
         ];
     }
 
@@ -64,6 +67,10 @@ class CommandeRestaurant extends Model
         }
         if ($this->terminee_le !== null) {
             return 'terminee';
+        }
+        // Différée (appel à 20 h pour 22 h) : elle attend son heure pour partir en cuisine.
+        if ($this->envoi_prevu_le !== null) {
+            return 'differee';
         }
         $ordre = [
             LigneCommandeRestaurant::ATTENTE => 'enregistree',

@@ -344,4 +344,45 @@ class RestaurantTest extends TestCase
         $deuxieme = $this->commander(['table' => 'T2'])->json('data.numero');
         $this->assertSame([$premiere, $deuxieme], array_column($this->api()->getJson('/api/restaurant/commandes')->json('data'), 'numero'));
     }
+
+    public function test_commande_differee_part_seule_en_cuisine_30_minutes_avant(): void
+    {
+        $this->travelTo(now()->setTime(20, 0));
+        $c = $this->commander([
+            'type' => 'emporter', 'telephone' => true, 'client_id' => $this->client, 'table' => null,
+            'heure_prevue' => now()->setTime(22, 0)->toIso8601String(),
+        ])->assertCreated()->assertJsonPath('data.etape', 'differee')->json('data');
+        $this->assertSame(['attente', 'attente'], array_column($c['lignes'], 'etat'), 'rien en cuisine pour l’instant');
+        $this->assertSame([], $this->api()->getJson('/api/restaurant/cuisine')->json('data'));
+        $this->api()->getJson('/api/restaurant/compteurs')->assertJsonPath('data.differees', 1);
+        // Une commande pour tout de suite passe avant elle dans la file.
+        $maintenant = $this->commander(['table' => 'T1'])->json('data.numero');
+        $this->assertSame([$maintenant, $c['numero']], array_column($this->api()->getJson('/api/restaurant/commandes')->json('data'), 'numero'));
+
+        $this->travelTo(now()->setTime(21, 29));
+        $this->artisan('ecaisse:lancer-commandes-differees')->assertSuccessful();
+        $this->api()->getJson("/api/restaurant/commandes/{$c['id']}")->assertJsonPath('data.etape', 'differee');
+
+        $this->travelTo(now()->setTime(21, 30));
+        $this->artisan('ecaisse:lancer-commandes-differees')->assertSuccessful();
+        $this->api()->getJson("/api/restaurant/commandes/{$c['id']}")->assertJsonPath('data.etape', 'en_attente')->assertJsonPath('data.paiement', 'non_payee');
+        $this->assertCount(2, $this->api()->getJson('/api/restaurant/cuisine')->json('data'));
+        $this->assertTrue(NotificationApp::where('titre', 'À emporter : commande différée en cuisine')->exists());
+    }
+
+    public function test_differee_lancee_a_la_consultation_et_envoi_anticipe(): void
+    {
+        $this->travelTo(now()->setTime(12, 0));
+        // Pour dans 20 minutes : moins que le temps de la cuisine, elle part tout de suite.
+        $this->commander(['type' => 'emporter', 'table' => null, 'heure_prevue' => now()->addMinutes(20)->toIso8601String()])
+            ->assertJsonPath('data.etape', 'en_attente');
+        $c = $this->commander(['type' => 'emporter', 'table' => null, 'heure_prevue' => now()->addHours(3)->toIso8601String()])->json('data');
+        // Sans attendre la tâche planifiée : la cuisine la voit dès qu'elle consulte, à l'heure venue.
+        $this->travelTo(now()->addHours(2)->addMinutes(31));
+        $this->assertCount(2, $this->api()->getJson('/api/restaurant/cuisine')->json('data'));
+
+        // Le serveur peut aussi l'envoyer plus tôt, à la main.
+        $d = $this->commander(['type' => 'emporter', 'table' => null, 'heure_prevue' => now()->addHours(2)->toIso8601String()])->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$d['id']}/envoyer")->assertOk()->assertJsonPath('data.etape', 'en_attente');
+    }
 }

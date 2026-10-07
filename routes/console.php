@@ -25,6 +25,16 @@ Artisan::command('ecaisse:diffuser-annonces', function () {
 
 Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlapping();
 
+// Restaurant : les commandes différées partent en cuisine 30 minutes avant leur heure.
+Artisan::command('ecaisse:lancer-commandes-differees', function () {
+    $n = app(\App\Services\CommandesRestaurant::class)->lancerDifferees(toutes: true);
+    if ($n > 0) {
+        $this->info("{$n} commande(s) différée(s) partie(s) en cuisine.");
+    }
+})->purpose('Envoie en cuisine les commandes différées dont l’heure approche');
+
+Schedule::command('ecaisse:lancer-commandes-differees')->everyMinute()->withoutOverlapping();
+
 // Paiements en ligne (Jèko, FedaPay) restés en attente : relus chez leur prestataire, l'abonnement
 // s'active même si le commerçant n'est pas revenu et que le webhook s'est perdu.
 Artisan::command('ecaisse:verifier-paiements-mobile', function () {
