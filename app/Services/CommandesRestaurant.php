@@ -12,8 +12,11 @@ use App\Models\FormuleRestaurant;
 use App\Models\IngredientRestaurant;
 use App\Models\LigneCommandeRestaurant;
 use App\Models\OptionRestaurant;
+use App\Models\PosteRestaurant;
 use App\Models\Produit;
 use App\Models\RecetteRestaurant;
+use App\Models\ReservationRestaurant;
+use App\Models\TableRestaurant;
 use App\Models\User;
 use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
@@ -200,18 +203,58 @@ class CommandesRestaurant
     }
 
     /**
-     * Plats prêts (par défaut : tous ceux en cuisine).
+     * La cuisine (ou le bar) commence : à préparer → en préparation.
+     *
+     * @param  list<string>|null  $ids
+     */
+    public function commencer(CommandeRestaurant $commande, ?array $ids): CommandeRestaurant
+    {
+        $this->exigerEnCours($commande);
+        $commande->lignes()->where('etat', LigneCommandeRestaurant::EN_CUISINE)
+            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))
+            ->update(['etat' => LigneCommandeRestaurant::EN_PREPARATION]);
+
+        return $commande->fresh();
+    }
+
+    /**
+     * Plats prêts (par défaut : tous ceux pas encore prêts). Le serveur qui a
+     * pris la commande est prévenu : « Table 12 : commande prête ».
      *
      * @param  list<string>|null  $ids
      */
     public function marquerPrets(CommandeRestaurant $commande, ?array $ids): CommandeRestaurant
     {
         $this->exigerEnCours($commande);
-        $commande->lignes()->where('etat', LigneCommandeRestaurant::EN_CUISINE)
-            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))
-            ->update(['etat' => LigneCommandeRestaurant::PRETE, 'prete_le' => now()]);
+        $lignes = $commande->lignes()->whereIn('etat', LigneCommandeRestaurant::EN_COURS)
+            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))->get();
+        if ($lignes->isEmpty()) {
+            return $commande->fresh();
+        }
+        LigneCommandeRestaurant::whereIn('id', $lignes->pluck('id'))->update(['etat' => LigneCommandeRestaurant::PRETE, 'prete_le' => now()]);
+        $this->prevenirServeur($commande, $lignes);
 
         return $commande->fresh();
+    }
+
+    /** @param  Collection<int, LigneCommandeRestaurant>  $lignes */
+    private function prevenirServeur(CommandeRestaurant $commande, Collection $lignes): void
+    {
+        $serveur = $commande->serveur;
+        if ($serveur === null) {
+            return;
+        }
+        $ou = $commande->type === 'sur_place' ? ($commande->table ?? 'Sur place') : ($commande->type === 'livraison' ? 'Livraison' : 'À emporter');
+        $toutPret = ! $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS])->exists();
+        $plats = $lignes->map(fn ($l) => "{$l->quantite}× {$l->nom}")->implode(', ');
+        app(NotifierCompte::class)->envoyer(
+            $serveur,
+            "{$ou} : ".($toutPret ? 'commande prête' : 'plats prêts'),
+            "Commande {$commande->numero} — {$plats}.",
+            '/salle',
+            'restaurant',
+            email: false,
+        );
     }
 
     /**
@@ -223,7 +266,7 @@ class CommandesRestaurant
     public function servir(CommandeRestaurant $commande, ?array $ids, ?User $agent): CommandeRestaurant
     {
         $this->exigerEnCours($commande);
-        $aServir = $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, LigneCommandeRestaurant::EN_CUISINE, LigneCommandeRestaurant::PRETE]);
+        $aServir = $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE]);
         if ($ids !== null) {
             $aServir->whereIn('id', $ids);
         } elseif ((clone $aServir)->where('etat', LigneCommandeRestaurant::PRETE)->exists()) {
@@ -265,9 +308,13 @@ class CommandesRestaurant
             if ($montant > 0) {
                 $donne = $data['montant_donne'] ?? null;
                 $credit = (bool) ($data['credit'] ?? false) && $montant > $acompte;
-                $paiement = $credit
-                    ? ['moyen_paiement' => $commande->moyen_acompte ?? 'especes', 'montant_paye' => $acompte, 'montant_recu' => $acompte]
-                    : ['moyen_paiement' => $data['moyen_paiement'], 'montant_recu' => $donne === null ? $montant : $acompte + (int) $donne];
+                $mixte = ! $credit && count($data['paiements'] ?? []) > 1 ? $this->partsMixtes($data['paiements'], $montant - $acompte) : null;
+                $paiement = match (true) {
+                    $credit => ['moyen_paiement' => $commande->moyen_acompte ?? 'especes', 'montant_paye' => $acompte, 'montant_recu' => $acompte],
+                    // Paiement mixte : la vente porte le premier moyen et la liste des parts.
+                    $mixte !== null => ['moyen_paiement' => $mixte[0]['moyen'], 'paiements' => $mixte],
+                    default => ['moyen_paiement' => $data['moyen_paiement'], 'montant_recu' => $donne === null ? $montant : $acompte + (int) $donne],
+                };
                 $vente = app(VenteService::class)->encaisser([
                     'client_id' => $commande->client_id,
                     'lignes' => $lignes->map(fn (LigneCommandeRestaurant $l) => $l->produit_id !== null
@@ -284,7 +331,7 @@ class CommandesRestaurant
 
             $pourboire = (int) ($data['pourboire'] ?? 0);
             if ($pourboire > 0) {
-                $this->mouvement($commande, EncaissementRestaurant::POURBOIRE, $pourboire, $data['moyen_paiement'], $caissier);
+                $this->mouvement($commande, EncaissementRestaurant::POURBOIRE, $pourboire, $data['moyen_paiement'] ?? ($data['paiements'][0]['moyen'] ?? 'especes'), $caissier);
             }
 
             $commande->update([
@@ -296,6 +343,62 @@ class CommandesRestaurant
 
             return ['commande' => $commande->fresh(), 'vente' => $vente];
         });
+    }
+
+    /**
+     * Parts d'un paiement mixte : leur somme doit faire exactement le dû.
+     *
+     * @param  list<array{moyen: string, montant: int}>  $parts
+     * @return list<array{moyen: string, montant: int}>
+     */
+    private function partsMixtes(array $parts, int $du): array
+    {
+        $parts = array_values(array_filter(array_map(fn ($p) => ['moyen' => (string) $p['moyen'], 'montant' => (int) $p['montant']], $parts), fn ($p) => $p['montant'] > 0));
+        if (array_sum(array_column($parts, 'montant')) !== $du) {
+            throw ValidationException::withMessages(['paiements' => ['Les montants du paiement mixte doivent faire '.number_format($du, 0, ',', ' ').'.']]);
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Le plan de salle : chaque table et son état — libre, réservée (dans
+     * les deux heures), occupée, ou en attente de paiement (tout est servi,
+     * reste l'addition) — avec la commande qui l'occupe.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function salle(): array
+    {
+        $this->boutique();
+        $ouvertes = CommandeRestaurant::with('lignes')->where('type', 'sur_place')->whereNull('terminee_le')
+            ->where('statut', '!=', CommandeRestaurant::ANNULEE)->whereNotNull('table')->get()->groupBy('table');
+        $reservees = ReservationRestaurant::where('statut', ReservationRestaurant::PREVUE)->whereNotNull('table')
+            ->whereBetween('le', [now()->subMinutes(30), now()->addHours(2)])->get()->keyBy('table');
+        $etat = function (?CommandeRestaurant $c, ?ReservationRestaurant $r): string {
+            if ($c === null) {
+                return $r === null ? 'libre' : 'reservee';
+            }
+            $aServir = $c->lignes->contains(fn ($l) => in_array($l->etat, [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE], true));
+
+            return ! $aServir && $c->reste() > 0 ? 'a_payer' : 'occupee';
+        };
+        $place = fn (string $nom, ?string $zone, ?int $places) => [
+            'nom' => $nom, 'zone' => $zone, 'places' => $places,
+            'etat' => $etat($c = $ouvertes->get($nom)?->first(), $r = $reservees->get($nom)),
+            'commande_id' => $c?->id, 'numero' => $c === null ? null : (string) $c->numero, 'couverts' => $c?->couverts,
+            'total' => $c?->total, 'reste' => $c?->reste(), 'depuis' => $c?->created_at?->toIso8601String(),
+            'pretes' => $c === null ? 0 : (int) $c->lignes->where('etat', LigneCommandeRestaurant::PRETE)->sum('quantite'),
+            'reservation' => $r === null ? null : ['nom' => $r->nom, 'le' => $r->le->toIso8601String(), 'couverts' => $r->couverts],
+        ];
+        $tables = TableRestaurant::orderBy('ordre')->orderBy('nom')->get();
+        $connues = $tables->pluck('nom')->all();
+
+        return [
+            ...$tables->map(fn ($t) => $place($t->nom, $t->zone, $t->places))->all(),
+            // Une table tapée à la main (pas dans la liste) apparaît tant qu'elle est occupée.
+            ...$ouvertes->keys()->reject(fn ($nom) => in_array($nom, $connues, true))->map(fn ($nom) => $place((string) $nom, null, null))->values()->all(),
+        ];
     }
 
     /** Annulation : seulement si rien n'est payé ; [rembourser] rend l'acompte. */
@@ -377,6 +480,10 @@ class CommandesRestaurant
         $options = OptionRestaurant::whereIn('id', $ids)->get()->keyBy('id');
         $formules = FormuleRestaurant::whereIn('produit_id', $produits->keys())->get()->keyBy('produit_id');
         $composants = Produit::whereIn('id', collect($lignes)->flatMap(fn ($l) => $l['composition'] ?? [])->unique()->values())->pluck('nom', 'id');
+        // Les groupes d'options de chaque plat (portion, cuisson…) et leurs règles.
+        $groupes = OptionRestaurant::whereIn('produit_id', $produits->keys())->get()->groupBy(fn ($o) => $o->produit_id.'|'.($o->groupe ?? ''));
+        // Le poste de chaque catégorie : la cuisine, ou le bar pour les boissons.
+        $postes = PosteRestaurant::whereIn('categorie_produit_id', $produits->pluck('categorie_produit_id')->filter()->unique())->pluck('poste', 'categorie_produit_id');
 
         $preparees = [];
         foreach ($lignes as $ligne) {
@@ -387,6 +494,16 @@ class CommandesRestaurant
             $choisies = collect($ligne['options'] ?? [])->map(fn ($id) => $options->get($id));
             if ($choisies->contains(fn ($o) => $o === null || $o->produit_id !== $produit->id)) {
                 throw ValidationException::withMessages(['lignes' => ["Option inconnue pour « {$produit->nom} »."]]);
+            }
+            foreach ($groupes->filter(fn ($g, $cle) => str_starts_with($cle, $produit->id.'|')) as $groupe) {
+                $nombre = $choisies->filter(fn ($o) => $o->groupe === $groupe->first()->groupe)->count();
+                $titre = $groupe->first()->groupe ?? 'Options';
+                if ($groupe->first()->choix_unique && $nombre > 1) {
+                    throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » : un seul choix pour « {$titre} »."]]);
+                }
+                if ($groupe->first()->obligatoire && $nombre === 0) {
+                    throw ValidationException::withMessages(['lignes' => ["« {$produit->nom} » : choisissez « {$titre} »."]]);
+                }
             }
             $composition = null;
             if ($formule = $formules->get($produit->id)) {
@@ -414,6 +531,7 @@ class CommandesRestaurant
                 'options' => $choisies->isEmpty() ? null : $choisies->map(fn ($o) => ['nom' => $o->nom, 'prix' => $o->prix])->values()->all(),
                 'composition' => $formule ? array_values($ligne['composition']) : null,
                 'note' => filled($ligne['note'] ?? null) ? trim((string) $ligne['note']) : null,
+                'poste' => $postes[$produit->categorie_produit_id] ?? PosteRestaurant::CUISINE,
             ];
         }
 
@@ -447,7 +565,7 @@ class CommandesRestaurant
     private function terminerSiFini(CommandeRestaurant $commande): void
     {
         $commande->refresh();
-        $resteAServir = $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, LigneCommandeRestaurant::EN_CUISINE, LigneCommandeRestaurant::PRETE])->exists();
+        $resteAServir = $commande->lignes()->whereIn('etat', [LigneCommandeRestaurant::ATTENTE, ...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE])->exists();
         $commande->update(['terminee_le' => $commande->statut === CommandeRestaurant::PAYEE && ! $resteAServir ? ($commande->terminee_le ?? now()) : null]);
     }
 

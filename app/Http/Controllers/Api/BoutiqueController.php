@@ -111,6 +111,7 @@ class BoutiqueController extends Controller
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         $boutique->forceFill(['activite' => $data['activite']])->save();
         $boutique->preparerPressing();
+        $boutique->preparerRestaurant();
 
         return response()->json(['data' => $boutique->fresh()]);
     }

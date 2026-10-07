@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
+use App\Models\CategorieProduit;
 use App\Models\FormuleRestaurant;
 use App\Models\IngredientRestaurant;
 use App\Models\OptionRestaurant;
+use App\Models\PosteRestaurant;
 use App\Models\Produit;
 use App\Models\RecetteRestaurant;
 use App\Models\ReservationRestaurant;
@@ -163,14 +165,18 @@ class GestionRestaurantController extends Controller
         $options = OptionRestaurant::orderBy('ordre')->get()->groupBy('produit_id');
         $formules = FormuleRestaurant::all()->keyBy('produit_id');
         $recettes = RecetteRestaurant::with('ingredient')->get()->groupBy('produit_id');
+        $postes = PosteRestaurant::pluck('poste', 'categorie_produit_id');
 
-        return response()->json(['data' => $produits->map(function (Produit $p) use ($options, $formules, $recettes) {
+        return response()->json(['data' => $produits->map(function (Produit $p) use ($options, $formules, $recettes, $postes) {
             $recette = $recettes->get($p->id, collect());
             $cout = (int) round($recette->sum(fn ($r) => $r->quantite * ($r->ingredient?->cout_unitaire ?? 0)));
 
             return [
                 'id' => $p->id, 'nom' => $p->nom, 'prix' => (int) $p->prix_vente, 'categorie_id' => $p->categorie_produit_id,
-                'options' => $options->get($p->id, collect())->map(fn ($o) => ['id' => $o->id, 'groupe' => $o->groupe, 'nom' => $o->nom, 'prix' => $o->prix])->values(),
+                'options' => $options->get($p->id, collect())->map(fn ($o) => [
+                    'id' => $o->id, 'groupe' => $o->groupe, 'nom' => $o->nom, 'prix' => $o->prix, 'choix_unique' => $o->choix_unique, 'obligatoire' => $o->obligatoire,
+                ])->values(),
+                'poste' => $postes[$p->categorie_produit_id] ?? PosteRestaurant::CUISINE,
                 'formule' => ($f = $formules->get($p->id)) === null ? null : $f->etapes,
                 'recette' => $recette->map(fn ($r) => [
                     'ingredient_id' => $r->ingredient_id, 'nom' => $r->ingredient?->nom, 'unite' => $r->ingredient?->unite, 'quantite' => $r->quantite,
@@ -184,13 +190,52 @@ class GestionRestaurantController extends Controller
     public function ajouterOption(Request $request, Produit $produit): JsonResponse
     {
         $this->commandes->boutique();
-        $data = $request->validate(['groupe' => ['nullable', 'string', 'max:40'], 'nom' => ['required', 'string', 'max:60'], 'prix' => ['nullable', 'integer', 'min:0']]);
+        $data = $request->validate([
+            'groupe' => ['nullable', 'string', 'max:40'], 'nom' => ['required', 'string', 'max:60'], 'prix' => ['nullable', 'integer', 'min:0'],
+            'choix_unique' => ['nullable', 'boolean'], 'obligatoire' => ['nullable', 'boolean'],
+        ]);
+        $groupe = filled($data['groupe'] ?? null) ? trim($data['groupe']) : null;
+        // Les règles du groupe (un seul choix, obligatoire) : celles déjà fixées, sinon celles demandées.
+        $soeur = OptionRestaurant::where('produit_id', $produit->id)->where('groupe', $groupe)->first();
         $option = OptionRestaurant::create([
-            'produit_id' => $produit->id, 'groupe' => $data['groupe'] ?? null, 'nom' => trim($data['nom']), 'prix' => $data['prix'] ?? 0,
+            'produit_id' => $produit->id, 'groupe' => $groupe, 'nom' => trim($data['nom']), 'prix' => $data['prix'] ?? 0,
+            'choix_unique' => $soeur?->choix_unique ?? (bool) ($data['choix_unique'] ?? false),
+            'obligatoire' => $soeur?->obligatoire ?? (bool) ($data['obligatoire'] ?? false),
             'ordre' => (int) OptionRestaurant::where('produit_id', $produit->id)->max('ordre') + 1,
         ]);
 
         return response()->json(['data' => $option], 201);
+    }
+
+    /** Les règles d'un groupe d'options : un seul choix (portion, cuisson), obligatoire. */
+    public function groupe(Request $request, Produit $produit): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['groupe' => ['nullable', 'string', 'max:40'], 'choix_unique' => ['required', 'boolean'], 'obligatoire' => ['required', 'boolean']]);
+        OptionRestaurant::where('produit_id', $produit->id)->where('groupe', filled($data['groupe'] ?? null) ? $data['groupe'] : null)
+            ->update(['choix_unique' => $data['choix_unique'], 'obligatoire' => $data['obligatoire']]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Les catégories de la carte et leur poste : la cuisine, ou le bar. */
+    public function postes(): JsonResponse
+    {
+        $this->commandes->boutique();
+        $postes = PosteRestaurant::pluck('poste', 'categorie_produit_id');
+
+        return response()->json(['data' => CategorieProduit::orderBy('ordre')->orderBy('nom')->get(['id', 'nom'])
+            ->map(fn ($c) => ['categorie_id' => $c->id, 'nom' => $c->nom, 'poste' => $postes[$c->id] ?? PosteRestaurant::CUISINE])->values()]);
+    }
+
+    public function changerPoste(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['categorie_id' => ['required', 'uuid'], 'poste' => ['required', Rule::in([PosteRestaurant::CUISINE, PosteRestaurant::BAR])]]);
+        $categorie = CategorieProduit::findOrFail($data['categorie_id']);
+        PosteRestaurant::updateOrCreate(['categorie_produit_id' => $categorie->id], ['poste' => $data['poste']]);
+
+        return $this->postes();
     }
 
     public function supprimerOption(OptionRestaurant $option): JsonResponse

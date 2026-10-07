@@ -60,6 +60,7 @@ class Index extends Component
         $boutique = Boutique::findOrFail($this->boutiqueActiveId());
         $boutique->forceFill(['activite' => $activite])->save();
         $boutique->preparerPressing();
+        $boutique->preparerRestaurant();
         session()->flash('info', match ($activite) {
             'pharmacie' => 'Mode pharmacie activé : la caisse parle le langage de l’officine.',
             'pressing' => 'Mode pressing activé : la caisse parle de vêtements et de prestations, sans stock à compter.',

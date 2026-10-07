@@ -146,6 +146,22 @@ class Rapports
 
                 return ['moyen' => $moyen, 'libelle' => $libelle($moyen), 'nombre' => (int) $r->nombre, 'total' => (int) $r->total];
             });
+        // Restaurant, paiement mixte : chaque part va à son moyen.
+        $mixtes = $valides()->whereNotNull('paiements')->get();
+        if ($mixtes->isNotEmpty()) {
+            $lignes = $payes->keyBy('moyen')->all();
+            foreach ($mixtes as $v) {
+                $principal = $v->moyen_paiement instanceof MoyenPaiement ? $v->moyen_paiement->value : (string) $v->moyen_paiement;
+                $lignes[$principal]['total'] -= (int) $v->montant_paye;
+                $lignes[$principal]['nombre']--;
+                foreach ($v->partsParMoyen((int) $v->montant_paye) as $moyen => $montant) {
+                    $lignes[$moyen] ??= ['moyen' => $moyen, 'libelle' => $libelle($moyen), 'nombre' => 0, 'total' => 0];
+                    $lignes[$moyen]['total'] += $montant;
+                    $lignes[$moyen]['nombre']++;
+                }
+            }
+            $payes = collect($lignes)->filter(fn ($l) => $l['total'] > 0)->values();
+        }
         $credit = $valides()->where('reste_du', '>', 0);
         $nombreCredit = (clone $credit)->count();
         if ($nombreCredit > 0) {

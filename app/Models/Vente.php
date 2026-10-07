@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
-    'tva', 'total', 'montant_paye', 'acompte_deduit', 'commande_restaurant_id', 'reste_du', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
+    'tva', 'total', 'montant_paye', 'acompte_deduit', 'commande_restaurant_id', 'paiements', 'reste_du', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
     'jour_affaire', 'numero_jour', 'remise_fidelite', 'numero_facture', 'ordonnance', 'tarif', 'express',
 ])]
@@ -60,6 +60,7 @@ class Vente extends Model
             'vendue_hors_ligne' => 'boolean',
             'remise_fidelite' => 'boolean',
             'ordonnance' => 'array',
+            'paiements' => 'array',
             'express' => 'boolean',
             'synchronisee_le' => 'datetime',
             'annulee_le' => 'datetime',
@@ -168,5 +169,27 @@ class Vente extends Model
     public function commandeRestaurant(): BelongsTo
     {
         return $this->belongsTo(CommandeRestaurant::class);
+    }
+
+    /**
+     * Ce que la vente a reçu, par moyen : le moyen de la vente pour tout,
+     * sauf un paiement mixte (restaurant), réparti selon ses parts — le
+     * reste (acompte déjà compté) reste sur le moyen de la vente.
+     *
+     * @return array<string, int>
+     */
+    public function partsParMoyen(int $montant): array
+    {
+        $principal = $this->moyen_paiement instanceof MoyenPaiement ? $this->moyen_paiement->value : (string) $this->moyen_paiement;
+        if (empty($this->paiements)) {
+            return [$principal => $montant];
+        }
+        $parts = [];
+        foreach ($this->paiements as $p) {
+            $parts[$p['moyen']] = ($parts[$p['moyen']] ?? 0) + (int) $p['montant'];
+        }
+        $parts[$principal] = ($parts[$principal] ?? 0) + $montant - array_sum($parts);
+
+        return $parts;
     }
 }

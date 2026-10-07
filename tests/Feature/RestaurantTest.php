@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Boutique;
+use App\Models\CategorieProduit;
 use App\Models\Client;
 use App\Models\IngredientRestaurant;
+use App\Models\NotificationApp;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
@@ -215,5 +217,87 @@ class RestaurantTest extends TestCase
         $this->api()->getJson('/api/restaurant/cuisine')->assertUnprocessable();
         // Un commerce refuse toujours une vente sans stock.
         $this->api()->postJson('/api/ventes', ['lignes' => [['produit_id' => $this->bissap, 'quantite' => 1]], 'moyen_paiement' => 'especes'])->assertUnprocessable();
+    }
+
+    public function test_categories_de_restaurant_et_bar_separe_de_la_cuisine(): void
+    {
+        $boissons = CategorieProduit::where('nom', 'Boissons')->firstOrFail();
+        $this->assertSame(10, CategorieProduit::whereIn('nom', Boutique::CATEGORIES_RESTAURANT)->count());
+        $this->api()->putJson("/api/produits/{$this->bissap}", ['categorie_produit_id' => $boissons->id])->assertOk();
+        $this->api()->getJson('/api/restaurant/postes')->assertOk()->assertJsonFragment(['nom' => 'Boissons', 'poste' => 'bar']);
+
+        $c = $this->commander()->json('data');
+        $this->assertSame(['cuisine', 'bar'], array_column($c['lignes'], 'poste'));
+        $bar = $this->api()->getJson('/api/restaurant/cuisine?poste=bar')->json('data');
+        $this->assertSame(['Bissap'], array_column($bar[0]['lignes'], 'nom'));
+        $cuisine = $this->api()->getJson('/api/restaurant/cuisine?poste=cuisine')->json('data');
+        $this->assertSame(['Poulet braisé'], array_column($cuisine[0]['lignes'], 'nom'));
+
+        // Repasser en restaurant ne recrée rien.
+        $this->api()->putJson('/api/boutique/activite', ['activite' => 'restaurant'])->assertOk();
+        $this->assertSame(1, CategorieProduit::where('nom', 'Boissons')->count());
+    }
+
+    public function test_a_preparer_en_preparation_pret_et_le_serveur_est_prevenu(): void
+    {
+        $c = $this->commander()->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/commencer")->assertOk()
+            ->assertJsonPath('data.lignes.0.etat', 'en_preparation');
+        $this->api()->getJson('/api/restaurant/compteurs')->assertJsonPath('data.en_cuisine', 4);
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/prets")->assertOk()->assertJsonPath('data.lignes.0.etat', 'prete');
+        $notification = NotificationApp::where('user_id', $this->chef->id)->latest('id')->firstOrFail();
+        $this->assertSame('Table 4 : commande prête', $notification->titre);
+        $this->assertSame('/salle', $notification->lien);
+    }
+
+    public function test_options_a_choix_unique_et_obligatoire(): void
+    {
+        $normale = $this->api()->postJson("/api/restaurant/carte/{$this->poulet}/options", ['groupe' => 'Portion', 'nom' => 'Normale', 'choix_unique' => true, 'obligatoire' => true])->json('data.id');
+        $grande = $this->api()->postJson("/api/restaurant/carte/{$this->poulet}/options", ['groupe' => 'Portion', 'nom' => 'Grande', 'prix' => 1000])->json('data.id');
+        $carte = collect($this->api()->getJson('/api/restaurant/carte')->json('data'))->firstWhere('nom', 'Poulet braisé');
+        $this->assertTrue($carte['options'][1]['choix_unique'], 'la règle du groupe vaut pour ses options');
+
+        $plat = fn (array $options) => $this->api()->postJson('/api/restaurant/commandes', ['table' => 'T1', 'lignes' => [['produit_id' => $this->poulet, 'quantite' => 1, 'options' => $options]]]);
+        $plat([])->assertUnprocessable();
+        $plat([$normale, $grande])->assertUnprocessable();
+        $plat([$grande])->assertCreated()->assertJsonPath('data.total', 4000);
+    }
+
+    public function test_paiement_mixte_especes_et_orange_money(): void
+    {
+        $this->api()->postJson('/api/sessions-caisse', ['fond_initial' => 10000])->assertCreated();
+        $c = $this->commander()->json('data');
+        $payer = fn (array $parts) => $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/payer", ['paiements' => $parts]);
+        $payer([['moyen' => 'especes', 'montant' => 4000], ['moyen' => 'orange_money', 'montant' => 2000]])->assertUnprocessable()->assertJsonValidationErrors('paiements');
+        $payer([['moyen' => 'especes', 'montant' => 4000], ['moyen' => 'orange_money', 'montant' => 3000]])->assertOk()->assertJsonPath('data.statut', 'payee');
+
+        $vente = Vente::sole();
+        $this->assertSame(7000, (int) $vente->total);
+        $this->assertCount(2, $vente->paiements);
+        $this->api()->getJson('/api/sessions-caisse/courante')->assertJsonPath('fond_attendu', 14000);
+        $jour = now()->toDateString();
+        $parMoyen = collect($this->api()->getJson("/api/rapports?du={$jour}&au={$jour}")->json('par_moyen'))->pluck('total', 'moyen');
+        $this->assertSame(4000, $parMoyen['especes']);
+        $this->assertSame(3000, $parMoyen['orange_money']);
+    }
+
+    public function test_plan_de_salle_libre_occupee_a_payer_reservee(): void
+    {
+        foreach (['Table 1', 'Table 2', 'Table 3', 'Table 4'] as $nom) {
+            $this->api()->postJson('/api/restaurant/tables', ['nom' => $nom, 'places' => 4])->assertCreated();
+        }
+        $occupee = $this->commander(['table' => 'Table 2'])->json('data');
+        $servie = $this->commander(['table' => 'Table 3'])->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$servie['id']}/servir")->assertOk();
+        $this->api()->postJson('/api/restaurant/reservations', ['nom' => 'Famille Koné', 'le' => now()->addHour()->toIso8601String(), 'table' => 'Table 4'])->assertCreated();
+        $this->commander(['table' => 'Terrasse'])->assertCreated();
+
+        $salle = collect($this->api()->getJson('/api/restaurant/salle')->assertOk()->json('data'))->keyBy('nom');
+        $this->assertSame('libre', $salle['Table 1']['etat']);
+        $this->assertSame('occupee', $salle['Table 2']['etat']);
+        $this->assertSame($occupee['id'], $salle['Table 2']['commande_id']);
+        $this->assertSame('a_payer', $salle['Table 3']['etat']);
+        $this->assertSame('reservee', $salle['Table 4']['etat']);
+        $this->assertSame('occupee', $salle['Terrasse']['etat'], 'une table tapée à la main apparaît aussi');
     }
 }

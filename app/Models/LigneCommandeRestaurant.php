@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Un plat ou une boisson d'une commande, suivi en cuisine : attente → en cuisine → prête → servie. */
 #[Fillable([
     'commande_id', 'produit_id', 'nom', 'quantite', 'prix_unitaire', 'total_ligne', 'options', 'composition', 'note',
-    'etat', 'envoi', 'envoyee_le', 'prete_le', 'servie_le', 'vente_id', 'ordre',
+    'poste', 'etat', 'envoi', 'envoyee_le', 'prete_le', 'servie_le', 'vente_id', 'ordre',
 ])]
 class LigneCommandeRestaurant extends Model
 {
@@ -20,7 +20,14 @@ class LigneCommandeRestaurant extends Model
 
     public const ATTENTE = 'attente';
 
+    /** Envoyé, à préparer. */
     public const EN_CUISINE = 'en_cuisine';
+
+    /** Le cuisinier (ou le barman) s'y est mis. */
+    public const EN_PREPARATION = 'en_preparation';
+
+    /** Pas encore prêts : à préparer ou en préparation. */
+    public const EN_COURS = [self::EN_CUISINE, self::EN_PREPARATION];
 
     public const PRETE = 'prete';
 

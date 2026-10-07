@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\MoyenPaiement;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Boutique;
 use App\Models\LigneVente;
@@ -60,11 +61,18 @@ class Dashboard extends Component
         ]);
         $maxHeure = max(1, $ventesParHeure->max('total'));
 
-        $parMoyen = $ventesJour->groupBy('moyen_paiement')
-            ->map(fn ($groupe, $moyen) => [
-                'label' => $groupe->first()->moyen_paiement->label(),
-                'total' => (int) $groupe->sum('total'),
-                'pct' => $total > 0 ? round($groupe->sum('total') / $total * 100) : 0,
+        // Restaurant, paiement mixte : chaque part va à son moyen.
+        $parts = [];
+        foreach ($ventesJour as $v) {
+            foreach ($v->partsParMoyen((int) $v->total) as $moyen => $montant) {
+                $parts[$moyen] = ($parts[$moyen] ?? 0) + $montant;
+            }
+        }
+        $parMoyen = collect($parts)
+            ->map(fn (int $somme, string $moyen) => [
+                'label' => MoyenPaiement::tryFrom($moyen)?->label() ?? $moyen,
+                'total' => $somme,
+                'pct' => $total > 0 ? round($somme / $total * 100) : 0,
             ])->sortByDesc('total')->values();
 
         $topProduits = LigneVente::query()

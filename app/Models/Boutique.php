@@ -79,6 +79,39 @@ class Boutique extends Model
         }
     }
 
+    /** Catégories d'une carte de restaurant, et celles que prépare le bar. */
+    public const CATEGORIES_RESTAURANT = [
+        'Entrées', 'Poulet / Viandes', 'Poissons', 'Plats africains', 'Sauces', 'Grillades',
+        'Accompagnements', 'Boissons', 'Jus naturels', 'Desserts',
+    ];
+
+    public const CATEGORIES_BAR = ['Boissons', 'Jus naturels'];
+
+    /**
+     * Au passage en restaurant : les catégories d'une carte (celles qui
+     * manquent), et le bar pour les boissons. Rien ne change pour les autres.
+     */
+    public function preparerRestaurant(): void
+    {
+        if (! $this->estRestaurant()) {
+            return;
+        }
+        $existantes = CategorieProduit::withoutBoutiqueScope()->where('boutique_id', $this->id)->pluck('id', 'nom');
+        $ordre = (int) CategorieProduit::withoutBoutiqueScope()->where('boutique_id', $this->id)->max('ordre');
+        foreach (self::CATEGORIES_RESTAURANT as $nom) {
+            $id = $existantes[$nom] ?? null;
+            if ($id === null) {
+                $categorie = (new CategorieProduit(['nom' => $nom, 'ordre' => ++$ordre]))->forceFill(['boutique_id' => $this->id]);
+                $categorie->save();
+                $id = $categorie->id;
+            }
+            if (in_array($nom, self::CATEGORIES_BAR, true)
+                && ! PosteRestaurant::withoutBoutiqueScope()->where('categorie_produit_id', $id)->exists()) {
+                (new PosteRestaurant(['categorie_produit_id' => $id, 'poste' => PosteRestaurant::BAR]))->forceFill(['boutique_id' => $this->id])->save();
+            }
+        }
+    }
+
     protected function casts(): array
     {
         return [

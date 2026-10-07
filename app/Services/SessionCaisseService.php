@@ -68,6 +68,12 @@ class SessionCaisseService
             ->valides()
             ->where('moyen_paiement', MoyenPaiement::Especes)
             ->sum(DB::raw('montant_paye - acompte_deduit'));
+        // Restaurant, paiement mixte : seule la part en espèces est dans le tiroir.
+        foreach ($session->ventes()->valides()->whereNotNull('paiements')->get() as $mixte) {
+            $recu = (int) $mixte->montant_paye - (int) $mixte->acompte_deduit;
+            $ventes += ($mixte->partsParMoyen($recu)[MoyenPaiement::Especes->value] ?? 0)
+                - ($mixte->moyen_paiement === MoyenPaiement::Especes ? $recu : 0);
+        }
         $remboursements = (int) ReglementCredit::where('session_caisse_id', $session->id)
             ->where('moyen_paiement', MoyenPaiement::Especes->value)
             ->sum('montant');

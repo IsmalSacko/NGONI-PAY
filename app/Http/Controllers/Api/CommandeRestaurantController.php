@@ -56,7 +56,7 @@ class CommandeRestaurantController extends Controller
 
         return match ($filtre) {
             'a_payer' => $r->where('statut', CommandeRestaurant::OUVERTE)->where('total', '>', 0),
-            'en_cuisine' => $enCours($r)->whereHas('lignes', fn ($l) => $l->where('etat', LigneCommandeRestaurant::EN_CUISINE)),
+            'en_cuisine' => $enCours($r)->whereHas('lignes', fn ($l) => $l->whereIn('etat', LigneCommandeRestaurant::EN_COURS)),
             'pretes' => $enCours($r)->whereHas('lignes', fn ($l) => $l->where('etat', LigneCommandeRestaurant::PRETE)),
             'emporter' => $enCours($r)->whereIn('type', ['emporter', 'livraison']),
             'terminees' => $r->whereNotNull('terminee_le')->where('created_at', '>=', now()->subDays(30)),
@@ -75,19 +75,23 @@ class CommandeRestaurantController extends Controller
         return response()->json(['data' => [
             'en_cours' => $enCours()->count(),
             'a_payer' => CommandeRestaurant::where('statut', CommandeRestaurant::OUVERTE)->where('total', '>', 0)->count(),
-            'en_cuisine' => (int) LigneCommandeRestaurant::whereIn('commande_id', $enCours()->select('id'))->where('etat', LigneCommandeRestaurant::EN_CUISINE)->sum('quantite'),
+            'en_cuisine' => (int) LigneCommandeRestaurant::whereIn('commande_id', $enCours()->select('id'))->whereIn('etat', LigneCommandeRestaurant::EN_COURS)->sum('quantite'),
             'pretes' => (int) LigneCommandeRestaurant::whereIn('commande_id', $enCours()->select('id'))->where('etat', LigneCommandeRestaurant::PRETE)->sum('quantite'),
             'emporter' => $enCours()->whereIn('type', ['emporter', 'livraison'])->count(),
             'reservations' => ReservationRestaurant::where('statut', ReservationRestaurant::PREVUE)->whereBetween('le', [now()->startOfDay(), now()->endOfDay()])->count(),
         ]]);
     }
 
-    /** L'écran cuisine : les plats envoyés et pas encore servis, envoi par envoi, du plus ancien au plus récent. */
-    public function cuisine(): JsonResponse
+    /**
+     * L'écran cuisine (ou bar, ?poste=bar) : les plats envoyés et pas encore
+     * servis, envoi par envoi, du plus ancien au plus récent.
+     */
+    public function cuisine(Request $request): JsonResponse
     {
         $this->commandes->boutique();
         $lignes = LigneCommandeRestaurant::with('commande')
-            ->whereIn('etat', [LigneCommandeRestaurant::EN_CUISINE, LigneCommandeRestaurant::PRETE])
+            ->whereIn('etat', [...LigneCommandeRestaurant::EN_COURS, LigneCommandeRestaurant::PRETE])
+            ->when($request->query('poste'), fn ($q, string $poste) => $q->where('poste', $poste))
             ->whereHas('commande', fn ($c) => $c->where('statut', '!=', CommandeRestaurant::ANNULEE))
             ->orderBy('envoyee_le')->orderBy('ordre')->get();
 
@@ -173,6 +177,21 @@ class CommandeRestaurantController extends Controller
         return response()->json(['data' => $this->json($commande->fresh()), 'envoi' => $lignes->first()?->envoi, 'lignes' => $lignes->map(fn ($l) => $this->ligne($l))->values()]);
     }
 
+    /** Le plan de salle : chaque table et son état. */
+    public function salle(): JsonResponse
+    {
+        return response()->json(['data' => $this->commandes->salle()]);
+    }
+
+    /** La cuisine commence : à préparer → en préparation. */
+    public function commencer(Request $request, CommandeRestaurant $commande): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['lignes' => ['nullable', 'array'], 'lignes.*' => ['uuid']]);
+
+        return response()->json(['data' => $this->json($this->commandes->commencer($commande, $data['lignes'] ?? null))]);
+    }
+
     public function prets(Request $request, CommandeRestaurant $commande): JsonResponse
     {
         $this->commandes->boutique();
@@ -242,10 +261,15 @@ class CommandeRestaurantController extends Controller
     /** @return array<string, mixed> */
     private function reglesPaiement(string $prefixe): array
     {
-        $requis = $prefixe === '' ? 'required' : 'required_with:paiement';
+        // À la création, le paiement est facultatif : ses règles ne valent que s'il est là.
+        $si = $prefixe === '' ? [] : ['exclude_without:paiement'];
 
         return [
-            "{$prefixe}moyen_paiement" => [$requis, Rule::enum(MoyenPaiement::class)],
+            "{$prefixe}moyen_paiement" => [...$si, 'nullable', "required_without:{$prefixe}paiements", Rule::enum(MoyenPaiement::class)],
+            // Paiement mixte : plusieurs moyens, plusieurs montants.
+            "{$prefixe}paiements" => ['nullable', 'array', 'min:2', 'max:5'],
+            "{$prefixe}paiements.*.moyen" => ['required', Rule::enum(MoyenPaiement::class), Rule::notIn([MoyenPaiement::CreditClient->value])],
+            "{$prefixe}paiements.*.montant" => ['required', 'integer', 'min:1'],
             "{$prefixe}montant_donne" => ['nullable', 'integer', 'min:0'],
             "{$prefixe}pourboire" => ['nullable', 'integer', 'min:0'],
             "{$prefixe}credit" => ['nullable', 'boolean'],
@@ -260,7 +284,7 @@ class CommandeRestaurantController extends Controller
         return [
             'id' => $l->id, 'produit_id' => $l->produit_id, 'nom' => $l->nom, 'quantite' => $l->quantite,
             'prix_unitaire' => $l->prix_unitaire, 'total_ligne' => $l->total_ligne, 'options' => $l->options ?? [],
-            'composition' => $l->composition ?? [], 'note' => $l->note, 'etat' => $l->etat, 'envoi' => $l->envoi,
+            'composition' => $l->composition ?? [], 'note' => $l->note, 'poste' => $l->poste, 'etat' => $l->etat, 'envoi' => $l->envoi,
             'envoyee_le' => $l->envoyee_le?->toIso8601String(), 'payee' => $l->vente_id !== null,
         ];
     }

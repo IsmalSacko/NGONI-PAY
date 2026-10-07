@@ -297,6 +297,8 @@ class VenteService
                 'acompte_deduit' => min($paye, (int) ($data['acompte_deduit'] ?? 0)),
                 // Restaurant : la commande réglée par cette vente (table, numéro sur le ticket).
                 'commande_restaurant_id' => $data['commande_restaurant_id'] ?? null,
+                // Restaurant : paiement mixte (espèces + Orange Money…), jamais fourni par la caisse.
+                'paiements' => $data['paiements'] ?? null,
                 'reste_du' => $reste,
                 'moyen_paiement' => $moyenPaiement,
                 'montant_recu' => $montantRecu,
