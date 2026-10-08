@@ -44,6 +44,9 @@ class AuthController extends Controller
             'nom_utilisateur' => $data['nom_utilisateur'],
             'code_parrainage' => $data['code_parrainage'] ?? null,
             'empreinte' => Appareil::empreinte($request),
+            'appareil' => implode(' · ', array_filter([
+                ($a = Appareil::depuisRequete($request))->libelle(), $a->modele, $a->version === null ? null : "app {$a->version}",
+            ])),
         ]);
 
         if ($request->boolean('conditions_acceptees')) {

@@ -28,6 +28,23 @@ class EssaisAppareils
             ->exists();
     }
 
+    /**
+     * Les autres comptes déjà vus sur ce téléphone, pour l'alerte à l'exploitant.
+     *
+     * @return list<array{nom: string, telephone: ?string, inscrit_le: ?string}>
+     */
+    public static function autresComptes(?string $empreinte, User $sauf): array
+    {
+        if ($empreinte === null) {
+            return [];
+        }
+
+        return User::withTrashed()
+            ->whereIn('id', DB::table('essais_appareils')->where('empreinte', $empreinte)->where('user_id', '!=', $sauf->id)->select('user_id'))
+            ->orderBy('created_at')->limit(5)->get(['name', 'phone', 'created_at'])
+            ->map(fn (User $u) => ['nom' => (string) $u->name, 'telephone' => $u->phone, 'inscrit_le' => $u->created_at?->format('d/m/Y')])->all();
+    }
+
     /** Note le téléphone d'un propriétaire (sans effet pour un employé ou sans empreinte). */
     public static function noter(?string $empreinte, User $user): void
     {

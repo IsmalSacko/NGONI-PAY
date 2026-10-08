@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\Country;
+use App\Mail\FraudeEssaiMail;
 use App\Mail\InscriptionMail;
 use App\Models\Boutique;
 use App\Models\User;
@@ -98,8 +99,10 @@ class BoutiqueRegistrationService
 
             // Après le parrainage, qui rallonge l'essai : un téléphone déjà
             // utilisé n'en a aucun, parrainé ou non.
+            $dejaVus = [];
             if (EssaisAppareils::dejaUtilise($data['empreinte'] ?? null)) {
                 $essai->update(['fin' => now()->subDay()->toDateString()]);
+                $dejaVus = EssaisAppareils::autresComptes($data['empreinte'], $user);
             }
 
             // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
@@ -107,10 +110,17 @@ class BoutiqueRegistrationService
 
             EssaisAppareils::noter($data['empreinte'] ?? null, $user);
 
-            return ['boutique' => $boutique->fresh(), 'user' => $user->fresh(), 'essai_offert' => $essai->fresh()->fin?->isFuture() ?? false];
+            return ['boutique' => $boutique->fresh(), 'user' => $user->fresh(), 'essai_offert' => $essai->fresh()->fin?->isFuture() ?? false, 'deja_vus' => $dejaVus];
         });
 
         $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);
+
+        // Inscription depuis un téléphone déjà utilisé : essai refusé, et
+        // l'exploitant le sait tout de suite, avec les comptes du même téléphone.
+        if ($resultat['deja_vus'] !== []) {
+            $this->alerterFraude($resultat['user'], $resultat['boutique'], $resultat['deja_vus'], $data['appareil'] ?? null);
+        }
+        unset($resultat['deja_vus']);
 
         return $resultat;
     }
@@ -119,6 +129,32 @@ class BoutiqueRegistrationService
      * Mail à l'exploitant, une fois l'inscription enregistrée. Un mail perdu ne
      * doit jamais faire échouer l'inscription : le compte est visible dans la console.
      */
+    /**
+     * Essai refusé : téléphone déjà utilisé. Alerte dans la console (cloche et
+     * push) et e-mail à l'exploitant, avec le téléphone, la personne, les
+     * comptes déjà vus et un lien WhatsApp qui ouvre un message d'avertissement
+     * prêt à envoyer.
+     *
+     * @param  list<array{nom: string, telephone: ?string, inscrit_le: ?string}>  $dejaVus
+     */
+    private function alerterFraude(User $user, Boutique $boutique, array $dejaVus, ?string $appareil): void
+    {
+        $autres = implode(', ', array_map(fn (array $c) => "{$c['nom']} ({$c['telephone']})", $dejaVus));
+        app(AlertesExploitant::class)->envoyer(
+            'Essai refusé : téléphone déjà utilisé',
+            "{$user->name} ({$user->phone}) s'est inscrit depuis le téléphone de : {$autres}.",
+            '/console/comptes',
+        );
+
+        Apres::reponse(function () use ($user, $boutique, $dejaVus, $appareil): void {
+            try {
+                Mail::to(config('ecaisse.notification_email'))->send(new FraudeEssaiMail($user, $boutique, $dejaVus, $appareil));
+            } catch (\Throwable $e) {
+                Log::error('Mail de tentative de fraude non envoyé', ['user' => $user->id, 'error' => $e->getMessage()]);
+            }
+        });
+    }
+
     private function prevenirExploitant(User $user, Boutique $boutique, bool $nouveauCompte): void
     {
         Apres::reponse(function () use ($user, $boutique, $nouveauCompte): void {
