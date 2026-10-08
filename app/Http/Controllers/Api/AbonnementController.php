@@ -13,9 +13,11 @@ use App\Models\Plan;
 use App\Models\PlanTarif;
 use App\Services\AbonnementService;
 use App\Services\PaiementMobile;
+use App\Services\RecuAbonnement;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 
 /**
@@ -233,7 +235,24 @@ class AbonnementController extends Controller
             'fin_projetee' => $d->statut->estTranchee() ? null
                 : $this->abonnements->finProjetee($d->user_id, $d->plan, $d->mois)?->toDateString(),
             'cree_le' => $d->created_at?->toIso8601String(),
+            // Abonnement payé : le reçu à télécharger (GET abonnement/recus/{id}).
+            'recu_numero' => $d->recu_numero,
+            'periode_debut' => $d->periode_debut?->toDateString(),
+            'periode_fin' => $d->periode_fin?->toDateString(),
+            'decide_le' => $d->decide_le?->toIso8601String(),
         ];
+    }
+
+    /** Le reçu PDF d'un abonnement payé de cette boutique. */
+    public function recu(DemandeAbonnement $demande, RecuAbonnement $recus): Response
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless($demande->user_id === $boutique->proprietaire_id && $demande->recu_numero !== null, 404);
+
+        return response($recus->pdf($demande), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$recus->nomFichier($demande).'"',
+        ]);
     }
 
     /**
