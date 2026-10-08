@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Mail\BilanMensuelMail;
 use App\Models\Boutique;
 use App\Models\NotificationApp;
 use App\Models\User;
@@ -12,8 +11,6 @@ use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
@@ -21,8 +18,9 @@ use Illuminate\Support\Str;
  * paiement, caissiers — à montrer à la banque ou à un associé.
  *
  * Le 1er de chaque mois, il part au propriétaire de chaque boutique qui a
- * vendu le mois précédent : notification et push, et le PDF par e-mail s'il
- * en a un. Le même PDF se télécharge à tout moment depuis l'application.
+ * vendu le mois précédent : notification et push. Pas d'e-mail : envoyé à
+ * tous les propriétaires à la fois, il dépasserait le quota du serveur de
+ * mails. Le PDF se télécharge à tout moment depuis l'application.
  */
 class BilanMensuel
 {
@@ -81,22 +79,8 @@ class BilanMensuel
             }
 
             $message = "Le bilan de {$this->libelleMois($mois)} est prêt : chiffre d’affaires, marge, meilleurs articles. "
-                .'Retrouvez-le dans Pilotage'.(filled($proprietaire->email) ? ', et en PDF dans votre e-mail.' : '.');
+                .'Retrouvez-le dans Pilotage, et téléchargez-le en PDF.';
             $this->notifier->envoyer($proprietaire, $titre, $message, '/pilotage', self::TYPE, email: false);
-
-            if (filled($proprietaire->email)) {
-                try {
-                    Mail::to($proprietaire->email)->send(new BilanMensuelMail(
-                        $titre,
-                        "Vous trouverez en pièce jointe le bilan de {$this->libelleMois($mois)} de {$boutique->nom}.",
-                        $proprietaire->name,
-                        $this->pdf($boutique, $mois),
-                        $this->nomFichier($boutique, $mois),
-                    ));
-                } catch (\Throwable $e) {
-                    Log::error('Bilan mensuel : e-mail non envoyé', ['boutique' => $boutique->id, 'erreur' => $e->getMessage()]);
-                }
-            }
             $envoyes++;
         }
 

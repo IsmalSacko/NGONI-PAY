@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Mail\BilanMensuelMail;
 use App\Models\Boutique;
 use App\Models\NotificationApp;
 use App\Models\Produit;
@@ -13,6 +12,7 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -71,12 +71,9 @@ class BilanMensuelTest extends TestCase
         $avis = NotificationApp::where('user_id', $this->awa->id)->where('type', 'bilan_mensuel')->sole();
         $this->assertSame('Votre bilan de septembre 2026 — Épicerie Awa', $avis->titre);
         $this->assertSame('/pilotage', $avis->lien);
-        Mail::assertSent(BilanMensuelMail::class, 1);
-        Mail::assertSent(BilanMensuelMail::class, function (BilanMensuelMail $mail): bool {
-            $pj = $mail->attachments()[0];
-
-            return $mail->hasTo('awa@example.com') && $pj->as === 'bilan-epicerie-awa-2026-09.pdf';
-        });
+        $this->assertStringContainsString('téléchargez-le en PDF', $avis->message);
+        // Envoi de masse : cloche et push seulement, pas d'e-mail (quota).
+        Mail::assertNotSent(fn (Mailable $mail) => $mail->hasTo('awa@example.com'));
     }
 
     public function test_rien_pour_une_boutique_sans_vente_le_mois_precedent(): void
@@ -87,6 +84,6 @@ class BilanMensuelTest extends TestCase
         $this->artisan('ecaisse:bilan-mensuel')->assertSuccessful();
 
         $this->assertSame(0, NotificationApp::where('type', 'bilan_mensuel')->count());
-        Mail::assertNotSent(BilanMensuelMail::class);
+        Mail::assertNotSent(fn (Mailable $mail) => $mail->hasTo('awa@example.com'));
     }
 }
