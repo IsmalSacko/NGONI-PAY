@@ -441,4 +441,19 @@ class RestaurantTest extends TestCase
         $id = $this->api()->postJson("/api/restaurant/reservations/{$r['id']}/arrivee", ['table' => 'Table 7'])->assertOk()->json('commande_id');
         $this->api()->getJson("/api/restaurant/commandes/{$id}")->assertJsonPath('data.table', 'Table 7');
     }
+
+    public function test_mettre_en_place_fixe_le_nombre_sans_doublon(): void
+    {
+        $this->api()->postJson('/api/restaurant/tables/mettre-en-place', ['nombre' => 14, 'places' => 4])->assertOk()->assertJsonCount(14, 'data');
+        $this->api()->postJson('/api/restaurant/tables/ranger', ['rangee' => true])->assertOk();
+        // Remettre en place 10 tables : les mêmes, ressorties, et pas de nouvelles.
+        $tables = collect($this->api()->postJson('/api/restaurant/tables/mettre-en-place', ['nombre' => 10])->assertOk()->json('data'));
+        $this->assertCount(14, $tables);
+        $this->assertSame(['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6', 'Table 7', 'Table 8', 'Table 9', 'Table 10'], $tables->where('rangee', false)->pluck('nom')->values()->all());
+        $this->assertCount(10, $this->api()->getJson('/api/restaurant/salle')->json('data'));
+        // Les tables à nom ne bougent pas.
+        $this->api()->postJson('/api/restaurant/tables', ['nom' => 'Terrasse'])->assertCreated();
+        $this->api()->postJson('/api/restaurant/tables/mettre-en-place', ['nombre' => 12])->assertOk();
+        $this->assertCount(13, $this->api()->getJson('/api/restaurant/salle')->json('data'));
+    }
 }

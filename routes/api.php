@@ -254,6 +254,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('restaurant/commandes/{commande}/fusionner', [\App\Http\Controllers\Api\CommandeRestaurantController::class, 'fusionner'])->middleware('permission:ventes.create');
     Route::get('restaurant/tables', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'tables'])->middleware('permission:ventes.view');
     Route::post('restaurant/tables', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'creerTable'])->middleware('permission:boutique.update');
+    Route::post('restaurant/tables/mettre-en-place', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'mettreEnPlace'])->middleware('permission:boutique.update');
     Route::post('restaurant/tables/generer', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'generer'])->middleware('permission:boutique.update');
     Route::post('restaurant/tables/ranger', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'rangerTout'])->middleware('permission:ventes.create');
     Route::post('restaurant/tables/{table}/ranger', [\App\Http\Controllers\Api\GestionRestaurantController::class, 'ranger'])->middleware('permission:ventes.create');

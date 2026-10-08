@@ -70,6 +70,38 @@ class GestionRestaurantController extends Controller
         return $this->tables();
     }
 
+    /**
+     * Mettre en place N tables : le nombre total de tables numérotées. Table 1
+     * à Table N sont là (créées si besoin, ressorties si rangées), celles
+     * au-delà sont rangées ; rien n'est créé en double. Les tables à nom
+     * (Terrasse, VIP) ne bougent pas.
+     */
+    public function mettreEnPlace(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['nombre' => ['required', 'integer', 'min:1', 'max:200'], 'places' => ['nullable', 'integer', 'min:1', 'max:50']]);
+        $nombre = (int) $data['nombre'];
+        $existantes = TableRestaurant::get()->keyBy('nom');
+        $ordre = (int) TableRestaurant::max('ordre');
+        DB::transaction(function () use ($nombre, $existantes, $data, &$ordre): void {
+            for ($k = 1; $k <= $nombre; $k++) {
+                $table = $existantes->get("Table {$k}");
+                if ($table === null) {
+                    TableRestaurant::create(['nom' => "Table {$k}", 'places' => $data['places'] ?? null, 'ordre' => ++$ordre]);
+                } else {
+                    $table->update(['rangee' => false, 'places' => $data['places'] ?? $table->places]);
+                }
+            }
+            foreach ($existantes as $nom => $table) {
+                if (preg_match('/^Table (\d+)$/', (string) $nom, $m) && (int) $m[1] > $nombre) {
+                    $table->update(['rangee' => true]);
+                }
+            }
+        });
+
+        return $this->tables();
+    }
+
     /** Ranger (cacher du plan) ou ressortir une table. */
     public function ranger(Request $request, TableRestaurant $table): JsonResponse
     {
