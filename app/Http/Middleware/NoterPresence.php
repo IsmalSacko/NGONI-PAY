@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Services\EssaisAppareils;
 use App\Support\Presence\Appareil;
 use App\Support\Tenancy\TenantContext;
 use Closure;
@@ -43,6 +44,7 @@ class NoterPresence
                 'vu_version' => $appareil->version ?? $user->vu_version,
                 'vu_boutique_id' => $this->tenant->boutiqueId() ?? $user->vu_boutique_id ?? $user->boutique_id,
             ]);
+            EssaisAppareils::noter(Appareil::empreinte($request), $user);
         }
 
         return $response;

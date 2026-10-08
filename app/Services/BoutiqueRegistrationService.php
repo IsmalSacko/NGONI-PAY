@@ -88,17 +88,26 @@ class BoutiqueRegistrationService
             $boutique->update(['proprietaire_id' => $user->id]);
 
             // Essai offert au compte, une seule fois : une boutique ajoutée plus
-            // tard ne le relance pas.
+            // tard ne le relance pas. Un téléphone qui a déjà servi à un autre
+            // propriétaire n'en redonne pas : le compte naît avec un essai échu.
             $essai = app(AbonnementService::class)->demarrerEssai($user);
 
             if ($parrain !== null) {
                 app(Parrainage::class)->lier($user, $parrain, $essai);
             }
 
+            // Après le parrainage, qui rallonge l'essai : un téléphone déjà
+            // utilisé n'en a aucun, parrainé ou non.
+            if (EssaisAppareils::dejaUtilise($data['empreinte'] ?? null)) {
+                $essai->update(['fin' => now()->subDay()->toDateString()]);
+            }
+
             // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
             app(CatalogueDeDepart::class)->installer($boutique);
 
-            return ['boutique' => $boutique->fresh(), 'user' => $user->fresh()];
+            EssaisAppareils::noter($data['empreinte'] ?? null, $user);
+
+            return ['boutique' => $boutique->fresh(), 'user' => $user->fresh(), 'essai_offert' => $essai->fresh()->fin?->isFuture() ?? false];
         });
 
         $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);

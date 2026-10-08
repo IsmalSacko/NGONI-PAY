@@ -12,6 +12,7 @@ use App\Services\ReinitialisationMotDePasse;
 use App\Support\Auth\Identification;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
+use App\Support\Presence\Appareil;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -42,6 +43,7 @@ class AuthController extends Controller
             'password' => $data['password'],
             'nom_utilisateur' => $data['nom_utilisateur'],
             'code_parrainage' => $data['code_parrainage'] ?? null,
+            'empreinte' => Appareil::empreinte($request),
         ]);
 
         if ($request->boolean('conditions_acceptees')) {
@@ -54,6 +56,7 @@ class AuthController extends Controller
             'boutique' => $result['boutique'],
             'user' => $result['user'],
             'token' => $token,
+            'essai_offert' => $result['essai_offert'] ?? true,
         ], 201);
     }
 

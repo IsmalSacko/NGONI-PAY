@@ -22,6 +22,9 @@ final readonly class Appareil
 
     public const EN_TETE_VERSION = 'X-App-Version';
 
+    /** Empreinte du téléphone (identifiant haché par l'application), pour l'essai gratuit. */
+    public const EN_TETE_EMPREINTE = 'X-Appareil-Empreinte';
+
     /** Plateformes connues, et leur libellé dans la console. */
     public const PLATEFORMES = [
         'android' => 'Android',
@@ -37,6 +40,14 @@ final readonly class Appareil
         public ?string $modele = null,
         public ?string $version = null,
     ) {}
+
+    /** L'empreinte envoyée par l'application, si elle en a la forme (64 caractères hexadécimaux). */
+    public static function empreinte(Request $request): ?string
+    {
+        $empreinte = strtolower(trim((string) $request->header(self::EN_TETE_EMPREINTE)));
+
+        return preg_match('/^[a-f0-9]{64}$/', $empreinte) === 1 ? $empreinte : null;
+    }
 
     public static function depuisRequete(Request $request): self
     {
