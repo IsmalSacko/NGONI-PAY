@@ -298,36 +298,34 @@
         <p class="mt-6 text-center text-sm text-muted">Paiement par Orange Money, Wave, Moov Money, espèces ou virement. Tarifs trimestriels et semestriels dans l’application.</p>
         <p class="mt-2 text-center text-sm text-muted">Après l’essai, même sans abonnement, votre caisse reste ouverte sur les articles de votre catalogue.</p>
 
-        {{-- Abonnement à vie : sur demande, réglé une fois. Prix et période des
-             conditions d'utilisation (config/conditions.php), boutiques du plan
-             Pro de la console : la vitrine ne contredit ni l'un ni l'autre. --}}
-        @if ($aVie['ouverte'])
-        @php($offresAVie = [
-            ['Basic à vie', $aVie['basic'], 'Toutes les fonctions du Basic, sans jamais renouveler.'],
-            ['Pro à vie', $aVie['pro'], 'Tout le Pro'.($aVie['pro_boutiques'] ? ", jusqu’à {$aVie['pro_boutiques']} boutiques" : '').', une fois pour toutes.'],
-        ])
+        {{-- Abonnement à vie : sur demande, réglé une fois. Prix, texte et
+             période tenus dans la console (Plans et tarifs) ; absent hors période. --}}
+        @if ($aVie)
+        @php($jour = fn ($d) => (($c = \Illuminate\Support\Carbon::parse($d)->locale('fr'))->day === 1 ? '1er' : $c->day).' '.$c->isoFormat('MMMM YYYY'))
         <div id="a-vie" class="mt-10 max-w-4xl mx-auto rounded-3xl border-2 border-jaune bg-white p-7 md:p-8">
             <div class="flex flex-wrap items-baseline justify-between gap-3">
                 <h3 class="font-display font-extrabold text-2xl">Abonnement à vie</h3>
                 <span class="rounded-full bg-jaune text-accent text-xs font-extrabold px-3 py-1">Offre de lancement</span>
             </div>
-            <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance. <strong class="text-ink">Proposé seulement pendant les six premiers mois.</strong></p>
+            <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance.@if ($aVie['fin']) <strong class="text-ink">Proposé jusqu’au {{ $jour($aVie['fin']) }} seulement.</strong>@endif</p>
             <div class="mt-6 grid sm:grid-cols-2 gap-4">
-                @foreach ($offresAVie as [$nom, $montant, $texte])
+                @foreach ($aVie['offres'] as $offre)
                     <div class="rounded-2xl bg-paper border border-border p-5">
-                        <p class="font-bold">{{ $nom }}</p>
-                        <p class="mt-2"><span class="font-display font-extrabold text-3xl">{{ $prix($montant) }}</span> <span class="font-semibold">F CFA</span> <span class="text-sm text-muted">une seule fois</span></p>
-                        <p class="mt-2 text-sm text-muted">{{ $texte }}</p>
+                        <p class="font-bold">{{ $offre['nom'] }} à vie</p>
+                        <p class="mt-2"><span class="font-display font-extrabold text-3xl">{{ $prix($offre['prix']) }}</span> <span class="font-semibold">F CFA</span> <span class="text-sm text-muted">une seule fois</span></p>
+                        @if ($offre['texte'])<p class="mt-2 text-sm text-muted">{{ $offre['texte'] }}</p>@endif
+                        <p class="mt-1 text-xs text-muted">{{ $offre['max_boutiques'] === null ? 'Boutiques illimitées' : ($offre['max_boutiques'] === 1 ? '1 boutique' : "Jusqu’à {$offre['max_boutiques']} boutiques") }}</p>
                     </div>
                 @endforeach
             </div>
             <ul class="mt-5 flex flex-col gap-1.5 text-xs text-muted">
-                <li>• Offre de lancement : proposée pendant les six premiers mois seulement, puis retirée.</li>
+                <li>• Offre de lancement : proposée pour une durée limitée, puis retirée.</li>
                 <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
                 <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
                 <li>• Remboursable sous certaines conditions.</li>
-                @php($jour = fn (string $d) => (($c = \Illuminate\Support\Carbon::parse($d)->locale('fr'))->day === 1 ? '1er' : $c->day).' '.$c->isoFormat('MMMM YYYY'))
+                @if ($aVie['debut'] && $aVie['fin'])
                 <li>• Offre valable pour toute souscription du {{ $jour($aVie['debut']) }} au {{ $jour($aVie['fin']) }}. <a href="{{ route('conditions') }}#a-vie" class="font-bold text-accent underline">Conditions complètes</a></li>
+                @endif
             </ul>
             @if ($waMessage)
                 <a href="{{ $wa }}?text={{ rawurlencode('Bonjour, je suis intéressé(e) par l’abonnement à vie de Ngoni Caisse.') }}" target="_blank" rel="noopener"

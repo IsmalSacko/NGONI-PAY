@@ -36,6 +36,11 @@ class GestionPlans
                 'essai' => $plan->estEssai(),
                 'code' => $plan->code,
                 'fonctionnalites' => array_fill_keys($plan->fonctionnalites ?? [], true),
+                // Abonnement à vie : prix (vide = pas proposé), texte et période de l'offre.
+                'prix_a_vie' => (string) ($plan->prix_a_vie ?? ''),
+                'texte_a_vie' => (string) $plan->texte_a_vie,
+                'a_vie_debut' => (string) $plan->a_vie_debut?->toDateString(),
+                'a_vie_fin' => (string) $plan->a_vie_fin?->toDateString(),
             ];
 
             if (! $plan->estEssai()) {
@@ -62,6 +67,10 @@ class GestionPlans
             'plans.*.max_boutiques' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'plans.*.max_membres' => ['nullable', 'integer', 'min:1', 'max:10000'],
             'tarifs.*.*.montant' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'plans.*.prix_a_vie' => ['nullable', 'integer', 'min:1', 'max:1000000000'],
+            'plans.*.texte_a_vie' => ['nullable', 'string', 'max:255'],
+            'plans.*.a_vie_debut' => ['nullable', 'date'],
+            'plans.*.a_vie_fin' => ['nullable', 'date', 'after_or_equal:plans.*.a_vie_debut'],
         ];
     }
 
@@ -97,6 +106,17 @@ class GestionPlans
                 // L'essai reste toujours disponible : il est offert à l'inscription.
                 'est_actif' => $essai ? true : (bool) ($p['est_actif'] ?? false),
             ]);
+
+            // Abonnement à vie : seulement s'il est envoyé (une application plus
+            // ancienne ne le connaît pas et ne doit pas l'effacer).
+            if (! $essai && array_key_exists('prix_a_vie', $p)) {
+                Plan::whereKey($id)->update([
+                    'prix_a_vie' => $vide($p['prix_a_vie']),
+                    'texte_a_vie' => trim((string) ($p['texte_a_vie'] ?? '')) ?: null,
+                    'a_vie_debut' => ($p['a_vie_debut'] ?? '') ?: null,
+                    'a_vie_fin' => ($p['a_vie_fin'] ?? '') ?: null,
+                ]);
+            }
 
             if ($essai) {
                 continue;

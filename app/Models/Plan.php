@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CycleFacturation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Plan d'abonnement, tenu par l'exploitant depuis la console : nom, limites,
@@ -94,6 +95,7 @@ class Plan extends Model
     protected $fillable = [
         'code', 'nom', 'description', 'fonctionnalites', 'jours_essai',
         'max_boutiques', 'max_membres', 'est_actif', 'ordre',
+        'prix_a_vie', 'texte_a_vie', 'a_vie_debut', 'a_vie_fin',
     ];
 
     protected function casts(): array
@@ -103,6 +105,9 @@ class Plan extends Model
             'jours_essai' => 'integer',
             'max_boutiques' => 'integer',
             'max_membres' => 'integer',
+            'prix_a_vie' => 'integer',
+            'a_vie_debut' => 'date',
+            'a_vie_fin' => 'date',
             'est_actif' => 'boolean',
             'ordre' => 'integer',
         ];
@@ -138,6 +143,37 @@ class Plan extends Model
     public function fonctionnalitesIncluses(): array
     {
         return [...array_values(array_filter(array_keys(self::FONCTIONNALITES), fn (string $f) => $this->inclut($f))), self::PRESSING_AVANCE];
+    }
+
+    /**
+     * Abonnement à vie proposé aujourd'hui : les plans qui l'offrent (nom, prix,
+     * texte, boutiques) et la période de l'offre. Null s'il n'est pas proposé.
+     *
+     * @param  iterable<Plan>|null  $plans
+     * @return array{offres: list<array{nom: string, prix: int, texte: ?string, max_boutiques: ?int}>, debut: ?Carbon, fin: ?Carbon}|null
+     */
+    public static function offreAVie(?iterable $plans = null): ?array
+    {
+        $ouverts = collect($plans ?? self::actifs()->ordonnes()->get())->filter(fn (Plan $p) => ! $p->estEssai() && $p->aVieOuverte())->values();
+        if ($ouverts->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'offres' => $ouverts->map(fn (Plan $p) => [
+                'nom' => $p->nom, 'prix' => (int) $p->prix_a_vie, 'texte' => $p->texte_a_vie, 'max_boutiques' => $p->max_boutiques,
+            ])->all(),
+            'debut' => $ouverts->pluck('a_vie_debut')->filter()->min(),
+            'fin' => $ouverts->pluck('a_vie_fin')->filter()->max(),
+        ];
+    }
+
+    /** L'offre à vie de ce plan est proposée aujourd'hui (prix fixé, dans sa période). */
+    public function aVieOuverte(): bool
+    {
+        return $this->prix_a_vie !== null && $this->prix_a_vie > 0
+            && ($this->a_vie_debut === null || $this->a_vie_debut->lte(today()))
+            && ($this->a_vie_fin === null || $this->a_vie_fin->gte(today()));
     }
 
     public function joursEssai(): int

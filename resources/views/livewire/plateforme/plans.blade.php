@@ -103,6 +103,29 @@
                                 @endforeach
                             </div>
                         </section>
+
+                        {{-- Abonnement à vie : réglé une fois. Prix vide = pas proposé ;
+                             la vitrine et les conditions d'utilisation suivent. --}}
+                        <section class="flex flex-col gap-2.5">
+                            <h3 class="{{ $titreSection }}"><x-plateforme.picto nom="etoile" class="w-4 h-4" />Abonnement à vie</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                                <label class="flex flex-col gap-1 font-semibold">Prix (une seule fois)
+                                    <input wire:model="plans.{{ $id }}.prix_a_vie" type="number" min="1" placeholder="non proposé" class="{{ $champ }} w-full font-normal">
+                                    @error("plans.$id.prix_a_vie") <span class="text-xs font-normal text-danger-fg">{{ $message }}</span> @enderror
+                                </label>
+                                <label class="flex flex-col gap-1 font-semibold">Proposé du
+                                    <input wire:model="plans.{{ $id }}.a_vie_debut" type="date" class="{{ $champ }} w-full font-normal">
+                                </label>
+                                <label class="flex flex-col gap-1 font-semibold">au
+                                    <input wire:model="plans.{{ $id }}.a_vie_fin" type="date" class="{{ $champ }} w-full font-normal">
+                                    @error("plans.$id.a_vie_fin") <span class="text-xs font-normal text-danger-fg">{{ $message }}</span> @enderror
+                                </label>
+                            </div>
+                            <label class="block text-sm font-semibold">Texte affiché sur la vitrine
+                                <input wire:model="plans.{{ $id }}.texte_a_vie" type="text" maxlength="255" placeholder="Toutes les fonctions du plan, sans jamais renouveler."
+                                       class="{{ $champ }} mt-1 w-full font-normal">
+                            </label>
+                        </section>
                     @endunless
                 </div>
             </div>

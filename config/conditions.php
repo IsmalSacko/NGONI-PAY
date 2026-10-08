@@ -18,11 +18,5 @@ return [
     // ExigeConditions). Coupé dans les tests des autres écrans seulement.
     'exiger' => true,
 
-    // Offre de lancement « abonnement à vie » : souscription possible entre ces deux dates.
-    'a_vie' => [
-        'debut' => '2026-09-01',
-        'fin' => '2027-02-28',
-        'basic' => 100000,
-        'pro' => 250000,
-    ],
+    // L'abonnement à vie (prix, période) se tient dans la console : Plans et tarifs.
 ];

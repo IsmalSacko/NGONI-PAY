@@ -1,5 +1,6 @@
 @php
-    $aVie = config('conditions.a_vie');
+    // Abonnement à vie : tenu dans la console (Plans et tarifs), comme sur la vitrine.
+    $aVie = \App\Models\Plan::offreAVie();
     // « 1er septembre 2026 », « 28 février 2027 ».
     $date = function (string $d): string {
         $c = \Illuminate\Support\Carbon::parse($d)->locale('fr');
@@ -54,7 +55,11 @@
 <h3>6.3 Évolution des tarifs</h3>
 <p>L’Éditeur peut faire évoluer ses plans et ses prix. Une hausse est annoncée au moins <strong>30 jours à l’avance</strong> (notification dans l’application ou message). Elle ne s’applique jamais à une période déjà payée : elle vaut à partir du renouvellement suivant. Les demandes d’abonnement déjà déposées gardent leur montant.</p>
 <h3 id="a-vie">6.4 Abonnement à vie (offre de lancement)</h3>
-<p>Un abonnement « à vie » est proposé pour toute souscription faite <strong>du {{ $date($aVie['debut']) }} au {{ $date($aVie['fin']) }} inclus</strong> : Basic à vie ({{ $montant($aVie['basic']) }}) et Pro à vie ({{ $montant($aVie['pro']) }}), payés une seule fois. Après cette date, l’offre n’est plus proposée ; les abonnements à vie déjà souscrits restent valables.</p>
+@if ($aVie)
+<p>Un abonnement « à vie » est proposé pour toute souscription faite @if ($aVie['debut'] && $aVie['fin'])<strong>du {{ $date($aVie['debut']->toDateString()) }} au {{ $date($aVie['fin']->toDateString()) }} inclus</strong>@else pendant la durée de l’offre @endif : {{ collect($aVie['offres'])->map(fn ($o) => $o['nom'].' à vie ('.$montant($o['prix']).')')->implode(' et ') }}, payés une seule fois. Après cette date, l’offre n’est plus proposée ; les abonnements à vie déjà souscrits restent valables.</p>
+@else
+<p>L’abonnement « à vie » n’est plus proposé à la souscription ; les abonnements à vie déjà souscrits restent valables.</p>
+@endif
 <ul>
     <li><strong>« À vie »</strong> signifie : pour toute la durée d’existence du Service Ngoni Caisse, sans nouveau paiement. Le prix payé n’est jamais augmenté.</li>
     <li>L’abonnement est attaché à <strong>un seul compte</strong>, n’est ni transférable ni cessible, et s’exerce dans les limites du plan choisi (nombre de boutiques, de membres, fonctions incluses à la souscription).</li>

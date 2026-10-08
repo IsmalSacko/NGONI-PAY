@@ -177,6 +177,45 @@ class ConsolePlateformeTest extends TestCase
         $this->getJson('/api/plans')->assertJsonPath('data.1.tarifs.0.montant', 5000);
     }
 
+    public function test_l_abonnement_a_vie_se_regle_depuis_la_console_et_la_vitrine_suit(): void
+    {
+        $basic = Plan::parCode('basic');
+        $pro = Plan::parCode('pro');
+        $this->actingAs($this->exploitant);
+
+        Livewire::test(Plans::class)
+            ->assertSet("plans.{$pro->id}.prix_a_vie", '250000')
+            ->set("plans.{$pro->id}.prix_a_vie", '300000')
+            ->set("plans.{$pro->id}.texte_a_vie", 'Le Pro pour toujours.')
+            ->set("plans.{$pro->id}.a_vie_debut", today()->subDay()->toDateString())
+            ->set("plans.{$pro->id}.a_vie_fin", today()->addMonth()->toDateString())
+            // Basic : plus proposé à vie.
+            ->set("plans.{$basic->id}.prix_a_vie", '')
+            ->call('enregistrer')
+            ->assertHasNoErrors();
+
+        $this->assertSame(300000, Plan::parCode('pro')->prix_a_vie);
+        $this->assertNull(Plan::parCode('basic')->prix_a_vie);
+
+        // La vitrine (aperçu de l'exploitant) et les conditions affichent le même prix.
+        $this->get('/?apercu=1')->assertOk()->assertSee('300 000')->assertSee('Le Pro pour toujours.')->assertDontSee('Basic à vie');
+        $this->get('/conditions')->assertOk()->assertSee('Pro à vie (300 000 F CFA)', false);
+
+        // Une fin avant le début est refusée.
+        Livewire::test(Plans::class)
+            ->set("plans.{$pro->id}.a_vie_fin", today()->subMonth()->toDateString())
+            ->call('enregistrer')
+            ->assertHasErrors("plans.{$pro->id}.a_vie_fin");
+    }
+
+    public function test_hors_periode_l_abonnement_a_vie_disparait_de_la_vitrine(): void
+    {
+        Plan::query()->update(['a_vie_fin' => today()->subDay()]);
+
+        $this->get('/')->assertOk()->assertDontSee('Abonnement à vie');
+        $this->get('/conditions')->assertOk()->assertSee('n’est plus proposé à la souscription', false);
+    }
+
     public function test_la_console_coche_les_fonctions_d_un_plan(): void
     {
         $basic = Plan::parCode('basic');
