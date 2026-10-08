@@ -105,7 +105,8 @@ class EssaiParAppareilTest extends TestCase
             return $mail->hasTo(config('ecaisse.notification_email'))
                 && str_contains($html, 'Android · Samsung SM-A155F · app 4.11.2')
                 && str_contains($html, '+22376000041')
-                && str_contains($html, 'https://wa.me/22376000042?text=');
+                && str_contains($html, 'https://wa.me/22376000042?text=')
+                && str_contains($html, 'icone-192.png'); // l'en-tête commun, avec le logo
         });
     }
 }

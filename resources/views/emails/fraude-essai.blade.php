@@ -4,7 +4,7 @@
 <body style="margin:0; padding:24px 0; background:#eef2f8; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#111b30;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#fff; border-radius:12px; overflow:hidden;">
-    <tr><td style="background:#0F2A5C; padding:20px 28px; color:#fff; font-size:18px; font-weight:700;">Ngoni <span style="color:#FFCC1F;">Caisse</span> <span style="color:#c9d3e6; font-size:14px; font-weight:400;">· Essai refusé</span></td></tr>
+    @include('emails._entete', ['sousTitre' => 'Essai refusé'])
     <tr><td style="padding:24px 28px 8px 28px; font-size:15px; line-height:1.6;">
       <p style="margin:0 0 16px 0;">
         <strong>{{ $user->name }}</strong> vient de s'inscrire depuis un <strong>téléphone déjà utilisé</strong> pour un autre compte.
