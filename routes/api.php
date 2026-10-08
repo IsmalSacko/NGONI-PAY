@@ -140,6 +140,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('abonnement/demandes/{demande}', [AbonnementController::class, 'annuler'])->middleware('permission:abonnement.manage');
     Route::post('abonnement/paiement-mobile', [AbonnementController::class, 'payerMobile'])->middleware(['permission:abonnement.manage', 'throttle:10,1']);
     Route::get('abonnement/paiement-mobile/{demande}', [AbonnementController::class, 'statutPaiementMobile'])->middleware('permission:abonnement.manage');
+    Route::get('abonnement/recus/{demande}', [AbonnementController::class, 'recu'])->middleware('permission:abonnement.manage');
     // Code du propriétaire, ses filleuls et ce qu'ils lui ont rapporté.
     Route::get('parrainage', fn (Request $request) => response()->json(['data' => app(Parrainage::class)->resume($request->user())]))
         ->middleware('permission:abonnement.manage');

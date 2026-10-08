@@ -233,6 +233,11 @@ class AbonnementService
         $this->exigerEnAttente($demande);
 
         $abonnement = DB::transaction(function () use ($demande, $exploitant, $note, $sansEcheance): Abonnement {
+            // Le paiement prolonge la même offre en cours à partir de son échéance, sinon commence aujourd'hui.
+            $courant = Abonnement::where('user_id', $demande->user_id)->first();
+            $prolonge = $courant !== null && $courant->estEnCours() && $courant->plan === $demande->plan && $courant->fin !== null && $courant->fin->isFuture();
+            $periodeDebut = $prolonge ? $courant->fin->toDateString() : now()->toDateString();
+
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $demande->user_id],
                 [
@@ -263,10 +268,15 @@ class AbonnementService
                 $demande->update(['parrain_recompense_id' => $parrain->id]);
             }
 
-            return $abonnement->fresh();
+            $abonnement = $abonnement->fresh();
+            // Le reçu : un numéro, et la période que ce paiement couvre (jours offerts compris).
+            $demande->update(['periode_debut' => $periodeDebut, 'periode_fin' => $abonnement->fin?->toDateString()]);
+            $demande->update(['recu_numero' => RecuAbonnement::numero($demande)]);
+
+            return $abonnement;
         });
 
-        $this->prevenirActivation($abonnement, $demande->demande_par);
+        $this->prevenirActivation($abonnement, $demande->demande_par, $demande->recu_numero);
 
         return $abonnement;
     }
@@ -275,7 +285,7 @@ class AbonnementService
      * Le propriétaire (et le membre qui a fait la demande, si ce n'est pas lui)
      * apprend que son abonnement est actif, et jusqu'à quand.
      */
-    private function prevenirActivation(Abonnement $abonnement, ?string $demandeurId = null): void
+    private function prevenirActivation(Abonnement $abonnement, ?string $demandeurId = null, ?string $recu = null): void
     {
         $plan = Plan::parCode($abonnement->plan);
         $proprietaire = User::find($abonnement->user_id);
@@ -286,7 +296,8 @@ class AbonnementService
         $jusqua = $abonnement->fin === null ? 'sans échéance' : 'jusqu’au '.$abonnement->fin->format('d/m/Y');
         [$titre, $message] = $abonnement->estEssai()
             ? ['Votre essai gratuit est prolongé', "Bonne nouvelle : votre essai gratuit est prolongé {$jusqua}. Toutes les fonctions restent ouvertes."]
-            : ["Votre abonnement {$plan?->nom} est activé", "Merci pour votre confiance ! Votre abonnement {$plan?->nom} est actif {$jusqua}. Toutes ses fonctions sont ouvertes."];
+            : ["Votre abonnement {$plan?->nom} est activé", "Merci pour votre confiance ! Votre abonnement {$plan?->nom} est actif {$jusqua}. Toutes ses fonctions sont ouvertes."
+                .($recu !== null ? " Votre reçu n° {$recu} est disponible dans Abonnement." : '')];
 
         $notifier = app(NotifierCompte::class);
         $notifier->envoyer($proprietaire, $titre, $message);

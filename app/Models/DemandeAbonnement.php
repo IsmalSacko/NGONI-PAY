@@ -21,7 +21,7 @@ class DemandeAbonnement extends Model
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
         'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'frais_mobile',
-        'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id',
+        'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id', 'recu_numero', 'periode_debut', 'periode_fin',
     ];
 
     protected function casts(): array
@@ -33,6 +33,8 @@ class DemandeAbonnement extends Model
             'montant' => 'integer',
             'frais_mobile' => 'integer',
             'decide_le' => 'datetime',
+            'periode_debut' => 'date',
+            'periode_fin' => 'date',
         ];
     }
 
