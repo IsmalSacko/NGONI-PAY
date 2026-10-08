@@ -297,6 +297,26 @@ enum Country: string
     }
 
     /**
+     * Nombre de chiffres d'un numéro d'abonné, indicatif exclu, pour les pays où
+     * il est fixe et sûr ; null ailleurs (rien n'est vérifié).
+     *
+     * Sert à l'inscription : un numéro tapé avec un chiffre en moins n'existe
+     * dans aucun compte, si bien qu'un commerçant qui ne retrouvait pas le sien
+     * en créait un second — avec un nouvel essai gratuit.
+     *
+     * @return list<int>|null
+     */
+    public function subscriberLengths(): ?array
+    {
+        return match ($this) {
+            self::Mali, self::BurkinaFaso, self::Togo, self::Niger, self::Mauritania => [8],
+            self::Senegal, self::Guinea, self::Cameroon, self::France => [9],
+            self::IvoryCoast, self::Benin => [10],
+            default => null,
+        };
+    }
+
+    /**
      * Indicatif téléphonique, sans le « + ».
      */
     public function dialingCode(): string

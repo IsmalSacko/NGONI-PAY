@@ -47,6 +47,28 @@ class AuthTest extends TestCase
             ->assertJsonFragment(['Ce numéro a déjà un compte Ngoni Caisse. Connectez-vous, ou utilisez « Mot de passe oublié ».']);
     }
 
+    public function test_un_numero_auquel_il_manque_un_chiffre_ne_cree_pas_un_second_compte(): void
+    {
+        // Cas réel : un commerçant sénégalais (+221 76 690 09 57) ne retrouvait
+        // pas son compte et s'est réinscrit avec un 0 en moins — nouvel essai offert.
+        $inscription = ['nom_boutique' => 'Blocs Béton', 'pays' => 'SN', 'password' => 'password123', 'nom_utilisateur' => 'Faty'];
+
+        $this->postJson('/api/inscription', [...$inscription, 'telephone' => '76690957'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('telephone')
+            ->assertJsonFragment(['Pour le pays choisi (Sénégal), un numéro a 9 chiffres : vous en avez tapé 8. Vérifiez votre numéro. Si vous avez déjà un compte, connectez-vous ou utilisez « Mot de passe oublié ».']);
+        $this->assertDatabaseCount('users', 0);
+
+        $this->postJson('/api/inscription', [...$inscription, 'pays' => 'ML', 'telephone' => '7600000'])->assertUnprocessable()->assertJsonValidationErrors('telephone');
+        $this->postJson('/api/inscription', [...$inscription, 'pays' => 'CI', 'telephone' => '050014404'])->assertUnprocessable()->assertJsonValidationErrors('telephone');
+
+        // Le bon nombre de chiffres passe, avec ou sans indicatif.
+        $this->postJson('/api/inscription', [...$inscription, 'telephone' => '76 690 09 57'])->assertCreated();
+        $this->postJson('/api/inscription', [...$inscription, 'pays' => 'ML', 'telephone' => '+223 76 00 00 01'])->assertCreated();
+        // Un pays sans longueur connue n'est pas bloqué.
+        $this->postJson('/api/inscription', [...$inscription, 'pays' => 'GA', 'telephone' => '07123456'])->assertCreated();
+    }
+
     public function test_registration_creates_a_boutique_with_an_admin_user(): void
     {
         $response = $this->postJson('/api/inscription', [

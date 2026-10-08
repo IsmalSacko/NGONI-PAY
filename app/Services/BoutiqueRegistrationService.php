@@ -39,6 +39,8 @@ class BoutiqueRegistrationService
         $paysSaisi = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
         $telephone = PhoneNumber::normalize($data['telephone'], $paysSaisi);
 
+        $this->verifierLongueur($telephone, $paysSaisi);
+
         // Un numéro déjà inscrit : le dire, plutôt que de laisser la base
         // refuser l'insertion — l'application affichait une erreur serveur, et
         // le commerçant recommençait sans comprendre.
@@ -209,5 +211,33 @@ class BoutiqueRegistrationService
                 ['name' => $role, 'guard_name' => 'web', 'boutique_id' => $boutique->id],
             )->syncPermissions($permissions);
         }
+    }
+
+    /**
+     * Un numéro qui n'a pas le bon nombre de chiffres pour son pays est refusé :
+     * tapé avec un chiffre en moins, il ne correspond à aucun compte, et le
+     * commerçant qui ne retrouvait pas le sien en créait un second, avec un
+     * nouvel essai. Un numéro d'un autre pays (saisi avec son indicatif) n'est
+     * pas vérifié ici.
+     */
+    private function verifierLongueur(string $telephone, Country $pays): void
+    {
+        $longueurs = $pays->subscriberLengths();
+        $prefixe = '+'.$pays->dialingCode();
+
+        if ($longueurs === null || ! str_starts_with($telephone, $prefixe)) {
+            return;
+        }
+
+        $tape = strlen(substr($telephone, strlen($prefixe)));
+        if (in_array($tape, $longueurs, true)) {
+            return;
+        }
+
+        $attendu = implode(' ou ', $longueurs);
+        throw ValidationException::withMessages(['telephone' => [
+            "Pour le pays choisi ({$pays->label()}), un numéro a {$attendu} chiffres : vous en avez tapé {$tape}. Vérifiez votre numéro. "
+            .'Si vous avez déjà un compte, connectez-vous ou utilisez « Mot de passe oublié ».',
+        ]]);
     }
 }
