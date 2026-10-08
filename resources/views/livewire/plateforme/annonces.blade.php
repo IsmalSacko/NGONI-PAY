@@ -7,7 +7,7 @@
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Annonces</h1>
-            <p class="text-sm text-muted">Envoyées en notification push sur les téléphones et dans la cloche de l’application. L’e-mail seulement si vous le cochez.</p>
+            <p class="text-sm text-muted">Envoyées en notification push sur les téléphones et dans la cloche de l’application. Les envois partent par lots, en arrière-plan : l’avancement s’affiche dans la liste.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <button wire:click="nouvelle('mise_a_jour')" class="h-11 px-4 rounded-xl bg-accent text-white font-bold inline-flex items-center gap-2 shadow-carte hover:bg-accent-dark"><x-icone nom="actualiser" class="w-4 h-4" />Mise à jour</button>
@@ -49,7 +49,7 @@
                 </label>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3">
                 <label class="flex flex-col gap-1 text-sm font-semibold">Destinataires
                     <select wire:model.live="audience" class="{{ $champ }}">
                         @foreach (\App\Models\Annonce::AUDIENCES as $code => $libelle)
@@ -57,9 +57,6 @@
                         @endforeach
                     </select>
                     <span class="font-normal text-muted">{{ $apercu }} compte(s) concerné(s).</span>
-                </label>
-                <label class="flex items-center gap-2.5 text-sm sm:mt-6 self-start rounded-xl ring-1 ring-border px-3 py-2.5 cursor-pointer has-checked:bg-accent-soft has-checked:ring-accent/25">
-                    <input type="checkbox" wire:model="par_email" class="w-4 h-4 accent-accent shrink-0"> <span>Envoyer aussi par e-mail <span class="text-muted">(facultatif, compte dans le quota Mailjet)</span></span>
                 </label>
             </div>
 
@@ -115,7 +112,8 @@
         </form>
     @endif
 
-    <section class="bg-white rounded-2xl shadow-carte divide-y divide-separateur">
+    {{-- Une annonce qui part : la liste se rafraîchit pour suivre l'envoi. --}}
+    <section class="bg-white rounded-2xl shadow-carte divide-y divide-separateur" @if ($annonces->contains(fn ($a) => $a->statut === 'en_cours' || ($a->statut === 'programmee' && $a->programmee_le?->isPast()))) wire:poll.4s @endif>
         @forelse ($annonces as $a)
             <div class="flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3.5 text-sm hover:bg-fond-tableau/60 first:rounded-t-2xl last:rounded-b-2xl" wire:key="a-{{ $a->id }}">
                 <x-plateforme.icone-chip :nom="$pictos[$a->type][0] ?? 'envoyer'" :ton="$pictos[$a->type][1] ?? 'info'" />
@@ -124,11 +122,12 @@
                     <span class="text-muted text-xs">
                         {{ \App\Models\Annonce::TYPES[$a->type] ?? $a->type }} · {{ \App\Models\Annonce::AUDIENCES[$a->audience] ?? $a->audience }}
                         @if ($a->recurrence) · {{ \App\Models\Annonce::RECURRENCES[$a->recurrence] }} @endif
-                        @if ($a->par_email) · e-mail @endif
                     </span>
                 </div>
                 <span class="text-xs">
-                    @if ($a->statut === 'programmee' && $a->programmee_le)
+                    @if ($a->statut === 'en_cours')
+                        <x-plateforme.pastille ton="info">envoi en cours…</x-plateforme.pastille>
+                    @elseif ($a->statut === 'programmee' && $a->programmee_le)
                         <x-plateforme.pastille ton="attente">prochain envoi {{ $a->programmee_le->format('d/m/Y H:i') }}</x-plateforme.pastille>
                     @elseif ($a->statut === 'envoyee')
                         <x-plateforme.pastille ton="succes">envoyée {{ $a->derniere_diffusion?->format('d/m/Y H:i') }}</x-plateforme.pastille>
@@ -136,7 +135,7 @@
                         <x-plateforme.pastille ton="neutre">arrêtée</x-plateforme.pastille>
                     @endif
                 </span>
-                <span class="text-xs text-muted tabular-nums whitespace-nowrap"><span class="font-bold text-ink">{{ $a->nb_notifies }}</span> notif. · <span class="font-bold text-ink">{{ $a->nb_emails }}</span> e-mails @if ($a->nb_echecs) · <span class="font-bold text-danger-fg">{{ $a->nb_echecs }} échecs</span> @endif</span>
+                <span class="text-xs text-muted tabular-nums whitespace-nowrap"><span class="font-bold text-ink">{{ $a->nb_notifies }}</span> notif. @if ($a->nb_echecs) · <span class="font-bold text-danger-fg">{{ $a->nb_echecs }} échecs</span> @endif</span>
                 <div class="flex gap-1 ml-auto shrink-0">
                     <button wire:click="envoyerMaintenant({{ $a->id }})" wire:confirm="Renvoyer « {{ $a->titre }} » maintenant ?" title="Renvoyer maintenant"
                             class="h-9 px-2.5 rounded-lg text-xs font-bold text-accent inline-flex items-center gap-1.5 hover:bg-accent-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30">

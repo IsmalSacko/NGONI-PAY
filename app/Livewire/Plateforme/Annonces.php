@@ -35,8 +35,6 @@ class Annonces extends Component
 
     public string $audience = 'tous';
 
-    public bool $par_email = false;
-
     /** maintenant | programmer */
     public string $quand = 'maintenant';
 
@@ -55,7 +53,7 @@ class Annonces extends Component
     public function nouvelle(GestionAnnonces $annonces, string $type = 'message'): void
     {
         $this->resetValidation();
-        $this->reset(['par_email', 'programmee_le', 'recurrence', 'cibles', 'recherche', 'info']);
+        $this->reset(['programmee_le', 'recurrence', 'cibles', 'recherche', 'info']);
         $modele = $annonces->modele($type);
         [$this->type, $this->titre, $this->message, $this->version, $this->lien, $this->quand] =
             [$modele['type'], $modele['titre'], $modele['message'], $modele['version'], $modele['lien'], $modele['quand']];
@@ -75,21 +73,22 @@ class Annonces extends Component
         // La validation se fait dans le service : les erreurs d'un essai précédent
         // ne s'effacent pas d'elles-mêmes.
         $this->resetErrorBag();
-        ['annonce' => $annonce, 'resultat' => $r] = $annonces->creer(
-            $this->only(['type', 'titre', 'message', 'version', 'lien', 'audience', 'par_email', 'quand', 'programmee_le', 'recurrence', 'cibles']),
+        ['annonce' => $annonce, 'lancee' => $lancee] = $annonces->creer(
+            $this->only(['type', 'titre', 'message', 'version', 'lien', 'audience', 'quand', 'programmee_le', 'recurrence', 'cibles']),
             Auth::user(),
         );
 
         $this->formulaire = false;
-        $this->info = $r !== null
-            ? GestionAnnonces::resume($annonce, $r)
+        $this->info = $lancee
+            ? $annonces->resume($annonce)
             : "« {$annonce->titre} » programmée le {$annonce->programmee_le->format('d/m/Y à H:i')}.";
     }
 
     public function envoyerMaintenant(int $id, GestionAnnonces $annonces): void
     {
         $annonce = Annonce::findOrFail($id);
-        $this->info = GestionAnnonces::resume($annonce, $annonces->envoyerMaintenant($annonce));
+        $annonces->envoyerMaintenant($annonce);
+        $this->info = $annonces->resume($annonce);
     }
 
     public function arreter(int $id, GestionAnnonces $annonces): void

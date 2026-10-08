@@ -48,7 +48,6 @@ class AnnoncerMiseAJour extends Command
             'version' => $version,
             'lien' => (string) config('mobile.store_url'),
             'audience' => 'tous',
-            'par_email' => (bool) config('mobile.annonce_par_email'),
             'statut' => 'programmee',
             'programmee_le' => now(),
         ]);
@@ -60,8 +59,8 @@ class AnnoncerMiseAJour extends Command
         }
 
         $annonce->save();
-        $r = $diffusion->diffuser($annonce);
-        $this->info("Version {$version} annoncée : {$r['notifies']} notification(s), {$r['pushs']} push, {$r['emails']} e-mail(s).");
+        $r = $diffusion->diffuser($annonce) ?? ['notifies' => 0, 'pushs' => 0];
+        $this->info("Version {$version} annoncée : {$r['notifies']} notification(s), {$r['pushs']} push.");
 
         return self::SUCCESS;
     }

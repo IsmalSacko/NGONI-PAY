@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Livewire\Plateforme\Annonces;
-use App\Mail\AnnonceMail;
 use App\Models\Annonce;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
@@ -41,23 +40,20 @@ class AnnoncesTest extends TestCase
         $this->exploitant = User::factory()->create(['est_admin_plateforme' => true]);
     }
 
-    public function test_une_mise_a_jour_notifie_tout_le_monde_et_ecrit_a_ceux_qui_ont_un_email(): void
+    public function test_une_mise_a_jour_notifie_tout_le_monde_sans_e_mail(): void
     {
         $this->actingAs($this->exploitant);
 
         Livewire::test(Annonces::class)
             ->call('nouvelle', 'mise_a_jour')
             ->assertSet('lien', config('mobile.store_url'))
-            ->assertSet('par_email', false)
             ->set('version', '3.0.0')
-            ->set('par_email', true)
             ->call('enregistrer')
             ->assertHasNoErrors()
-            ->assertSet('info', fn ($i) => str_contains($i, '2 notification(s), 0 push, 1 e-mail(s)'));
+            ->assertSet('info', fn ($i) => str_contains($i, 'part vers 2 compte(s)'));
 
-        Mail::assertSent(AnnonceMail::class, fn (AnnonceMail $m) => $m->hasTo('awa@example.com'));
-        // Une seule annonce envoyée (les inscriptions de la mise en place écrivent aussi à l'exploitant).
-        Mail::assertSent(AnnonceMail::class, 1);
+        $annonce = Annonce::sole();
+        $this->assertSame(['envoyee', 2], [$annonce->statut, $annonce->nb_notifies]);
 
         // L'application de Moussa voit la notification, non lue.
         $this->app['auth']->forgetGuards();

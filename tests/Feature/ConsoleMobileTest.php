@@ -142,7 +142,7 @@ class ConsoleMobileTest extends TestCase
     public function test_envoyer_une_annonce_depuis_l_application(): void
     {
         $this->console()->postJson('/api/plateforme/annonces', ['titre' => 'Maintenance', 'message' => 'Ce soir à 22 h.', 'audience' => 'tous'])
-            ->assertCreated()->assertJsonPath('resultat.notifies', 2);
+            ->assertCreated()->assertJsonPath('lancee', true)->assertJsonPath('message', fn ($m) => str_contains($m, 'part vers 2 compte(s)'));
         $this->assertSame(1, NotificationApp::where('user_id', $this->awa->id)->where('titre', 'Maintenance')->count());
     }
 
@@ -168,7 +168,7 @@ class ConsoleMobileTest extends TestCase
         $this->console()->postJson('/api/plateforme/annonces', [
             'type' => 'campagne', 'titre' => 'Promo Pro', 'message' => 'Un mois offert.', 'audience' => 'tous',
             'quand' => 'programmer', 'programmee_le' => now()->addDay()->toIso8601String(), 'recurrence' => 'mensuelle',
-        ])->assertCreated()->assertJsonPath('resultat', null)->assertJsonPath('message', fn ($m) => str_contains($m, 'programmée'));
+        ])->assertCreated()->assertJsonPath('lancee', false)->assertJsonPath('message', fn ($m) => str_contains($m, 'programmée'));
         $this->assertSame(0, NotificationApp::where('titre', 'Promo Pro')->count(), 'rien envoyé avant la date');
 
         $annonce = $this->console()->getJson('/api/plateforme/annonces')->json('data.0');
@@ -193,7 +193,7 @@ class ConsoleMobileTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('cibles');
 
         $this->console()->postJson('/api/plateforme/annonces', ['titre' => 'Rien que pour vous', 'message' => '…', 'audience' => 'selection', 'cibles' => [$this->awa->id]])
-            ->assertCreated()->assertJsonPath('resultat.notifies', 1);
+            ->assertCreated()->assertJsonPath('message', fn ($m) => str_contains($m, 'part vers 1 compte(s)'));
         $this->assertSame([$this->awa->id], NotificationApp::where('titre', 'Rien que pour vous')->pluck('user_id')->all());
     }
 }

@@ -343,13 +343,15 @@ class PlateformeController extends Controller
                 'lien' => $a->lien,
                 'audience' => $a->audience,
                 'cibles' => $a->cibles_count,
-                'par_email' => (bool) $a->par_email,
+                // Les annonces ne partent plus par e-mail ; gardé pour les anciennes versions de l'application.
+                'par_email' => false,
                 'statut' => $a->statut,
                 'programmee_le' => $a->programmee_le?->toIso8601String(),
                 'recurrence' => $a->recurrence,
                 'derniere_diffusion' => $a->derniere_diffusion?->toIso8601String(),
                 'nb_notifies' => (int) $a->nb_notifies,
                 'nb_emails' => (int) $a->nb_emails,
+                'nb_echecs' => (int) $a->nb_echecs,
             ]),
         ]);
     }
@@ -383,19 +385,21 @@ class PlateformeController extends Controller
     /** Mise à jour, message libre ou campagne ; tout de suite ou programmée (voir GestionAnnonces). */
     public function envoyerAnnonce(Request $request, GestionAnnonces $annonces): JsonResponse
     {
-        ['annonce' => $annonce, 'resultat' => $r] = $annonces->creer($request->all() + ['type' => 'message', 'quand' => 'maintenant'], $request->user());
+        ['annonce' => $annonce, 'lancee' => $lancee] = $annonces->creer($request->all() + ['type' => 'message', 'quand' => 'maintenant'], $request->user());
 
         return response()->json([
-            'message' => $r !== null
-                ? GestionAnnonces::resume($annonce, $r)
+            'message' => $lancee
+                ? $annonces->resume($annonce)
                 : "« {$annonce->titre} » programmée le {$annonce->programmee_le->timezone('Africa/Bamako')->format('d/m/Y à H:i')}.",
-            'resultat' => $r,
+            'lancee' => $lancee,
         ], 201);
     }
 
     public function envoyerAnnonceMaintenant(Annonce $annonce, GestionAnnonces $annonces): JsonResponse
     {
-        return response()->json(['message' => GestionAnnonces::resume($annonce, $annonces->envoyerMaintenant($annonce))]);
+        $annonces->envoyerMaintenant($annonce);
+
+        return response()->json(['message' => $annonces->resume($annonce)]);
     }
 
     public function arreterAnnonce(Annonce $annonce, GestionAnnonces $annonces): JsonResponse

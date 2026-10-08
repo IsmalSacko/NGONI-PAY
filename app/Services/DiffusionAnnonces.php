@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Mail\AnnonceMail;
 use App\Models\Abonnement;
 use App\Models\Annonce;
+use App\Models\Appareil;
 use App\Models\NotificationApp;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Diffuse une annonce : une notification dans l'application pour chaque
- * destinataire (le canal qui atteint tout le monde), et un e-mail à ceux qui
- * en ont une adresse si l'annonce le demande.
+ * destinataire (le canal qui atteint tout le monde) et un push sur ses
+ * téléphones.
  */
 class DiffusionAnnonces
 {
@@ -39,76 +38,96 @@ class DiffusionAnnonces
         };
     }
 
-    /** @return array{notifies: int, emails: int, echecs: int, pushs: int} */
-    public function diffuser(Annonce $annonce): array
+    /**
+     * Une notification dans l'application pour chaque destinataire, et un push
+     * vers ses téléphones, par lots envoyés en parallèle (des milliers de
+     * comptes passent en quelques secondes). Pas d'e-mail : le quota ne suit pas.
+     *
+     * Reprenable : une diffusion interrompue (statut « en_cours ») repart là où
+     * elle s'était arrêtée, sans renotifier ceux déjà servis dans ce tour. Un
+     * verrou empêche deux diffusions simultanées de la même annonce ; null si
+     * une autre est déjà en train de l'envoyer.
+     *
+     * @return array{notifies: int, echecs: int, pushs: int}|null
+     */
+    public function diffuser(Annonce $annonce): ?array
     {
-        $notifies = $emails = $echecs = $pushs = 0;
-        $push = app(PushFirebase::class);
+        $verrou = Cache::lock("diffusion-annonce-{$annonce->id}", 30 * 60);
+        if (! $verrou->get()) {
+            return null;
+        }
 
-        $this->destinataires($annonce)->orderBy('id')->chunk(200, function ($users) use ($annonce, $push, &$notifies, &$emails, &$echecs, &$pushs): void {
-            foreach ($users as $user) {
-                $notification = NotificationApp::create([
-                    'user_id' => $user->id,
-                    'annonce_id' => $annonce->id,
-                    'type' => $annonce->type,
-                    'titre' => $annonce->titre,
-                    'message' => $annonce->version ? "Version {$annonce->version} disponible. {$annonce->message}" : $annonce->message,
-                    'lien' => $annonce->lien,
-                ]);
-                $notifies++;
+        try {
+            @set_time_limit(0);
+            ignore_user_abort(true);
 
-                // Push instantané vers ses téléphones (si Firebase est configuré).
-                $pushs += $push->envoyerAuxComptes([$user->id], [
-                    'notification_id' => (string) $notification->id,
-                    'titre' => $notification->titre,
-                    'message' => $notification->message,
-                    'lien' => (string) $notification->lien,
-                    'type' => $notification->type,
-                ]);
-
-                if (! $annonce->par_email || blank($user->email)) {
-                    continue;
-                }
-
-                try {
-                    // Les annonces partent en nombre : sur leur propre quota
-                    // (Mailjet), pour ne jamais priver une inscription d'e-mail.
-                    Mail::mailer(config('mail.annonces_mailer'))->to($user->email)->send(new AnnonceMail($annonce, $user->name));
-                    $emails++;
-                } catch (\Throwable $e) {
-                    $echecs++;
-                    Log::error("Annonce {$annonce->id} : e-mail non envoyé", ['user_id' => $user->id, 'erreur' => $e->getMessage()]);
-                }
+            $annonce->refresh();
+            if ($annonce->statut !== 'en_cours') {
+                // Nouveau tour : ses compteurs repartent de ce qui est déjà acquis.
+                $annonce->update(['statut' => 'en_cours', 'derniere_diffusion' => now()]);
             }
-        });
+            $debut = $annonce->derniere_diffusion;
 
-        $prochaine = match ($annonce->recurrence) {
-            'hebdomadaire' => now()->addWeek(),
-            'mensuelle' => now()->addMonth(),
-            default => null,
-        };
+            $notifies = $echecs = $pushs = 0;
+            $push = app(PushFirebase::class);
+            $message = $annonce->version ? "Version {$annonce->version} disponible. {$annonce->message}" : $annonce->message;
 
-        $annonce->update([
-            'statut' => $prochaine ? 'programmee' : 'envoyee',
-            'programmee_le' => $prochaine,
-            'derniere_diffusion' => now(),
-            'nb_notifies' => $annonce->nb_notifies + $notifies,
-            'nb_emails' => $annonce->nb_emails + $emails,
-            'nb_echecs' => $annonce->nb_echecs + $echecs,
-        ]);
+            $this->destinataires($annonce)
+                ->whereNotIn('id', NotificationApp::where('annonce_id', $annonce->id)->where('created_at', '>=', $debut)->select('user_id'))
+                ->chunkById(200, function ($users) use ($annonce, $push, $message, &$notifies, &$echecs, &$pushs): void {
+                    $envois = [];
+                    $notifications = [];
+                    foreach ($users as $user) {
+                        $notifications[$user->id] = NotificationApp::create([
+                            'user_id' => $user->id,
+                            'annonce_id' => $annonce->id,
+                            'type' => $annonce->type,
+                            'titre' => $annonce->titre,
+                            'message' => $message,
+                            'lien' => $annonce->lien,
+                        ]);
+                    }
 
-        return ['notifies' => $notifies, 'emails' => $emails, 'echecs' => $echecs, 'pushs' => $pushs];
+                    foreach (Appareil::whereIn('user_id', array_keys($notifications))->get(['user_id', 'jeton']) as $appareil) {
+                        $n = $notifications[$appareil->user_id];
+                        $envois[] = ['jeton' => $appareil->jeton, 'donnees' => [
+                            'notification_id' => (string) $n->id,
+                            'titre' => $n->titre,
+                            'message' => $n->message,
+                            'lien' => (string) $n->lien,
+                            'type' => $n->type,
+                        ]];
+                    }
+                    $r = $push->envoyerEnMasse($envois);
+
+                    $notifies += count($notifications);
+                    $pushs += $r['reussis'];
+                    $echecs += $r['echecs'];
+                    // La console suit l'avancement lot après lot.
+                    $annonce->increment('nb_notifies', count($notifications), ['nb_echecs' => $annonce->nb_echecs + $r['echecs']]);
+                });
+
+            $prochaine = match ($annonce->recurrence) {
+                'hebdomadaire' => now()->addWeek(),
+                'mensuelle' => now()->addMonth(),
+                default => null,
+            };
+            $annonce->update(['statut' => $prochaine ? 'programmee' : 'envoyee', 'programmee_le' => $prochaine]);
+
+            return ['notifies' => $notifies, 'echecs' => $echecs, 'pushs' => $pushs];
+        } finally {
+            $verrou->release();
+        }
     }
 
     /** Annonces programmées arrivées à échéance (appelé chaque minute). */
     public function diffuserLesEcheances(): int
     {
-        $dues = Annonce::where('statut', 'programmee')->whereNotNull('programmee_le')->where('programmee_le', '<=', now())->get();
+        // Les diffusions interrompues (« en_cours ») reprennent aussi.
+        $dues = Annonce::where(fn ($q) => $q->where('statut', 'en_cours')
+            ->orWhere(fn ($p) => $p->where('statut', 'programmee')->whereNotNull('programmee_le')->where('programmee_le', '<=', now())))
+            ->orderBy('id')->get();
 
-        foreach ($dues as $annonce) {
-            $this->diffuser($annonce);
-        }
-
-        return $dues->count();
+        return $dues->filter(fn (Annonce $annonce) => $this->diffuser($annonce) !== null)->count();
     }
 }

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Annonce;
 use App\Models\User;
+use App\Support\Apres;
 use App\Support\VersionApplication;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -49,10 +50,11 @@ class GestionAnnonces
     }
 
     /**
-     * Enregistre l'annonce ; l'envoie tout de suite si `quand` vaut « maintenant ».
+     * Enregistre l'annonce ; la lance tout de suite si `quand` vaut « maintenant »
+     * (sans faire attendre l'écran : voir lancer()).
      *
-     * @param  array<string, mixed>  $donnees  type, titre, message, version, lien, audience, par_email, quand, programmee_le, recurrence, cibles
-     * @return array{annonce: Annonce, resultat: ?array<string, int>}
+     * @param  array<string, mixed>  $donnees  type, titre, message, version, lien, audience, quand, programmee_le, recurrence, cibles
+     * @return array{annonce: Annonce, lancee: bool}
      */
     public function creer(array $donnees, User $auteur): array
     {
@@ -63,7 +65,6 @@ class GestionAnnonces
             'version' => ['nullable', 'string', 'max:20'],
             'lien' => ['nullable', 'url', 'max:255'],
             'audience' => ['required', Rule::in(array_keys(Annonce::AUDIENCES))],
-            'par_email' => ['boolean'],
             'quand' => ['required', Rule::in(['maintenant', 'programmer'])],
             'programmee_le' => ['nullable', 'required_if:quand,programmer', 'date', 'after:now'],
             'recurrence' => ['nullable', Rule::in(array_filter(array_keys(Annonce::RECURRENCES)))],
@@ -78,7 +79,6 @@ class GestionAnnonces
             'version' => filled($data['version'] ?? null) ? $data['version'] : null,
             'lien' => filled($data['lien'] ?? null) ? $data['lien'] : null,
             'audience' => $data['audience'],
-            'par_email' => (bool) ($data['par_email'] ?? false),
             'statut' => 'programmee',
             'programmee_le' => $data['quand'] === 'programmer' ? Carbon::parse($data['programmee_le']) : now(),
             'recurrence' => filled($data['recurrence'] ?? null) ? $data['recurrence'] : null,
@@ -89,13 +89,30 @@ class GestionAnnonces
             $annonce->cibles()->sync($data['cibles']);
         }
 
-        return ['annonce' => $annonce, 'resultat' => $data['quand'] === 'maintenant' ? $this->diffusion->diffuser($annonce) : null];
+        if ($data['quand'] === 'maintenant') {
+            $this->lancer($annonce);
+        }
+
+        return ['annonce' => $annonce, 'lancee' => $data['quand'] === 'maintenant'];
     }
 
-    /** @return array<string, int> */
-    public function envoyerMaintenant(Annonce $annonce): array
+    /** Renvoie une annonce tout de suite. */
+    public function envoyerMaintenant(Annonce $annonce): void
     {
-        return $this->diffusion->diffuser($annonce);
+        if ($annonce->statut !== 'en_cours') {
+            $annonce->update(['statut' => 'programmee', 'programmee_le' => now()]);
+        }
+        $this->lancer($annonce);
+    }
+
+    /**
+     * La diffusion part une fois la réponse rendue : des milliers de comptes ne
+     * font plus attendre (ni expirer) la console. Si elle est interrompue, la
+     * tâche planifiée de chaque minute la reprend là où elle s'était arrêtée.
+     */
+    private function lancer(Annonce $annonce): void
+    {
+        Apres::reponse(fn () => $this->diffusion->diffuser($annonce));
     }
 
     /** Un envoi programmé qui ne partira plus ; l'annonce reste dans l'historique. */
@@ -125,10 +142,9 @@ class GestionAnnonces
             ->orderBy('name')->limit(20)->get(['id', 'name', 'phone', 'email']);
     }
 
-    /** Résumé d'un envoi, pour l'exploitant. @param  array<string, int>  $r */
-    public static function resume(Annonce $annonce, array $r): string
+    /** Ce que l'exploitant lit une fois l'annonce lancée. */
+    public function resume(Annonce $annonce): string
     {
-        return "« {$annonce->titre} » envoyée : {$r['notifies']} notification(s), {$r['pushs']} push, {$r['emails']} e-mail(s)"
-            .(($r['echecs'] ?? 0) ? ", {$r['echecs']} échec(s)" : '').'.';
+        return "« {$annonce->titre} » part vers {$this->diffusion->destinataires($annonce)->count()} compte(s) : l’avancement s’affiche dans la liste.";
     }
 }

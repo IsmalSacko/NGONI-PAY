@@ -46,7 +46,6 @@ class PublicationPlayController extends Controller
             'version' => $version,
             'lien' => (string) config('mobile.store_url'),
             'audience' => 'tous',
-            'par_email' => (bool) config('mobile.annonce_par_email'),
             'statut' => 'programmee',
             'programmee_le' => now()->addHours((int) config('mobile.delai_annonce_heures')),
         ]);

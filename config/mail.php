@@ -35,12 +35,6 @@ return [
     |
     */
 
-    /*
-    | Envoi des annonces en nombre : un mailer à part, pour que leur volume
-    | n'épuise pas le quota des e-mails transactionnels.
-    */
-    'annonces_mailer' => env('MAIL_ANNONCES_MAILER', 'smtp'),
-
     'mailers' => [
 
         'smtp' => [

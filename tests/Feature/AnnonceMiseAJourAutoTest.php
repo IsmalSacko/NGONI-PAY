@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Mail\AnnonceMail;
 use App\Models\Annonce;
 use App\Models\NotificationApp;
 use App\Services\BoutiqueRegistrationService;
@@ -44,7 +43,6 @@ class AnnonceMiseAJourAutoTest extends TestCase
         $this->assertSame(2, $annonce->nb_notifies);
         $this->assertSame(2, NotificationApp::where('annonce_id', $annonce->id)->count());
         $this->assertStringContainsString('Version 3.1.0 disponible. Caisse tactile', NotificationApp::where('annonce_id', $annonce->id)->value('message'));
-        Mail::assertNotSent(AnnonceMail::class);
     }
 
     public function test_rien_n_est_envoye_pour_une_version_deja_annoncee_ou_plus_ancienne(): void
@@ -69,18 +67,13 @@ class AnnonceMiseAJourAutoTest extends TestCase
         $this->assertNull(Annonce::where('version', '3.9.0')->first());
     }
 
-    public function test_la_simulation_n_envoie_rien_et_l_email_est_en_option(): void
+    public function test_la_simulation_n_envoie_rien(): void
     {
         config(['mobile.latest_version' => '3.2.0']);
         $this->artisan('ecaisse:annoncer-mise-a-jour', ['--simulation' => true])
             ->expectsOutputToContain('Serait envoyé à 2 compte(s)')
             ->assertSuccessful();
         $this->assertNull(Annonce::where('version', '3.2.0')->first());
-
-        config(['mobile.annonce_par_email' => true]);
-        $this->artisan('ecaisse:annoncer-mise-a-jour')->assertSuccessful();
-        Mail::assertSent(AnnonceMail::class, fn (AnnonceMail $m) => $m->hasTo('awa@example.com'));
-        Mail::assertSent(AnnonceMail::class, 1);
     }
 
     public function test_la_commande_est_planifiee(): void
