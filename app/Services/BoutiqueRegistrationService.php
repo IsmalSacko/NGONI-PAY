@@ -141,7 +141,7 @@ class BoutiqueRegistrationService
     {
         $autres = implode(', ', array_map(fn (array $c) => "{$c['nom']} ({$c['telephone']})", $dejaVus));
         app(AlertesExploitant::class)->envoyer(
-            'Essai refusé : téléphone déjà utilisé',
+            '⚠️ Alerte fraude : essai bloqué',
             "{$user->name} ({$user->phone}) s'est inscrit depuis le téléphone de : {$autres}.",
             '/console/comptes',
         );

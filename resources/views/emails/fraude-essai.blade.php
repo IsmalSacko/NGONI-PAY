@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="utf-8"><title>Essai refusé : téléphone déjà utilisé</title></head>
+<head><meta charset="utf-8"><title>Alerte fraude</title></head>
 <body style="margin:0; padding:24px 0; background:#eef2f8; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#111b30;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#fff; border-radius:12px; overflow:hidden;">
-    @include('emails._entete', ['sousTitre' => 'Essai refusé'])
+    @include('emails._entete', ['sousTitre' => 'Alerte fraude'])
+    <tr><td style="background:#C62828; padding:14px 28px; color:#fff; font-size:16px; font-weight:700;">
+      ⚠️ Tentative de fraude à l'essai gratuit
+      <div style="font-size:13px; font-weight:400; color:#ffe1e1; margin-top:4px;">Un nouveau compte a été créé depuis un téléphone déjà utilisé : l'essai gratuit a été bloqué automatiquement.</div>
+    </td></tr>
     <tr><td style="padding:24px 28px 8px 28px; font-size:15px; line-height:1.6;">
       <p style="margin:0 0 16px 0;">
-        <strong>{{ $user->name }}</strong> vient de s'inscrire depuis un <strong>téléphone déjà utilisé</strong> pour un autre compte.
-        Le compte est créé, <strong>sans essai gratuit</strong>.
+        <strong>{{ $user->name }}</strong> vient de s'inscrire depuis un <strong>téléphone déjà utilisé</strong> pour un autre compte,
+        sans doute pour obtenir un nouvel essai gratuit. Le compte est créé, <strong>sans essai</strong> : il devra s'abonner pour tout utiliser.
       </p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
         <tr><td style="padding:5px 0; color:#5a6478; width:170px;">Nom</td><td>{{ $user->name }}</td></tr>

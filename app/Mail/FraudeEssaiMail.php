@@ -28,7 +28,7 @@ class FraudeEssaiMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Essai refusé : téléphone déjà utilisé — '.$this->user->name);
+        return new Envelope(subject: '⚠️ Alerte fraude : nouvel essai depuis un téléphone déjà utilisé — '.$this->user->name);
     }
 
     public function content(): Content

@@ -90,10 +90,10 @@ class EssaiParAppareilTest extends TestCase
 
         \Illuminate\Support\Facades\Mail::fake();
         $this->inscrire('76000041', self::TELEPHONE_A);
-        $this->assertSame(0, \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', 'Essai refusé : téléphone déjà utilisé')->count(), 'un premier compte est normal');
+        $this->assertSame(0, \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->count(), 'un premier compte est normal');
 
         $this->inscrire('76000042', self::TELEPHONE_A);
-        $alerte = \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', 'Essai refusé : téléphone déjà utilisé')->sole();
+        $alerte = \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->sole();
         $this->assertStringContainsString('+22376000042', $alerte->message);
         $this->assertStringContainsString('+22376000041', $alerte->message, 'le compte déjà vu sur ce téléphone');
         $this->assertSame('/console/comptes', $alerte->lien);
