@@ -57,6 +57,13 @@ class Plan extends Model
     public const DEPENSES = 'depenses';
 
     /**
+     * Restaurant : écran cuisine et bar, réservations, livraison, commandes
+     * différées, options et formules, ingrédients et recettes, bilan du
+     * service. Le reste du restaurant (commandes, salle, addition) est pour tous.
+     */
+    public const RESTAURANT_AVANCE = 'restaurant_avance';
+
+    /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
      */
@@ -74,6 +81,7 @@ class Plan extends Model
         self::OBJECTIF_MOIS => 'Objectif du mois',
         self::VENTE_GROS => 'Vente en gros (deux prix)',
         self::DEPENSES => 'Dépenses et bilan',
+        self::RESTAURANT_AVANCE => 'Restaurant : cuisine, réservations, livraison, recettes',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */

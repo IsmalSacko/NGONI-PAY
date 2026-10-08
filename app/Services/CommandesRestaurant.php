@@ -12,6 +12,7 @@ use App\Models\FormuleRestaurant;
 use App\Models\IngredientRestaurant;
 use App\Models\LigneCommandeRestaurant;
 use App\Models\OptionRestaurant;
+use App\Models\Plan;
 use App\Models\PosteRestaurant;
 use App\Models\Produit;
 use App\Models\RecetteRestaurant;
@@ -20,6 +21,7 @@ use App\Models\TableRestaurant;
 use App\Models\User;
 use App\Models\Vente;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +96,14 @@ class CommandesRestaurant
         $envoyer = (bool) ($data['envoyer'] ?? true);
         $envoiPrevu = $envoyer && $heure !== null && $lignes !== [] && $heure->gt(now()->addMinutes(CommandeRestaurant::MINUTES_AVANT_DIFFEREE))
             ? $heure->copy()->subMinutes(CommandeRestaurant::MINUTES_AVANT_DIFFEREE) : null;
+
+        // Offre Pro : la livraison et les commandes différées.
+        if ($type === 'livraison') {
+            $this->exigerPro($boutique, 'La livraison fait partie de l’offre Pro.');
+        }
+        if ($envoiPrevu !== null) {
+            $this->exigerPro($boutique, 'Les commandes différées font partie de l’offre Pro.');
+        }
 
         $commande = DB::transaction(function () use ($boutique, $data, $serveur, $type, $telephone, $lignes, $total, $acompte, $envoiPrevu): CommandeRestaurant {
             // Un numéro au hasard à 6 chiffres, jamais deux fois le même dans la boutique.
@@ -713,6 +723,15 @@ class CommandesRestaurant
             'session_caisse_id' => $agent === null ? null : $this->sessions->courante($agent)?->id,
             'type' => $type, 'montant' => $montant, 'moyen_paiement' => $moyen ?? 'especes',
         ]);
+    }
+
+    private function exigerPro(Boutique $boutique, string $message): void
+    {
+        if (! app(AbonnementService::class)->permet($boutique, Plan::RESTAURANT_AVANCE)) {
+            throw new HttpResponseException(response()->json([
+                'message' => $message, 'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => Plan::RESTAURANT_AVANCE,
+            ], 403));
+        }
     }
 
     private function exigerEnCours(CommandeRestaurant $commande): void

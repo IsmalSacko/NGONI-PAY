@@ -456,4 +456,41 @@ class RestaurantTest extends TestCase
         $this->api()->postJson('/api/restaurant/tables/mettre-en-place', ['nombre' => 12])->assertOk();
         $this->assertCount(13, $this->api()->getJson('/api/restaurant/salle')->json('data'));
     }
+
+    public function test_hors_pro_la_base_marche_les_fonctions_avancees_sont_sous_cadenas(): void
+    {
+        $this->chef->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
+        // Pour tous : commande à table, cuisine par la fiche, addition à la caisse.
+        $c = $this->commander()->assertCreated()->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/prets")->assertOk();
+        $this->api()->postJson("/api/restaurant/commandes/{$c['id']}/payer", ['moyen_paiement' => 'especes', 'pourboire' => 200])->assertOk();
+        $this->api()->getJson('/api/restaurant/salle')->assertOk();
+
+        // Pro : écran cuisine, réservations, livraison, différées, options, ingrédients, bilan.
+        $this->api()->getJson('/api/restaurant/cuisine')->assertForbidden()->assertJsonPath('fonctionnalite', 'restaurant_avance');
+        $this->api()->postJson('/api/restaurant/reservations', ['nom' => 'Koné', 'le' => now()->addHour()->toIso8601String()])->assertForbidden();
+        $this->commander(['type' => 'livraison', 'table' => null, 'client_id' => $this->client, 'adresse' => 'ACI'])->assertForbidden();
+        $this->commander(['type' => 'emporter', 'table' => null, 'heure_prevue' => now()->addHours(3)->toIso8601String()])->assertForbidden();
+        $this->api()->postJson("/api/restaurant/carte/{$this->poulet}/options", ['nom' => 'Frites'])->assertForbidden();
+        $this->api()->getJson('/api/restaurant/ingredients')->assertForbidden();
+        $this->api()->getJson('/api/restaurant/bilan')->assertForbidden();
+    }
+
+    public function test_bilan_du_restaurant(): void
+    {
+        $a = $this->commander(['couverts' => 2])->json('data');
+        $this->api()->postJson("/api/restaurant/commandes/{$a['id']}/payer", ['moyen_paiement' => 'especes', 'pourboire' => 500])->assertOk();
+        $this->commander(['type' => 'emporter', 'table' => null])->assertCreated();
+        $this->api()->postJson('/api/restaurant/ingredients', ['nom' => 'Riz', 'quantite' => 1, 'seuil' => 5])->assertCreated();
+
+        $b = $this->api()->getJson('/api/restaurant/bilan')->assertOk()->json('data');
+        $this->assertSame(2, $b['commandes']);
+        $this->assertSame(['nombre' => 1, 'total' => 7000], $b['par_type']['sur_place']);
+        $this->assertSame(2, $b['couverts']);
+        $this->assertSame(3500, $b['par_couvert']);
+        $this->assertSame(500, $b['pourboires']);
+        $this->assertSame('Poulet braisé', $b['plats'][0]['nom']);
+        $this->assertSame(4, $b['plats'][0]['quantite']);
+        $this->assertSame(['Riz'], array_column($b['a_racheter'], 'nom'));
+    }
 }

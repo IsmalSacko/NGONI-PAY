@@ -7,12 +7,15 @@ namespace App\Http\Controllers\Api;
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
 use App\Models\CommandeRestaurant;
+use App\Models\EncaissementRestaurant;
+use App\Models\IngredientRestaurant;
 use App\Models\LigneCommandeRestaurant;
 use App\Models\ReservationRestaurant;
 use App\Services\CommandesRestaurant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 /** Restaurant : les commandes (prise, cuisine, service, addition). */
@@ -184,6 +187,41 @@ class CommandeRestaurantController extends Controller
         $lignes = $this->commandes->envoyerEnCuisine($commande, $request->user());
 
         return response()->json(['data' => $this->json($commande->fresh()), 'envoi' => $lignes->first()?->envoi, 'lignes' => $lignes->map(fn ($l) => $this->ligne($l))->values()]);
+    }
+
+    /**
+     * Le bilan du restaurant sur une période (offre Pro) : commandes par type
+     * (sur place, à emporter, livraison), couverts servis et dépense par
+     * couvert, pourboires, plats les plus vendus, ingrédients à racheter.
+     */
+    public function bilan(Request $request): JsonResponse
+    {
+        $this->commandes->boutique();
+        $data = $request->validate(['du' => ['nullable', 'date'], 'au' => ['nullable', 'date']]);
+        $du = Carbon::parse($data['du'] ?? now()->toDateString())->startOfDay();
+        $au = Carbon::parse($data['au'] ?? $du->toDateString())->endOfDay();
+        $commandes = CommandeRestaurant::with('lignes')->whereBetween('created_at', [$du, $au])->where('statut', '!=', CommandeRestaurant::ANNULEE)->get();
+        $surPlace = $commandes->where('type', 'sur_place');
+        $couverts = (int) $surPlace->sum('couverts');
+        $plats = $commandes->flatMap(fn ($c) => $c->lignes)->where('etat', '!=', LigneCommandeRestaurant::ANNULEE)
+            ->groupBy(fn ($l) => $l->produit_id ?? $l->nom)
+            ->map(fn ($g) => ['nom' => preg_replace('/ \(.*\)$/', '', (string) $g->first()->nom), 'quantite' => (int) $g->sum('quantite'), 'total' => (int) $g->sum('total_ligne')])
+            ->sortByDesc('quantite')->take(10)->values();
+
+        return response()->json(['data' => [
+            'du' => $du->toDateString(), 'au' => $au->toDateString(),
+            'commandes' => $commandes->count(),
+            'total' => (int) $commandes->sum('total'),
+            'par_type' => collect(CommandeRestaurant::TYPES)->mapWithKeys(fn ($t) => [$t => [
+                'nombre' => $commandes->where('type', $t)->count(), 'total' => (int) $commandes->where('type', $t)->sum('total'),
+            ]]),
+            'couverts' => $couverts,
+            'par_couvert' => $couverts > 0 ? (int) round($surPlace->sum('total') / $couverts) : null,
+            'pourboires' => (int) EncaissementRestaurant::where('type', EncaissementRestaurant::POURBOIRE)->whereBetween('created_at', [$du, $au])->sum('montant'),
+            'plats' => $plats,
+            'a_racheter' => IngredientRestaurant::whereNotNull('seuil')->whereColumn('quantite', '<=', 'seuil')->orderBy('nom')->get()
+                ->map(fn ($i) => ['nom' => $i->nom, 'quantite' => $i->quantite, 'unite' => $i->unite, 'seuil' => $i->seuil])->values(),
+        ]]);
     }
 
     /** Le plan de salle : chaque table et son état. */
