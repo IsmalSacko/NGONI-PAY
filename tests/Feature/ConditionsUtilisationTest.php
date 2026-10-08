@@ -160,9 +160,27 @@ class ConditionsUtilisationTest extends TestCase
         config(['mobile.latest_version' => '4.9.0']);
         $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
 
-        // Un minimum déjà plus haut reste le sien.
+        // Un minimum plus haut que la version publiée attend qu'elle le soit.
         config(['mobile.minimum_version' => '5.0.0']);
+        $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
+        config(['mobile.latest_version' => '5.0.0']);
         $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '5.0.0');
+    }
+
+    public function test_une_version_imposee_attend_d_etre_sur_le_play_store_depuis_trois_jours(): void
+    {
+        config(['mobile.latest_version' => '4.9.0', 'mobile.minimum_version' => '4.11.2']);
+        // Pas encore vue sur le Play Store : personne n'est bloqué.
+        $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
+
+        // Vue et annoncée hier : le Play Store ne la propose pas encore partout.
+        $annonce = \App\Models\Annonce::create(['type' => 'mise_a_jour', 'titre' => 'Nouvelle version', 'message' => '…', 'version' => '4.11.2',
+            'audience' => 'tous', 'statut' => 'envoyee', 'derniere_diffusion' => now()->subDay()]);
+        $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
+
+        // Trois jours plus tard : obligatoire.
+        $annonce->update(['derniere_diffusion' => now()->subDays(3)->subMinute()]);
+        $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.11.2');
     }
 
     public function test_la_console_montre_l_acceptation_de_chaque_utilisateur(): void

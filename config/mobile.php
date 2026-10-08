@@ -13,6 +13,11 @@ return [
     // parlent à une API qui n'existe plus.
     'minimum_version' => env('MOBILE_MINIMUM_VERSION', '2.0.0'),
 
+    // Délai entre la publication d'une version sur le Play Store (vue et
+    // annoncée) et le moment où MOBILE_MINIMUM_VERSION peut l'imposer : le
+    // Play Store la propose à tous les téléphones en quelques jours.
+    'delai_version_minimale_jours' => (int) env('MOBILE_DELAI_VERSION_MINIMALE_JOURS', 3),
+
     // Annonce automatique d'une nouvelle version (ecaisse:annoncer-mise-a-jour) :
     // dès que MOBILE_LATEST_VERSION dépasse la dernière version annoncée, tous
     // les comptes reçoivent une notification (application + push). À changer

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Annonce;
+use App\Services\ConditionsUtilisation;
 
 /**
  * Dernière version publiée de l'application : la plus haute entre celle du
@@ -29,6 +30,47 @@ class VersionApplication
         }
 
         return self::plusHaute([...$annoncees, $configuree]) ?? $configuree;
+    }
+
+    /**
+     * Version en deçà de laquelle l'application exige la mise à jour.
+     *
+     * MOBILE_MINIMUM_VERSION dit celle que l'on veut imposer ; elle ne
+     * s'applique qu'une fois disponible partout : vue en production sur le
+     * Play Store (et annoncée) depuis MOBILE_DELAI_VERSION_MINIMALE_JOURS. Avant,
+     * un commerçant à qui le Play Store ne la propose pas encore serait bloqué.
+     * Le socle reste la version qui présente les conditions d'utilisation.
+     */
+    public static function minimale(): string
+    {
+        $socle = version_compare(self::derniere(), ConditionsUtilisation::VERSION_APPLICATION, '>=')
+            ? ConditionsUtilisation::VERSION_APPLICATION
+            : '0.0.0';
+        $voulue = (string) config('mobile.minimum_version');
+
+        return self::plusHaute([$socle, self::disponiblePartout($voulue) ? $voulue : '0.0.0']) ?? $socle;
+    }
+
+    /**
+     * Cette version est publiée : déclarée dans le .env (MOBILE_LATEST_VERSION),
+     * ou vue en production sur le Play Store et annoncée depuis le délai voulu.
+     */
+    private static function disponiblePartout(string $version): bool
+    {
+        if (version_compare($version, (string) config('mobile.latest_version'), '<=')) {
+            return true;
+        }
+
+        $jours = (int) config('mobile.delai_version_minimale_jours', 3);
+
+        try {
+            return Annonce::where('type', 'mise_a_jour')->where('statut', 'envoyee')->whereNotNull('version')
+                ->where('derniere_diffusion', '<=', now()->subDays($jours))
+                ->pluck('version')
+                ->contains(fn (string $v) => version_compare($v, $version, '>='));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** Plus haute version déjà annoncée ou programmée (pour ne jamais annoncer deux fois). */

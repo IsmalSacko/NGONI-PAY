@@ -45,12 +45,9 @@ Route::get('pays', [PaysController::class, 'index']);
 Route::get('app-version', fn () => response()->json([
     'latest_version' => VersionApplication::derniere(),
     'store_url' => config('mobile.store_url'),
-    // Dès que la 4.9.0 est sur le Play Store, elle devient obligatoire : les
-    // versions d'avant ne savent pas présenter les conditions d'utilisation.
-    'minimum_version' => version_compare(VersionApplication::derniere(), ConditionsUtilisation::VERSION_APPLICATION, '>=')
-        && version_compare((string) config('mobile.minimum_version'), ConditionsUtilisation::VERSION_APPLICATION, '<')
-        ? ConditionsUtilisation::VERSION_APPLICATION
-        : config('mobile.minimum_version'),
+    // Obligatoire : la 4.9.0 (conditions d'utilisation), et MOBILE_MINIMUM_VERSION
+    // une fois disponible partout (voir VersionApplication::minimale).
+    'minimum_version' => VersionApplication::minimale(),
 ]));
 // Version publiée sur le Play Store, signalée par la CI (jeton secret) : annonce automatique.
 Route::post('publication-play', PublicationPlayController::class)->middleware('throttle:10,1');
