@@ -275,8 +275,8 @@
                     @if ($plan['mensuel'])
                         <p class="mt-6"><span class="font-display font-extrabold text-4xl">{{ $prix($plan['mensuel']) }}</span> <span class="font-semibold">F CFA / mois</span></p>
                     @endif
-                    @if ($plan['annuel'])
-                        <p class="mt-1 text-sm {{ $pro ? 'text-white/80' : 'text-muted' }}">ou {{ $prix($plan['annuel']) }} F CFA par an</p>
+                    @if ($plan['autres'] !== [])
+                        <p class="mt-1 text-sm {{ $pro ? 'text-white/80' : 'text-muted' }}">ou {{ collect($plan['autres'])->map(fn ($t) => $prix($t['montant']).' F CFA par '.$t['unite'])->implode(' · ') }}</p>
                     @endif
                     <ul class="mt-6 flex flex-col gap-2.5 text-sm">
                         <li>✓ {{ $plan['max_boutiques'] === null ? 'Boutiques illimitées' : ($plan['max_boutiques'] === 1 ? '1 boutique' : "Jusqu’à {$plan['max_boutiques']} boutiques") }}</li>
@@ -298,9 +298,14 @@
         <p class="mt-6 text-center text-sm text-muted">Paiement par Orange Money, Wave, Moov Money, espèces ou virement. Tarifs trimestriels et semestriels dans l’application.</p>
         <p class="mt-2 text-center text-sm text-muted">Après l’essai, même sans abonnement, votre caisse reste ouverte sur les articles de votre catalogue.</p>
 
-        {{-- Abonnement à vie : sur demande, réglé une fois. Prix fixés ici, hors
-             des plans de la console : ce n'est pas une durée qu'on renouvelle. --}}
-        @php($aVie = [['Basic à vie', 100000, 'Toutes les fonctions du Basic, sans jamais renouveler.'], ['Pro à vie', 250000, 'Tout le Pro — statistiques avancées, séances de caisse, 5 boutiques — une fois pour toutes.']])
+        {{-- Abonnement à vie : sur demande, réglé une fois. Prix et période des
+             conditions d'utilisation (config/conditions.php), boutiques du plan
+             Pro de la console : la vitrine ne contredit ni l'un ni l'autre. --}}
+        @if ($aVie['ouverte'])
+        @php($offresAVie = [
+            ['Basic à vie', $aVie['basic'], 'Toutes les fonctions du Basic, sans jamais renouveler.'],
+            ['Pro à vie', $aVie['pro'], 'Tout le Pro'.($aVie['pro_boutiques'] ? ", jusqu’à {$aVie['pro_boutiques']} boutiques" : '').', une fois pour toutes.'],
+        ])
         <div id="a-vie" class="mt-10 max-w-4xl mx-auto rounded-3xl border-2 border-jaune bg-white p-7 md:p-8">
             <div class="flex flex-wrap items-baseline justify-between gap-3">
                 <h3 class="font-display font-extrabold text-2xl">Abonnement à vie</h3>
@@ -308,7 +313,7 @@
             </div>
             <p class="mt-1 text-sm text-muted">Réglez une seule fois et gardez Ngoni Caisse sans échéance. <strong class="text-ink">Proposé seulement pendant les six premiers mois.</strong></p>
             <div class="mt-6 grid sm:grid-cols-2 gap-4">
-                @foreach ($aVie as [$nom, $montant, $texte])
+                @foreach ($offresAVie as [$nom, $montant, $texte])
                     <div class="rounded-2xl bg-paper border border-border p-5">
                         <p class="font-bold">{{ $nom }}</p>
                         <p class="mt-2"><span class="font-display font-extrabold text-3xl">{{ $prix($montant) }}</span> <span class="font-semibold">F CFA</span> <span class="text-sm text-muted">une seule fois</span></p>
@@ -321,7 +326,8 @@
                 <li>• « À vie » : tant que le service Ngoni Caisse existe.</li>
                 <li>• Un seul compte, non transférable, dans les limites du plan choisi (boutiques, membres).</li>
                 <li>• Remboursable sous certaines conditions.</li>
-                <li>• Offre valable pour toute souscription du 1er septembre 2026 au 28 février 2027. <a href="{{ route('conditions') }}#a-vie" class="font-bold text-accent underline">Conditions complètes</a></li>
+                @php($jour = fn (string $d) => (($c = \Illuminate\Support\Carbon::parse($d)->locale('fr'))->day === 1 ? '1er' : $c->day).' '.$c->isoFormat('MMMM YYYY'))
+                <li>• Offre valable pour toute souscription du {{ $jour($aVie['debut']) }} au {{ $jour($aVie['fin']) }}. <a href="{{ route('conditions') }}#a-vie" class="font-bold text-accent underline">Conditions complètes</a></li>
             </ul>
             @if ($waMessage)
                 <a href="{{ $wa }}?text={{ rawurlencode('Bonjour, je suis intéressé(e) par l’abonnement à vie de Ngoni Caisse.') }}" target="_blank" rel="noopener"
@@ -330,6 +336,7 @@
                 </a>
             @endif
         </div>
+        @endif
     </section>
 
     {{-- Parrainage : l'offre et ses conditions, lisibles avant l'inscription. Les

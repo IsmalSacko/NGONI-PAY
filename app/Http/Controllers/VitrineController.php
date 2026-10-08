@@ -48,8 +48,18 @@ class VitrineController extends Controller
                     'inclus' => $p->inclut($code),
                 ])->all(),
                 'mensuel' => $p->tarif(CycleFacturation::Mensuel)?->montant,
-                'annuel' => $p->tarif(CycleFacturation::Annuel)?->montant,
+                // Les autres durées actives de la console (trimestre, semestre, an), dans l'ordre.
+                'autres' => collect([CycleFacturation::Trimestriel, CycleFacturation::Semestriel, CycleFacturation::Annuel])
+                    ->map(fn (CycleFacturation $c) => ['montant' => $p->tarif($c)?->montant, 'unite' => $c->unite()])
+                    ->filter(fn (array $t) => $t['montant'] !== null)->values()->all(),
             ])->values(),
+            // Offre à vie : les prix et la période des conditions d'utilisation
+            // (une seule source), et les boutiques du plan Pro de la console.
+            'aVie' => [
+                ...config('conditions.a_vie'),
+                'pro_boutiques' => $payants->first(fn (Plan $p) => $p->code === 'pro')?->max_boutiques,
+                'ouverte' => today()->betweenIncluded(config('conditions.a_vie.debut'), config('conditions.a_vie.fin')),
+            ],
             'communes' => Plan::COMMUNES,
             'storeUrl' => (string) config('mobile.store_url'),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
