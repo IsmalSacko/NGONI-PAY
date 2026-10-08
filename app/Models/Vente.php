@@ -35,7 +35,7 @@ class Vente extends Model
             $vente->jour_affaire ??= ($vente->created_at ?? now())->toDateString();
             // Numéro de facture figé à la création : renommer la boutique
             // ensuite ne change plus celui des factures déjà remises.
-            $vente->attributes['numero_facture'] ??= self::formater($vente->boutique_id, (int) $vente->numero, $vente->created_at);
+            $vente->attributes['numero_facture'] ??= self::prochainNumeroFacture($vente);
         });
 
         // Le compteur de la boutique ne recule jamais (voir dernier_numero_vente) :
@@ -130,6 +130,29 @@ class Vente extends Model
     public function getNumeroFactureAttribute(): string
     {
         return $this->numeroFormate();
+    }
+
+    /**
+     * Numéro de facture d'une nouvelle vente : compteur de la boutique pour
+     * l'année, qui repart à 1 chaque 1er janvier (ABC-2027-0001) et ne recule
+     * jamais dans l'année — même après « Repartir de zéro », un numéro remis à
+     * un client ne resert pas. Le service de caisse tient déjà la boutique
+     * verrouillée pendant la vente.
+     */
+    private static function prochainNumeroFacture(Vente $vente): string
+    {
+        if ($vente->boutique_id === null) {
+            return self::formater(null, (int) $vente->numero, $vente->created_at);
+        }
+
+        $annee = (int) ($vente->created_at ?? now())->format('Y');
+        $boutique = Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)->first(['id', 'annee_numero_facture', 'dernier_numero_facture']);
+        $numero = ($boutique !== null && (int) $boutique->annee_numero_facture === $annee ? (int) $boutique->dernier_numero_facture : 0) + 1;
+
+        Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)
+            ->update(['annee_numero_facture' => $annee, 'dernier_numero_facture' => $numero]);
+
+        return self::formater($vente->boutique_id, $numero, $vente->created_at);
     }
 
     /** Le numéro tel qu'il est calculé une seule fois, à la création de la vente. */

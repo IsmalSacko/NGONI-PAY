@@ -269,6 +269,25 @@ class ReinitialisationBoutiqueTest extends TestCase
         $this->assertSame(1, (int) DB::table('ventes')->where('boutique_id', $this->boutiqueIbrahim->id)->value('numero'));
     }
 
+    public function test_le_numero_de_facture_repart_a_1_chaque_annee_sans_jamais_resservir(): void
+    {
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $annee = (int) now()->format('Y');
+        $derniere = DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderByDesc('numero')->value('numero_facture');
+        $this->assertSame("PA-{$annee}-0002", $derniere, 'l’année en cours continue');
+
+        // Au 1er janvier, la facture repart à 1 ; l'année la distingue de celle d'avant.
+        $this->travelTo(now()->addYear()->startOfYear()->addHours(9));
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $suivante = $annee + 1;
+        $this->assertSame("PA-{$suivante}-0001", DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderByDesc('numero')->value('numero_facture'));
+
+        // « Repartir de zéro » en cours d'année : la suite continue, rien ne resert.
+        $this->reinitialiser(garderCatalogue: true);
+        $this->vendre($this->boutiqueAwa, $this->awa);
+        $this->assertSame("PA-{$suivante}-0002", DB::table('ventes')->where('boutique_id', $this->boutiqueAwa->id)->orderByDesc('numero')->value('numero_facture'));
+    }
+
     public function test_renommer_la_boutique_ne_change_pas_le_numero_des_factures_remises(): void
     {
         $vente = Vente::withoutGlobalScopes()->where('boutique_id', $this->boutiqueAwa->id)->first();
