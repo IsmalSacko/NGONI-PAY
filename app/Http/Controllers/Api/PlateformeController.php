@@ -54,6 +54,11 @@ class PlateformeController extends Controller
                 'est_actif' => (bool) $p['est_actif'],
                 'essai' => $p['essai'],
                 'fonctionnalites' => array_keys(array_filter($p['fonctionnalites'])),
+                // Abonnement à vie : prix (vide = pas proposé), texte et période.
+                'prix_a_vie' => $p['prix_a_vie'],
+                'texte_a_vie' => $p['texte_a_vie'],
+                'a_vie_debut' => $p['a_vie_debut'],
+                'a_vie_fin' => $p['a_vie_fin'],
                 'tarifs' => collect($tarifs[$id] ?? [])->map(fn (array $t, string $cycle) => [
                     'cycle' => $cycle,
                     'libelle' => CycleFacturation::from($cycle)->libelle(),
@@ -81,6 +86,13 @@ class PlateformeController extends Controller
                 'est_actif' => (bool) ($p['est_actif'] ?? false),
                 'fonctionnalites' => array_fill_keys(array_map('strval', (array) ($p['fonctionnalites'] ?? [])), true),
             ];
+            // Abonnement à vie : seulement s'il est envoyé (une application plus
+            // ancienne ne le connaît pas et ne doit pas l'effacer).
+            if (array_key_exists('prix_a_vie', $p)) {
+                foreach (['prix_a_vie', 'texte_a_vie', 'a_vie_debut', 'a_vie_fin'] as $champ) {
+                    $plans[(int) $p['id']][$champ] = $p[$champ] ?? null;
+                }
+            }
             foreach ((array) ($p['tarifs'] ?? []) as $t) {
                 $tarifs[(int) $p['id']][(string) ($t['cycle'] ?? '')] = ['montant' => $t['montant'] ?? null, 'actif' => (bool) ($t['actif'] ?? false)];
             }

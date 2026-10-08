@@ -263,6 +263,25 @@ class ConsolePlateformeTest extends TestCase
         $this->assertTrue((bool) Plan::parCode('essai')->est_actif);
     }
 
+    public function test_l_application_regle_l_abonnement_a_vie_sans_que_l_ancienne_l_efface(): void
+    {
+        $jeton = $this->exploitant->createToken('app')->plainTextToken;
+        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->assertOk()->json('plans');
+        $this->assertSame('250000', $plans[2]['prix_a_vie']);
+
+        $plans[2]['prix_a_vie'] = '200000';
+        $plans[2]['a_vie_fin'] = '2027-06-30';
+        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertOk()
+            ->assertJsonPath('plans.2.prix_a_vie', '200000');
+        $this->assertSame(200000, Plan::parCode('pro')->prix_a_vie);
+        $this->assertSame('2027-06-30', Plan::parCode('pro')->a_vie_fin->toDateString());
+
+        // Une application plus ancienne n'envoie pas ces champs : rien n'est effacé.
+        $anciens = array_map(fn (array $p) => array_diff_key($p, array_flip(['prix_a_vie', 'texte_a_vie', 'a_vie_debut', 'a_vie_fin'])), $plans);
+        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $anciens])->assertOk();
+        $this->assertSame(200000, Plan::parCode('pro')->prix_a_vie);
+    }
+
     public function test_les_plans_de_l_api_refusent_un_montant_negatif_et_un_non_exploitant(): void
     {
         $jeton = $this->exploitant->createToken('app')->plainTextToken;
