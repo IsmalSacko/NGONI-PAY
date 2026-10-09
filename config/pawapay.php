@@ -17,8 +17,8 @@ return [
     /*
      * Pays de la boutique (ISO 2) => code pawaPay (ISO 3), devise, et les
      * opérateurs affichés. La page de pawaPay laisse choisir l'opérateur.
-     * Seulement ce que le compte a d'actif (GET /v2/active-conf, vérifié le
-     * 2026-10-09) : ni Wave au Sénégal, ni le Burkina Faso.
+     * Secours seulement : les pays et opérateurs sont lus chez pawaPay
+     * (PawapayPays). Ceux-ci, vérifiés le 2026-10-09.
      */
     'pays' => [
         'SN' => ['code' => 'SEN', 'devise' => 'XOF', 'moyens' => ['orange_sen' => 'Orange Money', 'free_sen' => 'Free Money']],
@@ -27,4 +27,7 @@ return [
 
     /* Commission du contrat pawaPay (%), répercutée sur le commerçant. */
     'frais_pourcentage' => (float) env('PAWAPAY_FRAIS_POURCENTAGE', 3.0),
+
+    // Servis par Jèko : la Côte d'Ivoire.
+    'pays_exclus' => ['CI'],
 ];

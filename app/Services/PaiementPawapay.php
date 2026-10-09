@@ -13,8 +13,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Abonnement payé en ligne via pawaPay (Mobile Money du Sénégal, du Burkina
- * Faso, du Bénin).
+ * Abonnement payé en ligne via pawaPay (Mobile Money des pays du franc CFA que
+ * le compte a d'actifs : voir PawapayPays).
  *
  * Même parcours que FedaPay (voir PaiementMobile) : un dépôt est créé au prix
  * majoré de la commission, le commerçant paie sur la page de pawaPay, puis le
@@ -23,6 +23,8 @@ use Illuminate\Validation\ValidationException;
  */
 class PaiementPawapay
 {
+    public function __construct(private readonly PawapayPays $pays) {}
+
     public function actif(): bool
     {
         return filled(config('pawapay.token'));
@@ -30,13 +32,13 @@ class PaiementPawapay
 
     public function proposeA(?Boutique $boutique): bool
     {
-        return $this->actif() && $boutique !== null && isset(config('pawapay.pays')[$boutique->pays]);
+        return $this->actif() && $boutique !== null && isset($this->pays->actifs()[$boutique->pays]);
     }
 
     /** Opérateurs affichés à cette boutique. @return array<string, string> */
     public function moyensPour(?Boutique $boutique): array
     {
-        return $this->proposeA($boutique) ? config('pawapay.pays')[$boutique->pays]['moyens'] : [];
+        return $this->proposeA($boutique) ? $this->pays->actifs()[$boutique->pays]['moyens'] : [];
     }
 
     public static function taux(?string $moyen = null): float
@@ -52,7 +54,7 @@ class PaiementPawapay
      */
     public function creer(DemandeAbonnement $demande, string $moyen): string
     {
-        $pays = config('pawapay.pays')[$demande->boutique?->pays] ?? null;
+        $pays = $this->pays->actifs()[$demande->boutique?->pays] ?? null;
         if ($pays === null) {
             throw ValidationException::withMessages(['moyen' => ['Le paiement en ligne n’est pas disponible pour votre boutique.']]);
         }
@@ -121,7 +123,10 @@ class PaiementPawapay
     private function montantAttendu(DemandeAbonnement $demande, array $depot): bool
     {
         $attendu = $demande->montant + $demande->frais_mobile;
-        if ((int) round((float) ($depot['amount'] ?? 0)) !== $attendu || ($depot['currency'] ?? null) !== $demande->devise) {
+        // XAF (Afrique centrale) et XOF s'équivalent : même montant, l'un ou l'autre.
+        $devise = $depot['currency'] ?? null;
+        $devisesAdmises = in_array($demande->devise, PawapayPays::CFA, true) ? PawapayPays::CFA : [$demande->devise];
+        if ((int) round((float) ($depot['amount'] ?? 0)) !== $attendu || ! in_array($devise, $devisesAdmises, true)) {
             Log::warning('pawaPay : montant inattendu', ['demande' => $demande->id, 'montant' => $depot['amount'] ?? null, 'devise' => $depot['currency'] ?? null]);
 
             return false;

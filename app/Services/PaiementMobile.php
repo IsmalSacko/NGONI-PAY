@@ -60,7 +60,7 @@ class PaiementMobile
             return $this->jeko->demarrer($boutique, $demandeur, $plan, $cycle, $moyen);
         }
 
-        // pawaPay là où il opère (Sénégal, Burkina, Bénin), FedaPay ailleurs.
+        // pawaPay là où le compte est actif (pays du franc CFA), FedaPay ailleurs.
         [$prestataire, $colonne, $prefixe] = $this->pawapay->proposeA($boutique)
             ? [$this->pawapay, 'pawapay_deposit_id', 'pawapay_']
             : [$this->fedapay, 'fedapay_transaction_id', 'fedapay_'];
@@ -81,9 +81,9 @@ class PaiementMobile
         }
 
         $demande = $this->abonnements->soumettre($boutique, $demandeur, $plan, $cycle, moyen: $prefixe.$moyen, prevenir: false);
-        if ($demande->devise !== 'XOF') {
+        if (! in_array($demande->devise, PawapayPays::CFA, true)) {
             $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now(), 'note_decision' => 'Devise non prise en charge']);
-            throw ValidationException::withMessages(['moyen' => ['Le paiement en ligne n’accepte que le franc CFA (XOF).']]);
+            throw ValidationException::withMessages(['moyen' => ['Le paiement en ligne n’accepte que le franc CFA (XOF ou XAF).']]);
         }
 
         $demande->update(['frais_mobile' => PaiementJeko::fraisAuTaux($demande->montant, $prestataire::taux($moyen))]);

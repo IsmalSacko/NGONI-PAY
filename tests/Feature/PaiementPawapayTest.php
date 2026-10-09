@@ -46,10 +46,46 @@ class PaiementPawapayTest extends TestCase
             'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Awa',
         ]);
 
+        \Illuminate\Support\Facades\Cache::forget('pawapay-pays-actifs');
+        Http::preventStrayRequests();
         Http::fake([
             'api.sandbox.pawapay.io/v2/paymentpage' => Http::response(['redirectUrl' => 'https://paywith.pawapay.io/?token=abc']),
             'api.sandbox.pawapay.io/v2/deposits/*' => fn () => Http::response($this->depot),
+            // Le compte tel que pawaPay le décrit : Sénégal, Bénin, Cameroun (XAF),
+            // la Côte d'Ivoire (servie par Jèko) et le Kenya (devise locale).
+            'api.sandbox.pawapay.io/v2/active-conf*' => Http::response(['countries' => [
+                ['country' => 'SEN', 'providers' => [
+                    ['provider' => 'ORANGE_SEN', 'displayName' => 'Orange', 'currencies' => [['currency' => 'XOF']]],
+                    ['provider' => 'FREE_SEN', 'displayName' => 'Free', 'currencies' => [['currency' => 'XOF']]],
+                ]],
+                ['country' => 'BEN', 'providers' => [['provider' => 'MTN_MOMO_BEN', 'displayName' => 'MTN', 'currencies' => [['currency' => 'XOF']]]]],
+                ['country' => 'CMR', 'providers' => [['provider' => 'MTN_MOMO_CMR', 'displayName' => 'MTN', 'currencies' => [['currency' => 'XAF']]]]],
+                ['country' => 'CIV', 'providers' => [['provider' => 'ORANGE_CIV', 'displayName' => 'Orange', 'currencies' => [['currency' => 'XOF']]]]],
+                ['country' => 'KEN', 'providers' => [['provider' => 'MPESA_KEN', 'displayName' => 'Safaricom', 'currencies' => [['currency' => 'KES']]]]],
+            ]]),
         ]);
+    }
+
+    public function test_tous_les_pays_du_franc_cfa_actifs_chez_pawapay_sont_servis(): void
+    {
+        $pays = app(\App\Services\PawapayPays::class)->actifs();
+
+        $this->assertSame(['SN', 'BJ', 'CM'], array_keys($pays), 'ni la Côte d\'Ivoire (Jèko) ni le Kenya (devise locale)');
+        $this->assertSame(['orange_sen' => 'Orange Money', 'free_sen' => 'Free Money'], $pays['SN']['moyens']);
+        $this->assertSame('XAF', $pays['CM']['devise']);
+
+        // Une boutique au Cameroun paie en XAF, au montant de l'abonnement, et l'activation l'accepte.
+        $this->boutique->forceFill(['pays' => 'CM', 'devise' => 'XAF'])->save();
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.paiement_mobile.moyens.0.code', 'mtn_momo_cmr');
+        $demande = $this->payer('mtn_momo_cmr');
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/v2/paymentpage') && $r['country'] === 'CMR' && $r['amountDetails']['currency'] === 'XAF');
+
+        $this->depot = ['status' => 'FOUND', 'data' => [
+            'depositId' => $demande->pawapay_deposit_id, 'status' => 'COMPLETED',
+            'amount' => ($demande->montant + $demande->frais_mobile).'.00', 'currency' => 'XAF',
+        ]];
+        $this->postJson('/api/webhooks/pawapay', ['depositId' => $demande->pawapay_deposit_id])->assertOk();
+        $this->assertSame(\App\Enums\StatutDemande::Approuvee, $demande->fresh()->statut);
     }
 
     private function api()
