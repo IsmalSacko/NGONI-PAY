@@ -211,4 +211,70 @@ class FacturesEtRodageTest extends TestCase
         $this->assertNotNull(User::find($this->awa->id), 'les comptes restent');
         $this->assertSame("EAT-{$annee}-0001", $this->boutique->fresh()->prochaine_facture, 'la numérotation repart à 1');
     }
+
+    private function activerModeLibre()
+    {
+        return $this->api()->postJson('/api/boutique/mode-libre', [
+            'actif' => true, 'accepte' => true, 'confirmation' => "J'ACCEPTE", 'version' => config('mode_libre.version'),
+        ]);
+    }
+
+    public function test_le_mode_libre_s_active_en_acceptant_le_texte_et_la_preuve_est_gardee(): void
+    {
+        $this->api()->getJson('/api/boutique/mode-libre')->assertOk()
+            ->assertJsonPath('data.actif', false)
+            ->assertJsonPath('data.version', config('mode_libre.version'));
+
+        // Case non cochée, mot non tapé : refusé.
+        $this->api()->postJson('/api/boutique/mode-libre', ['actif' => true, 'version' => config('mode_libre.version')])
+            ->assertUnprocessable()->assertJsonValidationErrors(['accepte', 'confirmation']);
+
+        $this->activerModeLibre()->assertOk()->assertJsonPath('data.mode_libre_actif', true);
+
+        $preuve = DB::table('acceptations_mode_libre')->sole();
+        $this->assertSame('activation', $preuve->action);
+        $this->assertSame($this->awa->id, $preuve->user_id);
+        $this->assertSame('Épicerie Awa Traoré', $preuve->boutique_nom);
+        $this->assertSame(config('mode_libre.version'), $preuve->version);
+        $this->assertStringContainsString('seul responsable', $preuve->texte);
+        $this->assertNotNull($preuve->ip);
+
+        // Un texte plus récent : à accepter de nouveau.
+        config(['mode_libre.version' => '2099-01-01']);
+        $this->assertFalse($this->boutique->fresh()->mode_libre_actif);
+    }
+
+    public function test_en_mode_libre_une_vraie_vente_se_supprime_et_reste_au_journal(): void
+    {
+        $vente = $this->vendre();
+        $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertUnprocessable();
+
+        $this->activerModeLibre()->assertOk();
+        $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertOk();
+
+        $this->assertNull(Vente::withoutGlobalScopes()->find($vente['id']));
+        $this->assertEquals(50, $this->riz->fresh()->stock);
+        $this->api()->getJson('/api/boutique/journal-suppressions')->assertOk()
+            ->assertJsonPath('data.0.numero_facture', $vente['numero_facture'])
+            ->assertJsonPath('data.0.total', 2000)
+            ->assertJsonPath('data.0.par', 'Awa')
+            ->assertJsonPath('data.0.lignes.0.nom_produit', 'Riz');
+
+        // Quitté : la suppression redevient impossible, et le départ est tracé.
+        $this->api()->postJson('/api/boutique/mode-libre', ['actif' => false])->assertOk();
+        $autre = $this->vendre();
+        $this->api()->deleteJson("/api/ventes/{$autre['id']}")->assertUnprocessable();
+        $this->assertSame(['activation', 'desactivation'], DB::table('acceptations_mode_libre')->orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_en_mode_libre_une_vente_d_hier_s_annule_et_la_numerotation_peut_reculer(): void
+    {
+        $vente = $this->vendre();
+        $this->travel(1)->days();
+        $this->api()->postJson("/api/ventes/{$vente['id']}/annuler", ['motif' => 'Erreur'])->assertUnprocessable();
+
+        $this->activerModeLibre()->assertOk();
+        $this->api()->postJson("/api/ventes/{$vente['id']}/annuler", ['motif' => 'Erreur'])->assertOk();
+        $this->reglages(['facture_prochain_numero' => 1])->assertOk();
+    }
 }

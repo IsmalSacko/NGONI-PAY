@@ -171,11 +171,11 @@ class VenteController extends Controller
         return response()->json($this->ventes->annuler($vente, $request->user(), $data['motif']));
     }
 
-    /** Mode rodage : une vente d'essai s'efface (une vente réelle, jamais). */
+    /** Vente d'essai (rodage), ou toute vente en mode libre : supprimée, et tracée au journal. */
     public function supprimer(Request $request, Vente $vente): JsonResponse
     {
-        $this->ventes->supprimerEssai($vente, $request->user());
+        $this->ventes->supprimer($vente, $request->user());
 
-        return response()->json(['message' => 'Vente d’essai supprimée.']);
+        return response()->json(['message' => 'Vente supprimée.']);
     }
 }

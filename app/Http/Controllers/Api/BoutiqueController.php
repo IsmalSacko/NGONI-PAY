@@ -10,6 +10,7 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
 use App\Services\Images;
+use App\Services\ModeLibre;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
 use App\Support\Tenancy\TenantContext;
@@ -215,6 +216,58 @@ class BoutiqueController extends Controller
             'message' => "{$boutique->nom} est en mode réel : vos essais sont effacés, la prochaine facture sera {$boutique->fresh()->prochaine_facture}.",
             'data' => $boutique->fresh(),
         ]);
+    }
+
+    /** Mode libre : le texte à accepter, et l'état de la boutique. */
+    public function modeLibre(): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+
+        return response()->json(['data' => [
+            'actif' => ModeLibre::actif($boutique),
+            'version' => ModeLibre::version(),
+            'texte' => ModeLibre::texte(),
+            // Déjà actif, mais un texte plus récent est à accepter.
+            'a_reaccepter' => $boutique->mode_libre && ! ModeLibre::actif($boutique),
+        ]]);
+    }
+
+    /**
+     * Activer (texte accepté : case cochée et « J'ACCEPTE » tapé) ou quitter le
+     * mode libre. Propriétaire seul ; chaque choix est gardé comme preuve.
+     */
+    public function reglerModeLibre(Request $request, ModeLibre $modeLibre): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut choisir le mode libre.');
+        $data = $request->validate([
+            'actif' => ['required', 'boolean'],
+            'accepte' => ['exclude_unless:actif,true', 'accepted'],
+            'confirmation' => ['exclude_unless:actif,true', 'required', 'in:J\'ACCEPTE'],
+            'version' => ['exclude_unless:actif,true', 'required', 'in:'.ModeLibre::version()],
+        ], [
+            'accepte.accepted' => 'Cochez la case pour accepter les conditions du mode libre.',
+            'confirmation.in' => 'Tapez J\'ACCEPTE pour confirmer.',
+            'version.in' => 'Le texte a changé : relisez-le avant d’accepter.',
+        ]);
+
+        $data['actif'] ? $modeLibre->activer($boutique, $request->user(), $request) : $modeLibre->desactiver($boutique, $request->user(), $request);
+
+        return response()->json([
+            'message' => $data['actif'] ? 'Mode libre activé : vos ventes et factures sont sous votre responsabilité.' : 'Mode libre désactivé.',
+            'data' => $boutique->fresh(),
+        ]);
+    }
+
+    /** Journal des ventes supprimées de la boutique, les plus récentes d'abord. */
+    public function journalSuppressions(): JsonResponse
+    {
+        $boutiqueId = app(TenantContext::class)->boutiqueId();
+
+        return response()->json(['data' => DB::table('journal_suppressions')->where('boutique_id', $boutiqueId)
+            ->orderByDesc('supprimee_le')->limit(200)
+            ->get(['numero_facture', 'total', 'jour', 'par', 'essai', 'supprimee_le', 'lignes'])
+            ->map(fn ($l) => [...(array) $l, 'lignes' => json_decode((string) $l->lignes, true), 'essai' => (bool) $l->essai])]);
     }
 
     public function reinitialiser(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse

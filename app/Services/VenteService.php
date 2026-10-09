@@ -389,9 +389,12 @@ class VenteService
 
             // Des chiffres déjà arrêtés ne doivent jamais bouger après coup :
             // - une journée passée (chiffre d'affaires, rapports) ;
+            // Mode libre : le propriétaire a pris la responsabilité de ses
+            // ventes passées ; seules les dettes déjà remboursées restent protégées.
+            $libre = ModeLibre::actif(Boutique::find($vente->boutique_id));
             $journee = app(Journee::class);
             $jourVente = $vente->jour_affaire ?? $vente->created_at->toDateString();
-            if ($journee->estCloturee($jourVente) || ! Carbon::parse($jourVente)->isSameDay($journee->courante())) {
+            if (! $libre && ($journee->estCloturee($jourVente) || ! Carbon::parse($jourVente)->isSameDay($journee->courante()))) {
                 throw ValidationException::withMessages(['vente' => [
                     'Seules les ventes de la journée en cours s’annulent : les journées clôturées ou passées sont arrêtées.',
                 ]]);
@@ -399,7 +402,7 @@ class VenteService
 
             // - une séance de caisse fermée (son écart a été compté) ;
             $session = $vente->session_caisse_id ? SessionCaisse::find($vente->session_caisse_id) : null;
-            if ($session !== null && ! $session->estOuverte()) {
+            if (! $libre && $session !== null && ! $session->estOuverte()) {
                 throw ValidationException::withMessages(['vente' => [
                     'La séance de caisse de cette vente est fermée : son fond a déjà été compté.',
                 ]]);
@@ -428,17 +431,19 @@ class VenteService
     }
 
     /**
-     * Mode rodage : une vente d'essai s'efface pour de bon (le stock revient
-     * d'abord, si elle n'était pas déjà annulée). Une vente réelle, jamais.
+     * Supprimer une vente pour de bon (le stock revient d'abord, si elle
+     * n'était pas déjà annulée) : une vente d'essai en mode rodage, ou toute
+     * vente en mode libre. Chaque suppression reste au journal.
      */
-    public function supprimerEssai(Vente $vente, User $auteur): void
+    public function supprimer(Vente $vente, User $auteur): void
     {
         DB::transaction(function () use ($vente, $auteur): void {
             $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
-            $rodage = (bool) Boutique::whereKey($vente->boutique_id)->value('mode_rodage');
-            if (! $vente->essai || ! $rodage) {
+            $boutique = Boutique::find($vente->boutique_id);
+            $essai = $vente->essai && (bool) $boutique?->mode_rodage;
+            if (! $essai && ! ModeLibre::actif($boutique)) {
                 throw ValidationException::withMessages(['vente' => [
-                    'Seules les ventes d’essai, en mode rodage, se suppriment. Une vente réelle s’annule.',
+                    'Une vente réelle s’annule. Pour supprimer vos ventes, activez le mode libre (Ma boutique), sous votre responsabilité.',
                 ]]);
             }
             // Une vente née d'une commande (addition du restaurant, retrait du
@@ -451,6 +456,7 @@ class VenteService
             if (! $vente->estAnnulee()) {
                 $this->rendreStock($vente, $auteur);
             }
+            app(ModeLibre::class)->journaliser($vente, $auteur);
             MouvementStock::where('vente_id', $vente->id)->delete();
             $vente->delete();
         });

@@ -53,7 +53,7 @@ class NumerotationFactures
     {
         $annee = (int) now()->format('Y');
         $dernier = $this->dernier($boutique, $annee);
-        if ($prochain <= $dernier && ! $boutique->mode_rodage) {
+        if ($prochain <= $dernier && ! $boutique->mode_rodage && ! ModeLibre::actif($boutique)) {
             throw ValidationException::withMessages(['facture_prochain_numero' => [
                 "Les numéros jusqu'à {$dernier} ont déjà été donnés dans cette série : choisissez un numéro plus grand, "
                 .'ou changez de préfixe pour repartir à 1.',

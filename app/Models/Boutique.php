@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBoutique;
 use App\Services\Images;
+use App\Services\ModeLibre;
 use App\Services\NumerotationFactures;
 use Database\Factories\BoutiqueFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Storage;
 class Boutique extends Model
 {
     /** Adresse du logo, pour l'application et les tickets. */
-    protected $appends = ['logo_url', 'logo_vignette_url', 'prochaine_facture'];
+    protected $appends = ['logo_url', 'logo_vignette_url', 'prochaine_facture', 'mode_libre_actif'];
 
     /** Les compteurs restent au serveur : l'application reçoit `prochaine_facture`. */
     protected $hidden = ['compteurs_facture'];
@@ -126,6 +127,7 @@ class Boutique extends Model
             'facture_annee' => 'boolean',
             'compteurs_facture' => 'array',
             'mode_rodage' => 'boolean',
+            'mode_libre' => 'boolean',
         ];
     }
 
@@ -133,6 +135,12 @@ class Boutique extends Model
     public function getProchaineFactureAttribute(): string
     {
         return app(NumerotationFactures::class)->apercu($this);
+    }
+
+    /** Mode libre actif, accepté dans la version en vigueur du texte. */
+    public function getModeLibreActifAttribute(): bool
+    {
+        return ModeLibre::actif($this);
     }
 
     public function getLogoUrlAttribute(): ?string

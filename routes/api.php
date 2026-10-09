@@ -132,6 +132,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('boutique/reinitialiser', [BoutiqueController::class, 'reinitialiser'])->middleware('abonnement');
     Route::post('boutique/rodage', [BoutiqueController::class, 'activerRodage']);
     Route::post('boutique/mode-reel', [BoutiqueController::class, 'passerEnModeReel']);
+    Route::get('boutique/mode-libre', [BoutiqueController::class, 'modeLibre']);
+    Route::post('boutique/mode-libre', [BoutiqueController::class, 'reglerModeLibre']);
+    Route::get('boutique/journal-suppressions', [BoutiqueController::class, 'journalSuppressions'])->middleware('permission:boutique.update');
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;
     // les demandes engagent le propriétaire, donc réservées à l'admin.
