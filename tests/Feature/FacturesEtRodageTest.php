@@ -189,13 +189,18 @@ class FacturesEtRodageTest extends TestCase
     public function test_une_nouvelle_boutique_demarre_en_rodage(): void
     {
         config(['ecaisse.rodage_a_l_inscription' => true]);
-        ['boutique' => $neuve] = app(BoutiqueRegistrationService::class)->register([
-            'nom' => 'Boutique Neuve', 'pays' => 'ML', 'telephone' => '76008299', 'email' => null,
-            'password' => 'password123', 'nom_utilisateur' => 'Neuve',
-        ]);
+        $inscrire = fn (string $tel, ?string $version) => $this->withHeaders(array_filter([
+            'X-Appareil-Plateforme' => 'android', 'X-App-Version' => $version,
+        ]))->postJson('/api/inscription', [
+            'nom_boutique' => "Boutique {$tel}", 'pays' => 'ML', 'telephone' => $tel, 'password' => 'password123', 'nom_utilisateur' => 'Neuve',
+        ])->assertCreated()->json('boutique.id');
 
-        $this->assertTrue($neuve->fresh()->mode_rodage);
-        $this->assertStringStartsWith('ESSAI-', $neuve->fresh()->prochaine_facture);
+        $neuve = Boutique::withoutGlobalScopes()->find($inscrire('76008299', '4.12.0+41200'));
+        $this->assertTrue($neuve->mode_rodage);
+        $this->assertStringStartsWith('ESSAI-', $neuve->prochaine_facture);
+
+        // Une application plus ancienne ne sait pas quitter le rodage : pas de rodage.
+        $this->assertFalse(Boutique::withoutGlobalScopes()->find($inscrire('76008298', '4.11.2'))->mode_rodage);
     }
 
     public function test_tout_a_zero_efface_tout_sauf_les_comptes_et_la_numerotation_repart_a_1(): void
