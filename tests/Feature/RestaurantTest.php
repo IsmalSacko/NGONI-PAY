@@ -149,6 +149,22 @@ class RestaurantTest extends TestCase
         $this->assertSame([6000, 1000], Vente::orderBy('created_at')->pluck('total')->map(fn ($t) => (int) $t)->all());
     }
 
+    public function test_la_marge_d_un_plat_vient_de_sa_recette_sinon_de_son_prix_d_achat(): void
+    {
+        // Poulet braisé : recette (0,5 poulet à 1 500 F) ; Bissap : prix d'achat saisi (200 F).
+        $poulet = $this->api()->postJson('/api/restaurant/ingredients', ['nom' => 'Poulet', 'unite' => 'pièce', 'quantite' => 10, 'seuil' => 3, 'cout_unitaire' => 1500])->json('data.id');
+        $this->api()->putJson("/api/restaurant/carte/{$this->poulet}/recette", ['ingredients' => [['ingredient_id' => $poulet, 'quantite' => 0.5]]])->assertOk();
+        $this->api()->putJson("/api/produits/{$this->bissap}", ['nom' => 'Bissap', 'prix_vente' => 500, 'prix_achat' => 200, 'taux_tva' => 0])->assertOk();
+
+        $c = $this->api()->postJson('/api/restaurant/commandes', ['type' => 'emporter', 'lignes' => [
+            ['produit_id' => $this->poulet, 'quantite' => 2], ['produit_id' => $this->bissap, 'quantite' => 1],
+        ], 'paiement' => ['moyen_paiement' => 'especes']])->assertCreated();
+
+        $lignes = Vente::withoutGlobalScopes()->findOrFail($c->json('vente_id'))->lignes()->get()->keyBy('nom_produit');
+        $this->assertSame(750, (int) $lignes['Poulet braisé']->prix_achat, 'coût de la recette, enregistré à l\'encaissement');
+        $this->assertSame(200, (int) $lignes['Bissap']->prix_achat);
+    }
+
     public function test_options_formule_et_recette_consommee_en_cuisine(): void
     {
         $frites = $this->api()->postJson("/api/restaurant/carte/{$this->poulet}/options", ['groupe' => 'Accompagnement', 'nom' => 'Frites', 'prix' => 500])->assertCreated()->json('data.id');

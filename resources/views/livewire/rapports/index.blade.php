@@ -69,7 +69,7 @@
             ['Remboursements', $m($r['credit']['rembourse']).' '.$devise, '', 'savings'],
             ['Tickets', $r['ventes']['nombre'].' · '.\App\Support\Quantite::formater($r['ventes']['articles']).' articles', '', 'receipt_long'],
             ['Panier moyen', $m($r['ventes']['panier_moyen']).' '.$devise, '', 'shopping_basket'],
-            ['Marge brute', $r['marge']['taux'] === null ? 'Prix d’achat à renseigner' : $m($r['marge']['marge']).' '.$devise.' ('.$r['marge']['taux'].' %)', '', 'trending_up'],
+            ['Bénéfice', $r['marge']['taux'] === null ? 'Prix d’achat à renseigner' : $m($r['marge']['marge']).' '.$devise.' ('.$r['marge']['taux'].' %)', '', 'trending_up'],
             ['Remises accordées', $m($r['ventes']['remises']).' '.$devise, '', 'sell'],
             ['TVA collectée', $m($r['ventes']['tva']).' '.$devise, '', 'percent'],
             ['Ventes annulées', $r['annulees']['nombre'].' · '.$m($r['annulees']['total']).' '.$devise, '', 'cancel'],

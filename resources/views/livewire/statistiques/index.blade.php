@@ -40,11 +40,11 @@
         @foreach ([
             ['Tickets', number_format($ind['tickets']['actuel'], 0, ',', ' '), $ind['tickets']['variation'], null],
             ['Panier moyen', $m($ind['panier_moyen']['actuel']), $ind['panier_moyen']['variation'], null],
-            ['Marge brute', $ind['taux_marge']['actuel'] === null ? 'À renseigner' : $m($ind['marge']['actuel']), $ind['marge']['variation'],
+            ['Bénéfice', $ind['taux_marge']['actuel'] === null ? 'À renseigner' : $m($ind['marge']['actuel']), $ind['marge']['variation'],
                 $ind['taux_marge']['actuel'] === null ? 'Prix d’achat manquants' : $pct($ind['taux_marge']['actuel']).' du chiffre'],
         ] as [$libelle, $valeur, $var, $precision])
             <div class="{{ $carte }} min-w-0 !p-4 md:!p-5">
-                <p class="flex items-center gap-2 text-sm font-semibold text-muted"><x-charte.pastille :icone="['Tickets' => 'receipt_long', 'Panier moyen' => 'shopping_basket', 'Marge brute' => 'trending_up'][$libelle] ?? 'insights'" :taille="34" />{{ $libelle }}</p>
+                <p class="flex items-center gap-2 text-sm font-semibold text-muted"><x-charte.pastille :icone="['Tickets' => 'receipt_long', 'Panier moyen' => 'shopping_basket', 'Bénéfice' => 'trending_up'][$libelle] ?? 'insights'" :taille="34" />{{ $libelle }}</p>
                 <p class="mt-1 font-display font-extrabold text-lg md:text-2xl tabular-nums truncate" title="{{ $valeur }}">{{ $valeur }}</p>
                 @if ($precision)<p class="text-xs font-bold">{{ $precision }}</p>@endif
                 <p class="mt-1 text-xs text-muted">{!! $variation($var) !!} vs période précédente</p>

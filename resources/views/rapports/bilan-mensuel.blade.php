@@ -37,7 +37,7 @@
                     @if ($ecart !== null)<span class="{{ $ecart >= 0 ? 'hausse' : 'baisse' }}">{{ $ecart >= 0 ? '+' : '' }}{{ $ecart }} % par rapport au mois précédent</span>@endif</td>
                 <td>Ventes<b>{{ $r['ventes']['nombre'] }}</b><span class="petit">{{ $r['ventes']['articles'] }} articles</span></td>
                 <td>Panier moyen<b>{{ $m($r['ventes']['panier_moyen']) }}</b></td>
-                <td>Marge brute<b>{{ $r['marge']['taux'] === null ? '—' : $m($r['marge']['marge']) }}</b>
+                <td>Bénéfice<b>{{ $r['marge']['taux'] === null ? '—' : $m($r['marge']['marge']) }}</b>
                     <span class="petit">{{ $r['marge']['taux'] === null ? 'prix d’achat non renseignés' : $r['marge']['taux'].' %' }}</span></td>
             </tr>
             <tr>

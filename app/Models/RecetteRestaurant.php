@@ -23,6 +23,17 @@ class RecetteRestaurant extends Model
         return ['quantite' => 'float'];
     }
 
+    /**
+     * Coût d'un plat d'après sa recette (quantité × coût unitaire de chaque
+     * ingrédient), ou null s'il n'a pas de recette. Sert la marge du restaurant.
+     */
+    public static function coutDe(Produit $produit): ?int
+    {
+        $recette = self::with('ingredient')->where('produit_id', $produit->id)->get();
+
+        return $recette->isEmpty() ? null : (int) round($recette->sum(fn (self $r) => $r->quantite * ($r->ingredient?->cout_unitaire ?? 0)));
+    }
+
     /** @return BelongsTo<IngredientRestaurant, $this> */
     public function ingredient(): BelongsTo
     {

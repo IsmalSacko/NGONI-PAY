@@ -35,7 +35,7 @@
         <div>Remboursements<b>{{ $m($r['credit']['rembourse']) }}</b></div>
         <div>Tickets<b>{{ $r['ventes']['nombre'] }}</b></div>
         <div>Panier moyen<b>{{ $m($r['ventes']['panier_moyen']) }}</b></div>
-        <div>Marge brute<b>{{ $r['marge']['taux'] === null ? 'prix d’achat non renseignés' : $m($r['marge']['marge']).' ('.$r['marge']['taux'].' %)' }}</b>@if ($r['marge']['taux'] !== null && $r['marge']['couverture'] < 100)<small>sur {{ $r['marge']['couverture'] }} % des ventes</small>@endif</div>
+        <div>Bénéfice<b>{{ $r['marge']['taux'] === null ? 'prix d’achat non renseignés' : $m($r['marge']['marge']).' ('.$r['marge']['taux'].' %)' }}</b>@if ($r['marge']['taux'] !== null && $r['marge']['couverture'] < 100)<small>sur {{ $r['marge']['couverture'] }} % des ventes</small>@endif</div>
         <div>Remises<b>{{ $m($r['ventes']['remises']) }}</b></div>
         <div>TVA collectée<b>{{ $m($r['ventes']['tva']) }}</b></div>
         <div>Annulées<b>{{ $r['annulees']['nombre'] }} · {{ $m($r['annulees']['total']) }}</b></div>

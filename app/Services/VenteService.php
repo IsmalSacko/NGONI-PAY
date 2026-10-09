@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\MouvementStock;
 use App\Models\Plan;
 use App\Models\Produit;
+use App\Models\RecetteRestaurant;
 use App\Models\ServicePressing;
 use App\Models\SessionCaisse;
 use App\Models\User;
@@ -156,7 +157,9 @@ class VenteService
                         'prix_unitaire' => $prix,
                         'prix_gros' => false,
                         'prix_detail' => null,
-                        'prix_achat' => $produit->prix_achat,
+                        // Coût du plat pour la marge : sa recette (ingrédients),
+                        // sinon le prix d'achat saisi sur sa fiche.
+                        'prix_achat' => RecetteRestaurant::coutDe($produit) ?? $produit->prix_achat,
                         'taux_tva' => $produit->taux_tva,
                         'total_ligne' => $totalLigne,
                     ];
