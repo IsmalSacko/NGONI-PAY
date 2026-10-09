@@ -47,6 +47,19 @@ class AuthTest extends TestCase
             ->assertJsonFragment(['Ce numéro a déjà un compte Ngoni Caisse. Connectez-vous, ou utilisez « Mot de passe oublié ».']);
     }
 
+    public function test_un_nom_dans_la_case_du_numero_est_refuse(): void
+    {
+        // Cas réel : « Amadou » tapé à la place du numéro, compte introuvable ensuite.
+        $inscription = ['nom_boutique' => 'Ferme', 'pays' => 'CI', 'password' => 'password123', 'nom_utilisateur' => 'Coulibaly'];
+
+        foreach (['Amadou', 'Amadou 0555402516', '12345'] as $faux) {
+            $this->postJson('/api/inscription', [...$inscription, 'telephone' => $faux])
+                ->assertUnprocessable()->assertJsonValidationErrors('telephone');
+        }
+        $this->assertDatabaseCount('users', 0);
+        $this->postJson('/api/inscription', [...$inscription, 'telephone' => '05 55 40 25 16'])->assertCreated();
+    }
+
     public function test_un_numero_auquel_il_manque_un_chiffre_ne_cree_pas_un_second_compte(): void
     {
         // Cas réel : un commerçant sénégalais (+221 76 690 09 57) ne retrouvait

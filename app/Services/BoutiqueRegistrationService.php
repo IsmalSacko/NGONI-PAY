@@ -40,6 +40,14 @@ class BoutiqueRegistrationService
         $paysSaisi = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
         $telephone = PhoneNumber::normalize($data['telephone'], $paysSaisi);
 
+        // Cas réel : « Amadou » tapé dans la case du numéro — compte créé sans
+        // numéro, introuvable par la console et pour « Mot de passe oublié ».
+        if (strlen(PhoneNumber::digits($data['telephone'])) < 6 || preg_match('/\p{L}/u', $data['telephone'])) {
+            throw ValidationException::withMessages(['telephone' => [
+                'Tapez votre numéro de téléphone, en chiffres (ex. 07 07 12 34 56) : il sert à vous connecter et à retrouver votre compte.',
+            ]]);
+        }
+
         $this->verifierLongueur($telephone, $paysSaisi);
 
         // Un numéro déjà inscrit : le dire, plutôt que de laisser la base
