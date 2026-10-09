@@ -27,10 +27,11 @@ use Illuminate\Support\Facades\Storage;
  *   Seuls restent les comptes (propriétaire, équipe), les réglages de la
  *   boutique et l'abonnement ; les prestations et catégories par défaut de
  *   l'activité sont recréées.
+ * - « Numéros à 1 » (au choix, compris dans « Tout à zéro ») : factures et
+ *   tickets repartent à 1. Sinon la numérotation CONTINUE — un numéro déjà
+ *   remis à un client ne sert pas deux fois.
  * - Gardés : la boutique (réglages, logo, programme fidélité), l'équipe et
- *   l'abonnement, et la numérotation des factures : elle CONTINUE (compteur
- *   boutiques.dernier_numero_vente) — un numéro déjà remis à un client ne
- *   doit jamais servir deux fois.
+ *   l'abonnement.
  * - Une caisse restée ouverte est effacée aussi : l'aperçu le signale, sans
  *   bloquer — pour une boutique d'essai, c'est une séance d'essai de plus.
  *
@@ -97,7 +98,7 @@ class ReinitialisationBoutique
         'fournitures_pressing', 'services_pressing',
     ];
 
-    public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs, bool $toutAZero = false): array
+    public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs, bool $toutAZero = false, bool $numerosAZero = false): array
     {
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($boutiqueId);
         if (! self::autorise($exploitant, $boutique)) {
@@ -119,21 +120,23 @@ class ReinitialisationBoutique
             $tables[] = 'unites';
         }
 
+        $numerosAZero = $numerosAZero || $toutAZero;
+
         $sauvegarde = $this->sauvegarder($boutique, $tables, $exploitant);
         $photos = $garderCatalogue ? [] : array_values(array_filter(DB::table('produits')->where('boutique_id', $boutique->id)->pluck('photo')->all()));
 
-        DB::transaction(function () use ($boutique, $tables, $garderCatalogue, $toutAZero): void {
+        DB::transaction(function () use ($boutique, $tables, $garderCatalogue, $numerosAZero): void {
             foreach ($tables as $table) {
                 DB::table($table)->where('boutique_id', $boutique->id)->delete();
             }
             if ($garderCatalogue) {
                 DB::table('produits')->where('boutique_id', $boutique->id)->update(['stock' => 0, 'updated_at' => now()]);
             }
-            if ($toutAZero) {
-                // La numérotation repart à 1 : décision du propriétaire, prévenu que
-                // d'anciens numéros peuvent alors revenir.
+            if ($numerosAZero) {
+                // Factures et tickets repartent à 1 : décision du propriétaire,
+                // prévenu que d'anciens numéros peuvent alors revenir.
                 DB::table('boutiques')->where('id', $boutique->id)->update([
-                    'compteurs_facture' => null, 'annee_numero_facture' => null, 'dernier_numero_facture' => 0,
+                    'compteurs_facture' => null, 'annee_numero_facture' => null, 'dernier_numero_facture' => 0, 'dernier_numero_vente' => 0,
                 ]);
             }
         });

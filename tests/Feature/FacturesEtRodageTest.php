@@ -212,6 +212,27 @@ class FacturesEtRodageTest extends TestCase
         $this->assertSame("EAT-{$annee}-0001", $this->boutique->fresh()->prochaine_facture, 'la numérotation repart à 1');
     }
 
+    public function test_reinitialiser_avec_numeros_a_1_garde_le_catalogue_et_factures_et_tickets_repartent_a_1(): void
+    {
+        $annee = now()->format('Y');
+        $this->vendre();
+        $this->vendre();
+
+        // Sans l'option : la numérotation continue.
+        $this->api()->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER'])->assertOk();
+        $this->assertSame("EAT-{$annee}-0003", $this->boutique->fresh()->prochaine_facture);
+
+        $this->api()->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER', 'numeros_a_zero' => true])->assertOk();
+        $this->assertSame("EAT-{$annee}-0001", $this->boutique->fresh()->prochaine_facture);
+        $this->assertSame(0, (int) $this->boutique->fresh()->dernier_numero_vente, 'le numéro de ticket repart aussi');
+        $this->assertGreaterThan(0, Produit::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count(), 'catalogue gardé');
+
+        Produit::withoutGlobalScopes()->whereKey($this->riz->id)->update(['stock' => 10]);
+        $vente = $this->vendre();
+        $this->assertSame("EAT-{$annee}-0001", $vente['numero_facture']);
+        $this->assertSame(1, (int) $vente['numero']);
+    }
+
     private function activerModeLibre()
     {
         return $this->api()->postJson('/api/boutique/mode-libre', [

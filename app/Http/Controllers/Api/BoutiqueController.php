@@ -208,7 +208,7 @@ class BoutiqueController extends Controller
             throw ValidationException::withMessages(['rodage' => ['Votre boutique est déjà en mode réel.']]);
         }
 
-        $reinitialisation->reinitialiser($boutique->id, $request->user(), $request->boolean('garder_catalogue', true), $request->boolean('garder_fournisseurs', true));
+        $reinitialisation->reinitialiser($boutique->id, $request->user(), $request->boolean('garder_catalogue', true), $request->boolean('garder_fournisseurs', true), numerosAZero: true);
         $compteurs = array_filter($boutique->fresh()->compteurs_facture ?? [], fn ($serie) => ! str_starts_with((string) $serie, 'ESSAI|'), ARRAY_FILTER_USE_KEY);
         $boutique->forceFill(['mode_rodage' => false, 'compteurs_facture' => $compteurs])->save();
 
@@ -280,6 +280,8 @@ class BoutiqueController extends Controller
             'garder_fournisseurs' => ['boolean'],
             // Tout à zéro, numérotation des factures comprise : seuls les comptes restent.
             'tout_a_zero' => ['boolean'],
+            // Factures et tickets repartent à 1 (sans cela, la numérotation continue).
+            'numeros_a_zero' => ['boolean'],
         ], ['confirmation.in' => 'Tapez REINITIALISER pour confirmer.']);
 
         $resultat = $reinitialisation->reinitialiser(
@@ -288,6 +290,7 @@ class BoutiqueController extends Controller
             $request->boolean('garder_catalogue', true),
             $request->boolean('garder_fournisseurs', true),
             $request->boolean('tout_a_zero'),
+            $request->boolean('numeros_a_zero'),
         );
 
         return response()->json(['message' => "{$resultat['boutique']} est remise à zéro : elle est prête pour vos vraies ventes."]);
