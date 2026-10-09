@@ -324,4 +324,20 @@ class FacturesEtRodageTest extends TestCase
         // Le 0003 est pris : la vente suivante le saute.
         $this->assertSame("EAT-{$annee}-0004", $this->vendre()['numero_facture']);
     }
+
+    public function test_le_mode_libre_est_une_fonction_pro(): void
+    {
+        $vente = $this->vendre();
+        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
+
+        $this->activerModeLibre()->assertForbidden()->assertJsonPath('code', 'FONCTIONNALITE_NON_INCLUSE')->assertJsonPath('fonctionnalite', 'mode_libre');
+        $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertUnprocessable();
+
+        // Activé en Pro, puis retour au Basic : le mode libre dort.
+        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'pro', now()->addMonth(), $this->awa);
+        $this->activerModeLibre()->assertOk()->assertJsonPath('data.mode_libre_actif', true);
+        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
+        $this->assertFalse($this->boutique->fresh()->mode_libre_actif);
+        $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => 'FA-1'])->assertUnprocessable();
+    }
 }

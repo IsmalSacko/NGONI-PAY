@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Boutique;
+use App\Models\Plan;
 use App\Models\User;
 use App\Models\Vente;
 use Illuminate\Http\Request;
@@ -31,7 +32,9 @@ class ModeLibre
     /** Actif, et accepté dans la version en vigueur du texte. */
     public static function actif(?Boutique $boutique): bool
     {
-        return $boutique !== null && $boutique->mode_libre && $boutique->mode_libre_version === self::version();
+        // Fonction Pro : sans elle (offre ou abonnement terminé), le mode libre dort.
+        return $boutique !== null && $boutique->mode_libre && $boutique->mode_libre_version === self::version()
+            && app(AbonnementService::class)->permet($boutique, Plan::MODE_LIBRE);
     }
 
     public function activer(Boutique $boutique, User $proprietaire, Request $request): void

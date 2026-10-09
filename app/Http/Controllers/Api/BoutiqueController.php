@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
+use App\Services\AbonnementService;
+use App\Models\Plan;
 use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
@@ -250,6 +252,13 @@ class BoutiqueController extends Controller
             'confirmation.in' => 'Tapez J\'ACCEPTE pour confirmer.',
             'version.in' => 'Le texte a changé : relisez-le avant d’accepter.',
         ]);
+
+        if ($data['actif'] && ! app(AbonnementService::class)->permet($boutique, Plan::MODE_LIBRE)) {
+            return response()->json([
+                'message' => 'Le mode libre fait partie de l’offre Pro. Passez à l’offre Pro pour l’activer.',
+                'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => Plan::MODE_LIBRE,
+            ], 403);
+        }
 
         $data['actif'] ? $modeLibre->activer($boutique, $request->user(), $request) : $modeLibre->desactiver($boutique, $request->user(), $request);
 

@@ -64,6 +64,9 @@ class Plan extends Model
      */
     public const RESTAURANT_AVANCE = 'restaurant_avance';
 
+    /** Mode libre : supprimer, corriger et renuméroter ses ventes et factures, même passées. */
+    public const MODE_LIBRE = 'mode_libre';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
@@ -83,6 +86,7 @@ class Plan extends Model
         self::VENTE_GROS => 'Vente en gros (deux prix)',
         self::DEPENSES => 'Dépenses et bilan',
         self::RESTAURANT_AVANCE => 'Restaurant : cuisine, réservations, livraison, recettes',
+        self::MODE_LIBRE => 'Mode libre : supprimer, corriger, renuméroter ses factures',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */
