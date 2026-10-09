@@ -265,10 +265,27 @@ class BoutiqueRegistrationService
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
-        foreach (Permissions::roleMatrix() as $role => $permissions) {
-            Role::firstOrCreate(
-                ['name' => $role, 'guard_name' => 'web', 'boutique_id' => $boutique->id],
-            )->syncPermissions($permissions);
+        // Rôle neuf : ses permissions sont ajoutées d'un seul INSERT, sans
+        // syncPermissions — qui commence par un DELETE : sur un rôle vide, ce
+        // DELETE verrouille quand même un intervalle de role_has_permissions, et
+        // deux inscriptions à la même seconde s'y bloquaient (deadlock, erreur
+        // 500, vu en prod les 8 et 9 octobre 2026).
+        $ids = Permission::where('guard_name', 'web')->pluck('id', 'name');
+        $lignes = [];
+        foreach (Permissions::roleMatrix() as $nom => $permissions) {
+            $role = Role::firstOrCreate(['name' => $nom, 'guard_name' => 'web', 'boutique_id' => $boutique->id]);
+            if (! $role->wasRecentlyCreated) {
+                $role->syncPermissions($permissions);
+
+                continue;
+            }
+            foreach ($permissions as $permission) {
+                $lignes[] = ['permission_id' => $ids[$permission], 'role_id' => $role->id];
+            }
+        }
+        if ($lignes !== []) {
+            DB::table(config('permission.table_names.role_has_permissions'))->insert($lignes);
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
         }
     }
 
