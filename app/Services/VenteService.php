@@ -441,6 +441,13 @@ class VenteService
                     'Seules les ventes d’essai, en mode rodage, se suppriment. Une vente réelle s’annule.',
                 ]]);
             }
+            // Une vente née d'une commande (addition du restaurant, retrait du
+            // pressing) suit sa commande : elle s'efface au passage en mode réel.
+            if ($vente->commande_restaurant_id !== null || DB::table('commandes_pressing')->where('vente_id', $vente->id)->exists()) {
+                throw ValidationException::withMessages(['vente' => [
+                    'Cette vente vient d’une commande : elle s’efface avec les autres essais au passage en mode réel.',
+                ]]);
+            }
             if (! $vente->estAnnulee()) {
                 $this->rendreStock($vente, $auteur);
             }
