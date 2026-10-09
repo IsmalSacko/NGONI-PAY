@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Annonce;
+use App\Services\GestionAnnonces;
 use App\Support\VersionApplication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,13 @@ class PublicationPlayController extends Controller
             'programmee_le' => now()->addHours((int) config('mobile.delai_annonce_heures')),
         ]);
 
-        return response()->json(['statut' => 'programmee', 'version' => $version, 'le' => $annonce->programmee_le->toIso8601String()], 202);
+        $le = $annonce->programmee_le->toIso8601String();
+
+        // Sans délai : l'annonce part tout de suite (par lots, après la réponse).
+        if ((int) config('mobile.delai_annonce_heures') <= 0) {
+            app(GestionAnnonces::class)->envoyerMaintenant($annonce);
+        }
+
+        return response()->json(['statut' => 'programmee', 'version' => $version, 'le' => $le], 202);
     }
 }

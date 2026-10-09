@@ -26,8 +26,8 @@ return [
     'nouveautes' => env('MOBILE_NOUVEAUTES'),
 
     // Annonce sans intervention : la CI lit la version en production sur le
-    // Play Store et l'envoie à /api/publication-play avec ce jeton. L'annonce
-    // part après ce délai (le temps que le Play Store la diffuse partout).
+    // Play Store (chaque heure) et l'envoie à /api/publication-play avec ce
+    // jeton. L'annonce part après ce délai ; 0 : tout de suite.
     'jeton_publication' => env('MOBILE_JETON_PUBLICATION'),
-    'delai_annonce_heures' => (int) env('MOBILE_DELAI_ANNONCE_HEURES', 3),
+    'delai_annonce_heures' => (int) env('MOBILE_DELAI_ANNONCE_HEURES', 0),
 ];

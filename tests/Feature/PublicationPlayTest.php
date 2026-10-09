@@ -43,6 +43,17 @@ class PublicationPlayTest extends TestCase
         $this->assertNull(Annonce::where('version', '4.1.0')->first());
     }
 
+    public function test_sans_delai_la_version_vue_sur_le_play_store_est_annoncee_tout_de_suite(): void
+    {
+        config(['mobile.delai_annonce_heures' => 0]);
+
+        $this->signaler('4.2.0', nouveautes: 'Aide et tutoriels.')->assertStatus(202);
+
+        $this->assertSame('envoyee', Annonce::where('version', '4.2.0')->sole()->statut);
+        $this->assertSame(1, NotificationApp::where('type', 'mise_a_jour')->count());
+        $this->getJson('/api/app-version')->assertJsonPath('latest_version', '4.2.0');
+    }
+
     public function test_une_version_publiee_est_annoncee_apres_le_delai_une_seule_fois(): void
     {
         $this->freezeTime();
