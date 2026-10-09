@@ -42,6 +42,12 @@
                     </label>
                 </div>
             </div>
+            @unless ($edite)
+                <label class="flex items-center gap-2.5 text-sm mx-4 md:mx-5 mb-4 rounded-xl ring-1 ring-border px-3 py-2.5 cursor-pointer has-checked:bg-accent-soft has-checked:ring-accent/25">
+                    <input type="checkbox" wire:model="prevenir" class="w-4 h-4 accent-accent shrink-0">
+                    <span>Prévenir les commerçants <span class="text-muted">(notification qui ouvre la vidéo ; restaurant, pressing, pharmacie : leurs boutiques seulement)</span></span>
+                </label>
+            @endunless
             <div class="flex justify-end gap-2 px-4 md:px-5 pb-4 md:pb-5">
                 <button type="button" wire:click="$set('formulaire', false)" class="h-11 px-5 rounded-xl ring-1 ring-border-strong font-bold hover:bg-puce">Annuler</button>
                 <button type="submit" class="h-11 px-5 rounded-xl bg-accent text-white font-bold shadow-sm hover:bg-accent-dark">Enregistrer</button>

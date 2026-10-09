@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Plateforme;
 
 use App\Models\Tutoriel;
+use App\Services\AnnonceTutoriel;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -31,10 +33,13 @@ class Tutoriels extends Component
 
     public ?string $info = null;
 
+    /** Prévenir les commerçants d'une nouvelle vidéo (notification qui l'ouvre sur YouTube). */
+    public bool $prevenir = true;
+
     public function nouveau(): void
     {
         $this->resetErrorBag();
-        $this->reset(['edite', 'titre', 'sous_titre', 'url', 'info']);
+        $this->reset(['edite', 'titre', 'sous_titre', 'url', 'info', 'prevenir']);
         $this->categorie = 'ventes';
         $this->formulaire = true;
     }
@@ -58,8 +63,9 @@ class Tutoriels extends Component
         )->validate();
 
         if ($this->edite === null) {
-            Tutoriel::create($data + ['ordre' => (int) Tutoriel::max('ordre') + 1]);
-            $this->info = "« {$data['titre']} » ajouté : les commerçants le voient déjà.";
+            $tutoriel = Tutoriel::create($data + ['ordre' => (int) Tutoriel::max('ordre') + 1]);
+            $annonce = $this->prevenir ? app(AnnonceTutoriel::class)->annoncer($tutoriel, Auth::user()) : null;
+            $this->info = "« {$data['titre']} » ajouté".($annonce ? ' : les commerçants sont prévenus par notification.' : ' : visible dans l’aide.');
         } else {
             Tutoriel::findOrFail($this->edite)->update($data);
             $this->info = "« {$data['titre']} » enregistré.";

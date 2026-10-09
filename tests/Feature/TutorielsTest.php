@@ -98,4 +98,32 @@ class TutorielsTest extends TestCase
         \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)->call('supprimer', $t->id);
         $this->assertSame(0, Tutoriel::count());
     }
+
+    public function test_une_nouvelle_video_previent_les_commercants_concernes(): void
+    {
+        $restaurant = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Maquis Chez Awa', 'pays' => 'ML', 'telephone' => '76008202', 'password' => 'password123', 'nom_utilisateur' => 'Fanta',
+        ]);
+        $restaurant['boutique']->forceFill(['activite' => 'restaurant'])->save();
+
+        // Une vidéo générale : tout le monde, et le toucher ouvre YouTube.
+        $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
+            'titre' => 'Enregistrer une vente', 'categorie' => 'ventes', 'url' => 'https://youtu.be/dQw4w9WgXcQ',
+        ])->assertCreated()->assertJsonPath('message', fn ($m) => str_contains($m, 'prévenus'));
+        $generale = \App\Models\NotificationApp::where('titre', '🎬 Nouvelle vidéo : Enregistrer une vente')->get();
+        $this->assertCount(3, $generale);
+        $this->assertSame('https://youtu.be/dQw4w9WgXcQ', $generale->first()->lien);
+
+        // Une vidéo du module restaurant : les restaurants seulement.
+        $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
+            'titre' => 'Gérer les tables', 'categorie' => 'restaurant', 'url' => 'https://youtu.be/abcdefghijk',
+        ])->assertCreated();
+        $this->assertSame([$restaurant['user']->id], \App\Models\NotificationApp::where('titre', '🎬 Nouvelle vidéo : Gérer les tables')->pluck('user_id')->all());
+
+        // Case décochée : rien n'est envoyé.
+        $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
+            'titre' => 'Correction', 'categorie' => 'ventes', 'url' => 'https://youtu.be/abcdefghijk', 'prevenir' => false,
+        ])->assertCreated();
+        $this->assertSame(0, \App\Models\NotificationApp::where('titre', 'like', '%Correction%')->count());
+    }
 }

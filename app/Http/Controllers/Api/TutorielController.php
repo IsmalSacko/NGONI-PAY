@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tutoriel;
+use App\Services\AnnonceTutoriel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -33,11 +34,17 @@ class TutorielController extends Controller
         ]);
     }
 
-    public function enregistrer(Request $request): JsonResponse
+    public function enregistrer(Request $request, AnnonceTutoriel $annonces): JsonResponse
     {
         $tutoriel = Tutoriel::create($this->valider($request) + ['ordre' => (int) Tutoriel::max('ordre') + 1]);
 
-        return response()->json(['message' => "« {$tutoriel->titre} » ajouté.", 'data' => $tutoriel->versApplication()], 201);
+        // « Prévenir les commerçants » : coché par défaut.
+        $annonce = $request->boolean('prevenir', true) ? $annonces->annoncer($tutoriel, $request->user()) : null;
+
+        return response()->json([
+            'message' => "« {$tutoriel->titre} » ajouté".($annonce ? ' : les commerçants sont prévenus.' : '.'),
+            'data' => $tutoriel->versApplication(),
+        ], 201);
     }
 
     public function modifier(Request $request, Tutoriel $tutoriel): JsonResponse
