@@ -39,11 +39,19 @@ class ReglagesBoutique
             'identifiant_fiscal' => ['nullable', 'string', 'max:60'],
             'rccm' => ['nullable', 'string', 'max:60'],
             'message_ticket' => ['nullable', 'string', 'max:160'],
+            // Numéro de facture : PRÉFIXE-2026-0001-SUFFIXE (lettres et chiffres).
+            'facture_prefixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
+            'facture_suffixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
+            'facture_annee' => ['nullable', 'boolean'],
+            'facture_prochain_numero' => ['nullable', 'integer', 'min:1', 'max:99999999'],
             // Changement de devise : convertir (par défaut, au taux fixe s'il
             // existe, sinon au taux donné) ou garder les mêmes nombres.
             'convertir' => ['nullable', 'boolean'],
             'taux' => ['nullable', 'numeric', 'gt:0'],
-        ], [], ['devise' => 'devise', 'pays' => 'pays', 'taux' => 'taux de conversion'])->validate();
+        ], [
+            'facture_prefixe.regex' => 'Le préfixe ne garde que des lettres et des chiffres.',
+            'facture_suffixe.regex' => 'Le suffixe ne garde que des lettres et des chiffres.',
+        ], ['devise' => 'devise', 'pays' => 'pays', 'taux' => 'taux de conversion', 'facture_prefixe' => 'préfixe', 'facture_suffixe' => 'suffixe'])->validate();
 
         $pays = Country::from($data['pays']);
         $devise = $data['devise'] ?? $pays->currency();
@@ -75,7 +83,15 @@ class ReglagesBoutique
             'identifiant_fiscal' => array_key_exists('identifiant_fiscal', $donnees) ? ($data['identifiant_fiscal'] ?? null) : $boutique->identifiant_fiscal,
             'rccm' => array_key_exists('rccm', $donnees) ? ($data['rccm'] ?? null) : $boutique->rccm,
             'message_ticket' => array_key_exists('message_ticket', $donnees) ? ($data['message_ticket'] ?? null) : $boutique->message_ticket,
+            'facture_prefixe' => array_key_exists('facture_prefixe', $donnees) ? (strtoupper((string) ($data['facture_prefixe'] ?? '')) ?: null) : $boutique->facture_prefixe,
+            'facture_suffixe' => array_key_exists('facture_suffixe', $donnees) ? (strtoupper((string) ($data['facture_suffixe'] ?? '')) ?: null) : $boutique->facture_suffixe,
+            'facture_annee' => array_key_exists('facture_annee', $donnees) ? (bool) ($data['facture_annee'] ?? true) : $boutique->facture_annee,
         ]);
+
+        // Le prochain numéro vaut pour la série choisie ci-dessus (préfixe, suffixe, année).
+        if (filled($data['facture_prochain_numero'] ?? null)) {
+            app(NumerotationFactures::class)->fixerProchain($boutique->fresh(), (int) $data['facture_prochain_numero']);
+        }
 
         return $boutique->fresh();
     }

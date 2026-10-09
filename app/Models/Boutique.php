@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBoutique;
 use App\Services\Images;
+use App\Services\NumerotationFactures;
 use Database\Factories\BoutiqueFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -23,11 +24,14 @@ use Illuminate\Support\Facades\Storage;
  * pour la même raison que {@see User} : elle EST le tenant, elle ne lui
  * appartient pas.
  */
-#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket'])]
+#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket', 'facture_prefixe', 'facture_suffixe', 'facture_annee', 'mode_rodage'])]
 class Boutique extends Model
 {
     /** Adresse du logo, pour l'application et les tickets. */
-    protected $appends = ['logo_url', 'logo_vignette_url'];
+    protected $appends = ['logo_url', 'logo_vignette_url', 'prochaine_facture'];
+
+    /** Les compteurs restent au serveur : l'application reçoit `prochaine_facture`. */
+    protected $hidden = ['compteurs_facture'];
 
     /**
      * Activité choisie dans les réglages : la pharmacie, le pressing et le
@@ -119,7 +123,16 @@ class Boutique extends Model
             'objectif_mensuel' => 'integer',
             'fidelite_seuil' => 'integer',
             'fidelite_remise_pct' => 'integer',
+            'facture_annee' => 'boolean',
+            'compteurs_facture' => 'array',
+            'mode_rodage' => 'boolean',
         ];
+    }
+
+    /** Le numéro que portera la prochaine facture (aperçu dans Ma boutique). */
+    public function getProchaineFactureAttribute(): string
+    {
+        return app(NumerotationFactures::class)->apercu($this);
     }
 
     public function getLogoUrlAttribute(): ?string

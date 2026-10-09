@@ -130,6 +130,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     // Remise à zéro des essais : le propriétaire seul (vérifié par le service).
     Route::get('boutique/reinitialisation', [BoutiqueController::class, 'apercuReinitialisation']);
     Route::post('boutique/reinitialiser', [BoutiqueController::class, 'reinitialiser'])->middleware('abonnement');
+    Route::post('boutique/rodage', [BoutiqueController::class, 'activerRodage']);
+    Route::post('boutique/mode-reel', [BoutiqueController::class, 'passerEnModeReel']);
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;
     // les demandes engagent le propriétaire, donc réservées à l'admin.
@@ -215,6 +217,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
+    Route::delete('ventes/{vente}', [VenteController::class, 'supprimer'])->middleware('permission:ventes.delete');
     // Pressing : le registre des commandes (dépôt → prête → retrait, où naît la vente).
     // Pressing, offre Pro : dépenses, fournitures, forfaits, relevé mensuel.
     // Dépenses de la boutique et bilan (recettes − dépenses) : toutes les activités, offre Pro.

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\MoyenPaiement;
 use App\Models\Concerns\BelongsToBoutique;
+use App\Services\NumerotationFactures;
 use Database\Factories\VenteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -36,6 +37,10 @@ class Vente extends Model
             // Numéro de facture figé à la création : renommer la boutique
             // ensuite ne change plus celui des factures déjà remises.
             $vente->attributes['numero_facture'] ??= self::prochainNumeroFacture($vente);
+            // Mode rodage : une vente d'essai, numérotée ESSAI-…, supprimable.
+            if ($vente->boutique_id !== null && ! isset($vente->attributes['essai'])) {
+                $vente->attributes['essai'] = (bool) Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)->value('mode_rodage');
+            }
         });
 
         // Le compteur de la boutique ne recule jamais (voir dernier_numero_vente) :
@@ -57,6 +62,7 @@ class Vente extends Model
     {
         return [
             'moyen_paiement' => MoyenPaiement::class,
+            'essai' => 'boolean',
             'vendue_hors_ligne' => 'boolean',
             'remise_fidelite' => 'boolean',
             'ordonnance' => 'array',
@@ -145,14 +151,7 @@ class Vente extends Model
             return self::formater(null, (int) $vente->numero, $vente->created_at);
         }
 
-        $annee = (int) ($vente->created_at ?? now())->format('Y');
-        $boutique = Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)->first(['id', 'annee_numero_facture', 'dernier_numero_facture']);
-        $numero = ($boutique !== null && (int) $boutique->annee_numero_facture === $annee ? (int) $boutique->dernier_numero_facture : 0) + 1;
-
-        Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)
-            ->update(['annee_numero_facture' => $annee, 'dernier_numero_facture' => $numero]);
-
-        return self::formater($vente->boutique_id, $numero, $vente->created_at);
+        return app(NumerotationFactures::class)->prendre($vente->boutique_id, $vente->created_at);
     }
 
     /** Le numéro tel qu'il est calculé une seule fois, à la création de la vente. */

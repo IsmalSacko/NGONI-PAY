@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
+use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
 use App\Services\Images;
@@ -16,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Boutiques du compte : celles où il a un rôle, la création d'une nouvelle
@@ -168,6 +170,53 @@ class BoutiqueController extends Controller
     }
 
     /** Efface les données d'essai de la boutique : il faut taper REINITIALISER. */
+    /**
+     * Mode rodage, activé par le propriétaire tant que la boutique n'a pas de
+     * vraie vente : ses ventes sont des essais (ESSAI-…), supprimables. On en
+     * sort par le passage en mode réel, qui efface tout.
+     */
+    public function activerRodage(Request $request): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut passer en mode rodage.');
+        if (Vente::where('essai', false)->exists()) {
+            throw ValidationException::withMessages(['rodage' => [
+                'Votre boutique a déjà de vraies ventes : elles ne peuvent pas devenir des essais. Pour repartir de zéro, utilisez « Repartir de zéro ».',
+            ]]);
+        }
+        $boutique->forceFill(['mode_rodage' => true])->save();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    /**
+     * Fin du rodage : tout est effacé sauf les comptes (et le catalogue, les
+     * fournisseurs s'il le veut), les numéros d'essai repartent à zéro, et la
+     * boutique vend pour de vrai.
+     */
+    public function passerEnModeReel(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
+    {
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut passer en mode réel.');
+        $request->validate([
+            'confirmation' => ['required', 'in:MODE REEL'],
+            'garder_catalogue' => ['boolean'],
+            'garder_fournisseurs' => ['boolean'],
+        ], ['confirmation.in' => 'Tapez MODE REEL pour confirmer.']);
+        if (! $boutique->mode_rodage) {
+            throw ValidationException::withMessages(['rodage' => ['Votre boutique est déjà en mode réel.']]);
+        }
+
+        $reinitialisation->reinitialiser($boutique->id, $request->user(), $request->boolean('garder_catalogue', true), $request->boolean('garder_fournisseurs', true));
+        $compteurs = array_filter($boutique->fresh()->compteurs_facture ?? [], fn ($serie) => ! str_starts_with((string) $serie, 'ESSAI|'), ARRAY_FILTER_USE_KEY);
+        $boutique->forceFill(['mode_rodage' => false, 'compteurs_facture' => $compteurs])->save();
+
+        return response()->json([
+            'message' => "{$boutique->nom} est en mode réel : vos essais sont effacés, la prochaine facture sera {$boutique->fresh()->prochaine_facture}.",
+            'data' => $boutique->fresh(),
+        ]);
+    }
+
     public function reinitialiser(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());

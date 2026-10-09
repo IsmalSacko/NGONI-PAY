@@ -409,33 +409,58 @@ class VenteService
                 'annulee_par' => $auteur->id,
                 'motif_annulation' => $motif,
             ]);
-
-            // Le stock ne revient que là où la vente l'avait pris : pas pour
-            // les prestations d'un pressing, même s'il a changé d'activité depuis.
-            $sortis = MouvementStock::where('vente_id', $vente->id)->where('type', TypeMouvementStock::Sortie)->pluck('produit_id')->all();
-            foreach ($vente->lignes()->whereNotNull('produit_id')->get() as $ligne) {
-                $produit = in_array($ligne->produit_id, $sortis, true) ? Produit::whereKey($ligne->produit_id)->lockForUpdate()->first() : null;
-                if ($produit === null) {
-                    continue;
-                }
-                $base = Quantite::normaliser($ligne->quantite * ($ligne->contenance ?: 1));
-                $produit->stock = Quantite::normaliser($produit->stock + $base);
-                $produit->save();
-                app(Lots::class)->rendre($ligne->lots);
-
-                MouvementStock::create([
-                    'produit_id' => $produit->id,
-                    'user_id' => $auteur->id,
-                    'vente_id' => $vente->id,
-                    'type' => TypeMouvementStock::Entree,
-                    'quantite' => $base,
-                    'stock_apres' => $produit->stock,
-                    'motif' => 'Annulation vente '.$vente->numeroFormate(),
-                ]);
-            }
+            $this->rendreStock($vente, $auteur);
 
             return $vente->load(['lignes', 'client', 'caissier']);
         });
+    }
+
+    /**
+     * Mode rodage : une vente d'essai s'efface pour de bon (le stock revient
+     * d'abord, si elle n'était pas déjà annulée). Une vente réelle, jamais.
+     */
+    public function supprimerEssai(Vente $vente, User $auteur): void
+    {
+        DB::transaction(function () use ($vente, $auteur): void {
+            $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
+            $rodage = (bool) Boutique::whereKey($vente->boutique_id)->value('mode_rodage');
+            if (! $vente->essai || ! $rodage) {
+                throw ValidationException::withMessages(['vente' => [
+                    'Seules les ventes d’essai, en mode rodage, se suppriment. Une vente réelle s’annule.',
+                ]]);
+            }
+            if (! $vente->estAnnulee()) {
+                $this->rendreStock($vente, $auteur);
+            }
+            MouvementStock::where('vente_id', $vente->id)->delete();
+            $vente->delete();
+        });
+    }
+
+    /** Le stock revient là où la vente l'avait pris (pas pour les prestations d'un pressing). */
+    private function rendreStock(Vente $vente, User $auteur): void
+    {
+        $sortis = MouvementStock::where('vente_id', $vente->id)->where('type', TypeMouvementStock::Sortie)->pluck('produit_id')->all();
+        foreach ($vente->lignes()->whereNotNull('produit_id')->get() as $ligne) {
+            $produit = in_array($ligne->produit_id, $sortis, true) ? Produit::whereKey($ligne->produit_id)->lockForUpdate()->first() : null;
+            if ($produit === null) {
+                continue;
+            }
+            $base = Quantite::normaliser($ligne->quantite * ($ligne->contenance ?: 1));
+            $produit->stock = Quantite::normaliser($produit->stock + $base);
+            $produit->save();
+            app(Lots::class)->rendre($ligne->lots);
+
+            MouvementStock::create([
+                'produit_id' => $produit->id,
+                'user_id' => $auteur->id,
+                'vente_id' => $vente->id,
+                'type' => TypeMouvementStock::Entree,
+                'quantite' => $base,
+                'stock_apres' => $produit->stock,
+                'motif' => 'Annulation vente '.$vente->numeroFormate(),
+            ]);
+        }
     }
 
     /**

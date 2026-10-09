@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\Storage;
  * boutique vierge. La restauration, elle, reste à l'exploitant.
  *
  * - Effacés : ventes et tickets, séances de caisse, clôtures, mouvements de
- *   stock, achats et paiements fournisseurs, clients, crédits et règlements.
+ *   stock et lots, achats et paiements fournisseurs, clients, crédits et
+ *   règlements, dépenses ; commandes, encaissements et forfaits du pressing ;
+ *   commandes, encaissements et réservations du restaurant.
  * - Au choix : les fournisseurs ; le catalogue (gardé, il repart d'un stock
  *   à 0 ; sinon articles et catégories partent aussi).
  * - Gardés : la boutique (réglages, logo, programme fidélité), l'équipe et
@@ -35,7 +37,10 @@ class ReinitialisationBoutique
 {
     /** Ordre d'effacement : les tables qui en référencent d'autres d'abord. */
     private const TOUJOURS = [
-        'ventes', 'mouvements_stock', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur', 'achats', 'clotures', 'clients',
+        // Pressing et restaurant d'abord : leurs commandes tiennent aux clients.
+        'encaissements_pressing', 'commandes_pressing', 'forfaits_pressing', 'depenses',
+        'encaissements_restaurant', 'reservations_restaurant', 'commandes_restaurant',
+        'ventes', 'mouvements_stock', 'lots', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur', 'achats', 'clotures', 'clients',
     ];
 
     /** Le propriétaire de la boutique, ou l'exploitant de la plateforme : personne d'autre (ni admin employé, ni gérant). */
