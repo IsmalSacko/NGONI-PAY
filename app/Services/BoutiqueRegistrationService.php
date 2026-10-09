@@ -67,6 +67,8 @@ class BoutiqueRegistrationService
             $parrain = app(Parrainage::class)->parrainPour($data['code_parrainage'], $telephone);
         }
 
+        // Deux inscriptions au même instant peuvent se gêner sur les rôles
+        // (« deadlock », vu en prod) : la transaction est rejouée, jusqu'à 3 fois.
         $resultat = DB::transaction(function () use ($data, $parrain): array {
             $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
 
@@ -122,7 +124,7 @@ class BoutiqueRegistrationService
             EssaisAppareils::noter($data['empreinte'] ?? null, $user);
 
             return ['boutique' => $boutique->fresh(), 'user' => $user->fresh(), 'essai_offert' => $essai->fresh()->fin?->isFuture() ?? false, 'deja_vus' => $dejaVus];
-        });
+        }, attempts: 3);
 
         $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);
 
@@ -241,7 +243,7 @@ class BoutiqueRegistrationService
                 app(AbonnementService::class)->demarrerEssai($proprietaire);
 
                 return $boutique;
-            });
+            }, attempts: 3);
         } finally {
             // La requête continue dans la boutique où elle avait commencé.
             $this->tenant->setBoutique($tenantPrecedent);
@@ -270,13 +272,6 @@ class BoutiqueRegistrationService
         }
     }
 
-    /**
-     * Un numéro qui n'a pas le bon nombre de chiffres pour son pays est refusé :
-     * tapé avec un chiffre en moins, il ne correspond à aucun compte, et le
-     * commerçant qui ne retrouvait pas le sien en créait un second, avec un
-     * nouvel essai. Un numéro d'un autre pays (saisi avec son indicatif) n'est
-     * pas vérifié ici.
-     */
     /** Première version de l'application qui montre le rodage et sait le quitter. */
     public const VERSION_RODAGE = '4.12.0';
 
@@ -293,6 +288,13 @@ class BoutiqueRegistrationService
             && $version !== null && version_compare(explode('+', $version)[0], self::VERSION_RODAGE, '>=');
     }
 
+    /**
+     * Un numéro qui n'a pas le bon nombre de chiffres pour son pays est refusé :
+     * tapé avec un chiffre en moins, il ne correspond à aucun compte, et le
+     * commerçant qui ne retrouvait pas le sien en créait un second, avec un
+     * nouvel essai. Un numéro d'un autre pays (saisi avec son indicatif) n'est
+     * pas vérifié ici.
+     */
     private function verifierLongueur(string $telephone, Country $pays): void
     {
         $longueurs = $pays->subscriberLengths();
