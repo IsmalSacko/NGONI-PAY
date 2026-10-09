@@ -62,7 +62,7 @@ class PaiementPawapayTest extends TestCase
         return $this->withToken($this->awa->createToken('t')->plainTextToken);
     }
 
-    private function payer(string $moyen = 'wave_sen'): DemandeAbonnement
+    private function payer(string $moyen = 'free_sen'): DemandeAbonnement
     {
         $reponse = $this->api()->postJson('/api/abonnement/paiement-mobile', ['plan' => 'pro', 'cycle' => 'monthly', 'moyen' => $moyen])
             ->assertCreated()->assertJsonPath('redirect_url', 'https://paywith.pawapay.io/?token=abc');
@@ -82,14 +82,14 @@ class PaiementPawapayTest extends TestCase
     {
         $this->api()->getJson('/api/abonnement')
             ->assertJsonPath('data.paiement_mobile.titre', 'Payer par Mobile Money')
-            ->assertJsonCount(3, 'data.paiement_mobile.moyens')
-            ->assertJsonPath('data.paiement_mobile.moyens.1.code', 'wave_sen')
+            ->assertJsonCount(2, 'data.paiement_mobile.moyens')
+            ->assertJsonPath('data.paiement_mobile.moyens.1.code', 'free_sen')
             ->assertJsonPath('data.paiement_mobile.moyens.1.frais_pourcentage', 3);
 
         $demande = $this->payer();
 
         $this->assertSame(PaiementJeko::fraisAuTaux($demande->montant, 3.0), $demande->frais_mobile);
-        $this->assertSame('pawapay_wave_sen', $demande->moyen);
+        $this->assertSame('pawapay_free_sen', $demande->moyen);
         $this->assertNotNull($demande->pawapay_deposit_id);
         Http::assertSent(fn (Request $r) => $r->url() === 'https://api.sandbox.pawapay.io/v2/paymentpage'
             && $r['depositId'] === $demande->pawapay_deposit_id
@@ -109,7 +109,7 @@ class PaiementPawapayTest extends TestCase
 
         $demande->refresh();
         $this->assertSame(StatutDemande::Approuvee, $demande->statut);
-        $this->assertStringContainsString('Wave via pawaPay', (string) $demande->note_decision);
+        $this->assertStringContainsString('Free Money via pawaPay', (string) $demande->note_decision);
         $this->assertSame('pro', $this->awa->abonnement()->first()->plan);
     }
 

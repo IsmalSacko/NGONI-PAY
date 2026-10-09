@@ -17,10 +17,11 @@ return [
     /*
      * Pays de la boutique (ISO 2) => code pawaPay (ISO 3), devise, et les
      * opérateurs affichés. La page de pawaPay laisse choisir l'opérateur.
+     * Seulement ce que le compte a d'actif (GET /v2/active-conf, vérifié le
+     * 2026-10-09) : ni Wave au Sénégal, ni le Burkina Faso.
      */
     'pays' => [
-        'SN' => ['code' => 'SEN', 'devise' => 'XOF', 'moyens' => ['orange_sen' => 'Orange Money', 'wave_sen' => 'Wave', 'free_sen' => 'Free Money']],
-        'BF' => ['code' => 'BFA', 'devise' => 'XOF', 'moyens' => ['orange_bfa' => 'Orange Money', 'moov_bfa' => 'Moov Money']],
+        'SN' => ['code' => 'SEN', 'devise' => 'XOF', 'moyens' => ['orange_sen' => 'Orange Money', 'free_sen' => 'Free Money']],
         'BJ' => ['code' => 'BEN', 'devise' => 'XOF', 'moyens' => ['mtn_momo_ben' => 'MTN MoMo', 'moov_ben' => 'Moov Money']],
     ],
 
