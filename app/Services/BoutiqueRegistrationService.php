@@ -75,6 +75,8 @@ class BoutiqueRegistrationService
                 'devise' => $pays->currency(),
                 'telephone' => PhoneNumber::normalize($data['telephone'], $pays),
                 'email' => $data['email'] ?? null,
+                // Nouvelle boutique : en rodage, ses essais s'effacent au passage en mode réel.
+                'mode_rodage' => (bool) config('ecaisse.rodage_a_l_inscription'),
             ]);
 
             // Le contexte tenant doit être posé avant toute écriture qui en
@@ -224,6 +226,7 @@ class BoutiqueRegistrationService
                         : $proprietaire->phone,
                     'email' => $data['email'] ?? $proprietaire->email,
                     'adresse' => $data['adresse'] ?? null,
+                    'mode_rodage' => (bool) config('ecaisse.rodage_a_l_inscription'),
                 ]);
 
                 $this->tenant->setBoutique($boutique->id);

@@ -225,6 +225,8 @@ class BoutiqueController extends Controller
             'confirmation' => ['required', 'in:REINITIALISER'],
             'garder_catalogue' => ['boolean'],
             'garder_fournisseurs' => ['boolean'],
+            // Tout à zéro, numérotation des factures comprise : seuls les comptes restent.
+            'tout_a_zero' => ['boolean'],
         ], ['confirmation.in' => 'Tapez REINITIALISER pour confirmer.']);
 
         $resultat = $reinitialisation->reinitialiser(
@@ -232,6 +234,7 @@ class BoutiqueController extends Controller
             $request->user(),
             $request->boolean('garder_catalogue', true),
             $request->boolean('garder_fournisseurs', true),
+            $request->boolean('tout_a_zero'),
         );
 
         return response()->json(['message' => "{$resultat['boutique']} est remise à zéro : elle est prête pour vos vraies ventes."]);

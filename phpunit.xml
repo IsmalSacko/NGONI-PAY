@@ -32,5 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Les tests vendent en mode réel ; le rodage à l'inscription a ses propres tests. -->
+        <env name="ECAISSE_RODAGE_A_L_INSCRIPTION" value="false"/>
     </php>
 </phpunit>

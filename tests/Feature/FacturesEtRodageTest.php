@@ -185,4 +185,30 @@ class FacturesEtRodageTest extends TestCase
         ])->assertUnprocessable();
         $this->assertSame(2, Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
     }
+
+    public function test_une_nouvelle_boutique_demarre_en_rodage(): void
+    {
+        config(['ecaisse.rodage_a_l_inscription' => true]);
+        ['boutique' => $neuve] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Boutique Neuve', 'pays' => 'ML', 'telephone' => '76008299', 'email' => null,
+            'password' => 'password123', 'nom_utilisateur' => 'Neuve',
+        ]);
+
+        $this->assertTrue($neuve->fresh()->mode_rodage);
+        $this->assertStringStartsWith('ESSAI-', $neuve->fresh()->prochaine_facture);
+    }
+
+    public function test_tout_a_zero_efface_tout_sauf_les_comptes_et_la_numerotation_repart_a_1(): void
+    {
+        $annee = now()->format('Y');
+        $this->vendre();
+        $this->assertSame("EAT-{$annee}-0002", $this->vendre()['numero_facture']);
+
+        $this->api()->postJson('/api/boutique/reinitialiser', ['confirmation' => 'REINITIALISER', 'tout_a_zero' => true])->assertOk();
+
+        $this->assertSame(0, Produit::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count(), 'catalogue effacé');
+        $this->assertSame(0, Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
+        $this->assertNotNull(User::find($this->awa->id), 'les comptes restent');
+        $this->assertSame("EAT-{$annee}-0001", $this->boutique->fresh()->prochaine_facture, 'la numérotation repart à 1');
+    }
 }

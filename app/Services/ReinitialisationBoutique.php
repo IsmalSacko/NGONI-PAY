@@ -22,6 +22,11 @@ use Illuminate\Support\Facades\Storage;
  *   commandes, encaissements et réservations du restaurant.
  * - Au choix : les fournisseurs ; le catalogue (gardé, il repart d'un stock
  *   à 0 ; sinon articles et catégories partent aussi).
+ * - « Tout à zéro » : en plus, unités, fournitures et prestations du pressing,
+ *   carte et salle du restaurant — et la numérotation des factures repart à 1.
+ *   Seuls restent les comptes (propriétaire, équipe), les réglages de la
+ *   boutique et l'abonnement ; les prestations et catégories par défaut de
+ *   l'activité sont recréées.
  * - Gardés : la boutique (réglages, logo, programme fidélité), l'équipe et
  *   l'abonnement, et la numérotation des factures : elle CONTINUE (compteur
  *   boutiques.dernier_numero_vente) — un numéro déjà remis à un client ne
@@ -86,7 +91,13 @@ class ReinitialisationBoutique
     /**
      * @return array{boutique: string, sauvegarde: string}
      */
-    public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs): array
+    /** Configuration effacée par « Tout à zéro », dans l'ordre des liens entre tables. */
+    private const CONFIGURATION = [
+        'recettes_restaurant', 'formules_restaurant', 'options_restaurant', 'ingredients_restaurant', 'postes_restaurant', 'tables_restaurant',
+        'fournitures_pressing', 'services_pressing',
+    ];
+
+    public function reinitialiser(string $boutiqueId, User $exploitant, bool $garderCatalogue, bool $garderFournisseurs, bool $toutAZero = false): array
     {
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($boutiqueId);
         if (! self::autorise($exploitant, $boutique)) {
@@ -94,24 +105,44 @@ class ReinitialisationBoutique
         }
 
         $tables = [...self::TOUJOURS];
+        if ($toutAZero) {
+            [$garderCatalogue, $garderFournisseurs] = [false, false];
+            array_push($tables, ...self::CONFIGURATION);
+        }
         if (! $garderFournisseurs) {
             $tables[] = 'fournisseurs';
         }
         if (! $garderCatalogue) {
             array_push($tables, 'produits', 'categories_produits');
         }
+        if ($toutAZero) {
+            $tables[] = 'unites';
+        }
 
         $sauvegarde = $this->sauvegarder($boutique, $tables, $exploitant);
         $photos = $garderCatalogue ? [] : array_values(array_filter(DB::table('produits')->where('boutique_id', $boutique->id)->pluck('photo')->all()));
 
-        DB::transaction(function () use ($boutique, $tables, $garderCatalogue): void {
+        DB::transaction(function () use ($boutique, $tables, $garderCatalogue, $toutAZero): void {
             foreach ($tables as $table) {
                 DB::table($table)->where('boutique_id', $boutique->id)->delete();
             }
             if ($garderCatalogue) {
                 DB::table('produits')->where('boutique_id', $boutique->id)->update(['stock' => 0, 'updated_at' => now()]);
             }
+            if ($toutAZero) {
+                // La numérotation repart à 1 : décision du propriétaire, prévenu que
+                // d'anciens numéros peuvent alors revenir.
+                DB::table('boutiques')->where('id', $boutique->id)->update([
+                    'compteurs_facture' => null, 'annee_numero_facture' => null, 'dernier_numero_facture' => 0,
+                ]);
+            }
         });
+        if ($toutAZero) {
+            // Les prestations et catégories par défaut de l'activité reviennent.
+            $neuve = $boutique->fresh();
+            $neuve->preparerPressing();
+            $neuve->preparerRestaurant();
+        }
 
         // Les photos suivent la sauvegarde : une restauration les remet en place,
         // le nettoyage des 30 jours les efface avec elle.
