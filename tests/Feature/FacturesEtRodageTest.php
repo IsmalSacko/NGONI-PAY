@@ -157,4 +157,32 @@ class FacturesEtRodageTest extends TestCase
         $this->assertSame(0, DB::table('commandes_pressing')->where('boutique_id', $this->boutique->id)->count());
         $this->assertSame(0, Client::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
     }
+
+    public function test_corriger_une_facture_annule_et_remplace_dans_la_meme_operation(): void
+    {
+        $fautive = $this->vendre(); // 2 riz
+        $annee = now()->format('Y');
+
+        $corrigee = $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 3]],
+            'moyen_paiement' => 'especes',
+            'remplace_vente_id' => $fautive['id'],
+        ])->assertCreated()->json();
+
+        $this->assertSame("EAT-{$annee}-0002", $corrigee['numero_facture']);
+        $this->assertSame("EAT-{$annee}-0001", $corrigee['remplace_numero']);
+        $ancienne = $this->api()->getJson("/api/ventes/{$fautive['id']}")->assertOk()->json();
+        $this->assertSame('annulee', $ancienne['statut']);
+        $this->assertSame("EAT-{$annee}-0002", $ancienne['remplacee_par_numero']);
+        $this->assertStringContainsString('remplacée par la facture', $ancienne['motif_annulation']);
+        $this->assertEquals(47, $this->riz->fresh()->stock, 'les 2 riz reviennent, les 3 partent');
+
+        // Une facture déjà corrigée ne se corrige plus : rien n'est créé.
+        $this->api()->postJson('/api/ventes', [
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 1]],
+            'moyen_paiement' => 'especes',
+            'remplace_vente_id' => $fautive['id'],
+        ])->assertUnprocessable();
+        $this->assertSame(2, Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
+    }
 }

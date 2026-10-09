@@ -356,6 +356,18 @@ class VenteService
                 ]);
             }
 
+            // Correction : la vente fautive est annulée dans la même opération
+            // (mêmes règles qu'une annulation), et les deux factures se répondent.
+            if (! empty($data['remplace_vente_id'])) {
+                $ancienne = Vente::whereKey($data['remplace_vente_id'])->first();
+                if ($ancienne === null || $ancienne->remplacee_par_id !== null) {
+                    throw ValidationException::withMessages(['remplace_vente_id' => ['Cette facture a déjà été corrigée, ou n’existe plus.']]);
+                }
+                $this->annuler($ancienne, $caissier, 'Corrigée : remplacée par la facture '.$vente->numeroFormate());
+                Vente::whereKey($ancienne->id)->update(['remplacee_par_id' => $vente->id]);
+                $vente->forceFill(['remplace_vente_id' => $ancienne->id])->save();
+            }
+
             return $vente->load('lignes');
         });
     }

@@ -126,6 +126,8 @@ class VenteController extends Controller
             'vendue_hors_ligne' => ['nullable', 'boolean'],
             // Remise de fidélité demandée : le serveur la calcule lui-même.
             'remise_fidelite' => ['nullable', 'boolean'],
+            // Correction : la facture fautive, annulée et remplacée par celle-ci.
+            'remplace_vente_id' => ['nullable', 'uuid'],
         ]);
 
         if (($data['remise_fidelite'] ?? false) && empty($data['client_id'])) {
@@ -142,6 +144,7 @@ class VenteController extends Controller
             $data['remise'] = 0;
         }
         $refus = match (true) {
+            ! empty($data['remplace_vente_id']) && ! $user->can('ventes.delete') => 'Corriger une facture demande le droit d’annuler les ventes.',
             ($data['remise'] ?? 0) > 0 && ! ($data['remise_fidelite'] ?? false) && ! $user->can('ventes.remise') => 'Vous n’avez pas le droit de faire des remises.',
             collect($data['lignes'])->contains(fn ($l) => empty($l['produit_id'])) && ! $user->can('ventes.montant_libre') => 'Vous n’avez pas le droit de vendre au montant libre.',
             default => null,

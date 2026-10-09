@@ -53,7 +53,7 @@ class Vente extends Model
     }
 
     /** Numéro lisible, envoyé à l'application avec chaque vente. */
-    protected $appends = ['numero_facture'];
+    protected $appends = ['numero_facture', 'remplace_numero', 'remplacee_par_numero'];
 
     /** @var array<string, string> préfixe par boutique, le temps d'une requête */
     private static array $prefixes = [];
@@ -136,6 +136,18 @@ class Vente extends Model
     public function getNumeroFactureAttribute(): string
     {
         return $this->numeroFormate();
+    }
+
+    /** Correction : le numéro de la facture que celle-ci remplace. */
+    public function getRemplaceNumeroAttribute(): ?string
+    {
+        return $this->remplace_vente_id === null ? null : self::withoutGlobalScopes()->whereKey($this->remplace_vente_id)->value('numero_facture');
+    }
+
+    /** Correction : le numéro de la facture qui remplace celle-ci (annulée). */
+    public function getRemplaceeParNumeroAttribute(): ?string
+    {
+        return $this->remplacee_par_id === null ? null : self::withoutGlobalScopes()->whereKey($this->remplacee_par_id)->value('numero_facture');
     }
 
     /**
