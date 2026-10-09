@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\FedapayWebhookController;
 use App\Http\Controllers\Api\JekoWebhookController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\TutorielController;
 use App\Http\Controllers\Api\PawapayWebhookController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\PlateformeController;
@@ -95,6 +96,14 @@ Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('platefo
     Route::post('annonces/{annonce}/arreter', 'arreterAnnonce');
 });
 
+// Aide et tutoriels, gérés depuis la console.
+Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('plateforme')->controller(TutorielController::class)->group(function (): void {
+    Route::get('tutoriels', 'liste');
+    Route::post('tutoriels', 'enregistrer');
+    Route::put('tutoriels/{tutoriel}', 'modifier');
+    Route::delete('tutoriels/{tutoriel}', 'supprimer');
+});
+
 // Hors du groupe authentifié : se déconnecter avec un jeton déjà invalide
 // doit réussir. Refusé (401), l'application relançait la déconnexion en boucle
 // — des milliers de requêtes par minute et par téléphone.
@@ -110,6 +119,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
 
     Route::post('appareils', [AppareilController::class, 'store']);
     Route::get('notifications', [NotificationController::class, 'index']);
+    Route::get('tutoriels', [TutorielController::class, 'index']);
     Route::post('notifications/tout-lu', [NotificationController::class, 'toutLu']);
     Route::post('notifications/supprimer', [NotificationController::class, 'supprimerPlusieurs']);
     Route::post('notifications/{notification}/lue', [NotificationController::class, 'lue'])->whereNumber('notification');
