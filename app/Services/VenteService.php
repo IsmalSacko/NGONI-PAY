@@ -462,6 +462,40 @@ class VenteService
         });
     }
 
+    /**
+     * Le commerçant choisit le numéro d'une facture (mode libre, ou vente
+     * d'essai en rodage). Unique dans la boutique ; l'ancien numéro est gardé
+     * au journal.
+     */
+    public function changerNumeroFacture(Vente $vente, string $numero, User $auteur): Vente
+    {
+        $numero = mb_strtoupper(trim($numero));
+
+        return DB::transaction(function () use ($vente, $numero, $auteur): Vente {
+            $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
+            $boutique = Boutique::find($vente->boutique_id);
+            if (! ($vente->essai && (bool) $boutique?->mode_rodage) && ! ModeLibre::actif($boutique)) {
+                throw ValidationException::withMessages(['numero_facture' => [
+                    'Pour choisir le numéro de vos factures, activez le mode libre (Ma boutique), sous votre responsabilité.',
+                ]]);
+            }
+            $ancien = $vente->numeroFormate();
+            if ($numero === $ancien) {
+                return $vente;
+            }
+            if (Vente::withoutGlobalScopes()->where('boutique_id', $vente->boutique_id)->where('numero_facture', $numero)->exists()) {
+                throw ValidationException::withMessages(['numero_facture' => ["Le numéro {$numero} est déjà celui d’une autre facture."]]);
+            }
+            $vente->forceFill(['numero_facture' => $numero])->save();
+            DB::table('journal_numeros_facture')->insert([
+                'boutique_id' => $vente->boutique_id, 'user_id' => $auteur->id, 'par' => $auteur->name,
+                'vente_id' => $vente->id, 'ancien' => $ancien, 'nouveau' => $numero, 'le' => now(),
+            ]);
+
+            return $vente;
+        });
+    }
+
     /** Le stock revient là où la vente l'avait pris (pas pour les prestations d'un pressing). */
     private function rendreStock(Vente $vente, User $auteur): void
     {

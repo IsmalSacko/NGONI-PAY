@@ -171,6 +171,17 @@ class VenteController extends Controller
         return response()->json($this->ventes->annuler($vente, $request->user(), $data['motif']));
     }
 
+    /** Mode libre (ou vente d'essai) : le commerçant choisit le numéro de la facture. */
+    public function changerNumero(Request $request, Vente $vente): JsonResponse
+    {
+        $data = $request->validate([
+            'numero_facture' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z0-9][A-Za-z0-9\/_.-]*$/'],
+        ], ['numero_facture.regex' => 'Lettres, chiffres et - / _ . seulement, sans espace.']);
+        $vente = $this->ventes->changerNumeroFacture($vente, $data['numero_facture'], $request->user());
+
+        return response()->json(['message' => "La facture porte maintenant le numéro {$vente->numeroFormate()}.", 'data' => ['numero_facture' => $vente->numeroFormate()]]);
+    }
+
     /** Vente d'essai (rodage), ou toute vente en mode libre : supprimée, et tracée au journal. */
     public function supprimer(Request $request, Vente $vente): JsonResponse
     {

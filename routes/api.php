@@ -135,6 +135,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('boutique/mode-libre', [BoutiqueController::class, 'modeLibre']);
     Route::post('boutique/mode-libre', [BoutiqueController::class, 'reglerModeLibre']);
     Route::get('boutique/journal-suppressions', [BoutiqueController::class, 'journalSuppressions'])->middleware('permission:boutique.update');
+    Route::get('boutique/journal-numeros', [BoutiqueController::class, 'journalNumeros'])->middleware('permission:boutique.update');
 
     // Abonnement du propriétaire de la boutique active. Consultable par tous ;
     // les demandes engagent le propriétaire, donc réservées à l'admin.
@@ -221,6 +222,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('ventes/{vente}', [VenteController::class, 'show'])->middleware('permission:ventes.view');
     Route::post('ventes/{vente}/annuler', [VenteController::class, 'annuler'])->middleware('permission:ventes.delete');
     Route::delete('ventes/{vente}', [VenteController::class, 'supprimer'])->middleware('permission:ventes.delete');
+    Route::post('ventes/{vente}/numero-facture', [VenteController::class, 'changerNumero'])->middleware('permission:ventes.delete');
     // Pressing : le registre des commandes (dépôt → prête → retrait, où naît la vente).
     // Pressing, offre Pro : dépenses, fournitures, forfaits, relevé mensuel.
     // Dépenses de la boutique et bilan (recettes − dépenses) : toutes les activités, offre Pro.

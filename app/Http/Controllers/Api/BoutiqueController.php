@@ -270,6 +270,13 @@ class BoutiqueController extends Controller
             ->map(fn ($l) => [...(array) $l, 'lignes' => json_decode((string) $l->lignes, true), 'essai' => (bool) $l->essai])]);
     }
 
+    /** Les numéros de facture changés à la main : ancien, nouveau, qui, quand. */
+    public function journalNumeros(): JsonResponse
+    {
+        return response()->json(['data' => DB::table('journal_numeros_facture')->where('boutique_id', app(TenantContext::class)->boutiqueId())
+            ->orderByDesc('le')->limit(200)->get(['ancien', 'nouveau', 'par', 'le'])]);
+    }
+
     public function reinitialiser(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());

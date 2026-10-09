@@ -31,6 +31,11 @@ class NumerotationFactures
         $compteurs = $boutique->compteurs_facture ?? [];
         $serie = $this->serie($boutique, $annee);
         $numero = (int) ($compteurs[$serie] ?? 0) + 1;
+        // Un numéro déjà porté par une vente (choisi à la main, ou compteur
+        // reculé en mode libre) est sauté : jamais deux factures au même numéro.
+        while (Vente::withoutGlobalScopes()->where('boutique_id', $boutiqueId)->where('numero_facture', $this->formater($boutique, $numero, $annee))->exists()) {
+            $numero++;
+        }
         $compteurs[$serie] = $numero;
         Boutique::withoutGlobalScopes()->whereKey($boutiqueId)->update(['compteurs_facture' => json_encode($compteurs)]);
 

@@ -298,4 +298,30 @@ class FacturesEtRodageTest extends TestCase
         $this->api()->postJson("/api/ventes/{$vente['id']}/annuler", ['motif' => 'Erreur'])->assertOk();
         $this->reglages(['facture_prochain_numero' => 1])->assertOk();
     }
+
+    public function test_en_mode_libre_on_choisit_le_numero_d_une_facture_unique_et_journalise(): void
+    {
+        $annee = now()->format('Y');
+        $vente = $this->vendre();
+        $autre = $this->vendre();
+
+        // Hors mode libre : refusé, avec la marche à suivre.
+        $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => 'FA-100'])
+            ->assertUnprocessable()->assertJsonValidationErrors('numero_facture');
+
+        $this->activerModeLibre()->assertOk();
+        $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => 'fa 100'])
+            ->assertUnprocessable()->assertJsonValidationErrors('numero_facture');
+        $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => $autre['numero_facture']])
+            ->assertUnprocessable()->assertJsonValidationErrors('numero_facture');
+
+        $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => "eat-{$annee}-0003"])
+            ->assertOk()->assertJsonPath('data.numero_facture', "EAT-{$annee}-0003");
+        $this->api()->getJson('/api/boutique/journal-numeros')->assertOk()
+            ->assertJsonPath('data.0.ancien', "EAT-{$annee}-0001")
+            ->assertJsonPath('data.0.nouveau', "EAT-{$annee}-0003");
+
+        // Le 0003 est pris : la vente suivante le saute.
+        $this->assertSame("EAT-{$annee}-0004", $this->vendre()['numero_facture']);
+    }
 }
