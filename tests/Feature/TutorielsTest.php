@@ -80,4 +80,22 @@ class TutorielsTest extends TestCase
             $this->assertSame('dQw4w9WgXcQ', Tutoriel::idYoutube($url), $url);
         }
     }
+
+    public function test_la_console_web_ajoute_masque_et_supprime_une_video(): void
+    {
+        $admin = User::where('est_admin_plateforme', true)->firstOrFail();
+        $this->actingAs($admin)->get('/plateforme/tutoriels')->assertOk()->assertSee('Tutoriels');
+
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)
+            ->call('nouveau')
+            ->set('url', 'https://vimeo.com/1')->set('titre', 'Vente')->call('enregistrer')->assertHasErrors('url')
+            ->set('url', 'https://youtu.be/dQw4w9WgXcQ')->call('enregistrer')->assertHasNoErrors()
+            ->assertSee('Vente');
+
+        $t = Tutoriel::sole();
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)->call('basculer', $t->id);
+        $this->assertFalse($t->fresh()->actif);
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)->call('supprimer', $t->id);
+        $this->assertSame(0, Tutoriel::count());
+    }
 }

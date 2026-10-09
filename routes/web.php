@@ -15,6 +15,7 @@ use App\Livewire\Clients\Index as ClientsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\MonCompte;
 use App\Livewire\Plateforme\Annonces;
+use App\Livewire\Plateforme\Tutoriels;
 use App\Livewire\Plateforme\Comptes;
 use App\Livewire\Plateforme\Demandes;
 use App\Livewire\Plateforme\Plans;
@@ -179,6 +180,7 @@ Route::middleware(['auth', 'conditions', 'plateforme'])->prefix('plateforme')->n
     Route::get('plans', Plans::class)->name('plans');
     Route::get('utilisateurs', Utilisateurs::class)->name('utilisateurs');
     Route::get('annonces', Annonces::class)->name('annonces');
+    Route::get('tutoriels', Tutoriels::class)->name('tutoriels');
 
     // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
     Route::get('demandes/{demande}/preuve', function (DemandeAbonnement $demande) {

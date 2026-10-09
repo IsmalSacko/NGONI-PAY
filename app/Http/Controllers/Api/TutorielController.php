@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Tutoriel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 /**
  * Aide et tutoriels : la liste pour les commerçants, et sa gestion par
@@ -58,19 +57,6 @@ class TutorielController extends Controller
     /** @return array<string, mixed> */
     private function valider(Request $request, bool $partiel = false): array
     {
-        $requis = $partiel ? 'sometimes' : 'required';
-
-        return $request->validate([
-            'titre' => [$requis, 'string', 'max:120'],
-            'sous_titre' => ['nullable', 'string', 'max:160'],
-            'categorie' => [$requis, Rule::in(array_keys(Tutoriel::CATEGORIES))],
-            'url' => [$requis, 'url', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec): void {
-                if (Tutoriel::idYoutube((string) $valeur) === null) {
-                    $echec('Collez le lien d’une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).');
-                }
-            }],
-            'ordre' => ['sometimes', 'integer', 'min:0'],
-            'actif' => ['sometimes', 'boolean'],
-        ], [], ['url' => 'lien YouTube']);
+        return $request->validate(Tutoriel::regles($partiel), [], ['url' => 'lien YouTube']);
     }
 }

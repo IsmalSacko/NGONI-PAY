@@ -28,6 +28,29 @@ class Tutoriel extends Model
         return ['actif' => 'boolean', 'ordre' => 'integer'];
     }
 
+    /**
+     * Règles de saisie, communes à la console web et à celle de l'application.
+     *
+     * @return array<string, mixed>
+     */
+    public static function regles(bool $partiel = false): array
+    {
+        $requis = $partiel ? 'sometimes' : 'required';
+
+        return [
+            'titre' => [$requis, 'string', 'max:120'],
+            'sous_titre' => ['nullable', 'string', 'max:160'],
+            'categorie' => [$requis, \Illuminate\Validation\Rule::in(array_keys(self::CATEGORIES))],
+            'url' => [$requis, 'url', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec): void {
+                if (self::idYoutube((string) $valeur) === null) {
+                    $echec('Collez le lien d’une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).');
+                }
+            }],
+            'ordre' => ['sometimes', 'integer', 'min:0'],
+            'actif' => ['sometimes', 'boolean'],
+        ];
+    }
+
     /** Identifiant de la vidéo YouTube (youtu.be/…, watch?v=…, shorts/…, embed/…, live/…), ou null. */
     public static function idYoutube(?string $url): ?string
     {
