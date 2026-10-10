@@ -11,9 +11,9 @@ use App\Services\BoutiqueRegistrationService;
 use App\Services\ConditionsUtilisation;
 use App\Services\ReinitialisationMotDePasse;
 use App\Support\Auth\Identification;
+use App\Support\Presence\Appareil;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
-use App\Support\Presence\Appareil;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -118,8 +118,20 @@ class AuthController extends Controller
             // Conditions à (re)accepter : l'application l'exige avant d'ouvrir la caisse.
             'conditions' => app(ConditionsUtilisation::class)->etat($user),
             // Grossiste à qui des revendeurs commandent : l'écran « Commandes reçues » s'affiche.
-            'commandes_recues' => $boutiqueId !== null && CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->exists(),
+            'commandes_recues' => $boutiqueId !== null && $this->recoitCommandes($boutiqueId),
         ]);
+    }
+
+    /** Jamais bloquant : une migration en retard ne doit pas empêcher la connexion. */
+    private function recoitCommandes(string $boutiqueId): bool
+    {
+        try {
+            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->exists();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     /** « J'accepte » sur l'écran des nouvelles conditions, à la connexion. */
