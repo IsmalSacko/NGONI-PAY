@@ -77,7 +77,11 @@ class CommandeFournisseur
             $cle = $fournisseur?->id ?? '';
 
             $groupes[$cle] ??= [
-                'fournisseur' => $fournisseur === null ? null : ['id' => $fournisseur->id, 'nom' => $fournisseur->nom, 'telephone' => $fournisseur->telephone],
+                'fournisseur' => $fournisseur === null ? null : [
+                    'id' => $fournisseur->id, 'nom' => $fournisseur->nom, 'telephone' => $fournisseur->telephone,
+                    // Sa boutique Ngoni, s'il en a une : la commande y arrive, sans WhatsApp.
+                    'grossiste' => app(CommandesFournisseur::class)->boutiqueDuFournisseur($fournisseur)?->nom,
+                ],
                 'articles' => [],
             ];
             $groupes[$cle]['articles'][] = [

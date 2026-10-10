@@ -10,6 +10,7 @@ use App\Models\Fournisseur;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
+use App\Services\AchatService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,7 +56,7 @@ class CommandesGrossistesTest extends TestCase
             'password' => 'password123', 'nom_utilisateur' => 'Awa',
         ]);
         $this->dans($this->epicerie);
-        $this->riz = Produit::create(['nom' => 'Riz 25kg', 'code_barre' => '600123', 'prix_vente' => 15000, 'prix_achat' => 12000, 'taux_tva' => 0, 'stock' => 2]);
+        $this->riz = Produit::create(['nom' => 'Riz 25kg', 'code_barre' => '600123', 'prix_vente' => 15000, 'prix_achat' => 12000, 'taux_tva' => 0, 'stock' => 2, 'seuil_alerte' => 5]);
     }
 
     private function dans(Boutique $boutique): void
@@ -78,6 +79,11 @@ class CommandesGrossistesTest extends TestCase
     {
         $fournisseur = $this->api($this->awa)->postJson('/api/fournisseurs', ['nom' => 'Traoré', 'telephone' => '76 00 11 22'])->json('id');
         $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/ngoni")->assertJsonPath('sur_ngoni', true)->assertJsonPath('boutique', 'Dépôt Traoré');
+        $this->dans($this->epicerie);
+        app(AchatService::class)->receptionner($this->awa, [['produit_id' => $this->riz->id, 'quantite' => 1, 'prix_achat' => 12000]], $fournisseur, null, 12000);
+        $this->api($this->awa)->getJson('/api/stocks/a-commander')->assertJsonPath('data.0.fournisseur.grossiste', 'Dépôt Traoré');
+        $this->dans($this->epicerie);
+        $this->riz->refresh()->update(['stock' => 2]);
 
         $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', [
             'fournisseur_id' => $fournisseur, 'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 10]], 'note' => 'Livraison avant samedi',
