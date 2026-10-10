@@ -78,6 +78,7 @@ class CommandesGrossistesTest extends TestCase
     public function test_le_grossiste_sur_ngoni_recoit_confirme_et_livre_a_credit(): void
     {
         $fournisseur = $this->api($this->awa)->postJson('/api/fournisseurs', ['nom' => 'Traoré', 'telephone' => '76 00 11 22'])->json('id');
+        $this->api($this->awa)->getJson('/api/fournisseurs')->assertJsonPath('data.0.grossiste', 'Dépôt Traoré');
         $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/ngoni")->assertJsonPath('sur_ngoni', true)->assertJsonPath('boutique', 'Dépôt Traoré');
         $this->dans($this->epicerie);
         app(AchatService::class)->receptionner($this->awa, [['produit_id' => $this->riz->id, 'quantite' => 1, 'prix_achat' => 12000]], $fournisseur, null, 12000);

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Achat;
 use App\Models\Fournisseur;
 use App\Services\AchatService;
+use App\Services\CommandesFournisseur;
 use App\Services\Fournisseurs;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -21,11 +22,13 @@ class AchatController extends Controller
 
     public function __construct(private readonly AchatService $achats) {}
 
-    public function fournisseurs(): JsonResponse
+    public function fournisseurs(CommandesFournisseur $commandes): JsonResponse
     {
         return response()->json(['data' => Fournisseur::avecSoldeDu()->orderBy('nom')->get()->map(fn (Fournisseur $f) => [
             'id' => $f->id, 'nom' => $f->nom, 'telephone' => $f->telephone, 'notes' => $f->notes,
             'solde_du' => max(0, (int) $f->achats_total - (int) $f->paiements_total),
+            // Sa boutique Ngoni, s'il en a une : les commandes y arrivent.
+            'grossiste' => $commandes->boutiqueDuFournisseur($f)?->nom,
         ])]);
     }
 
