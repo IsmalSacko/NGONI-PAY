@@ -12,7 +12,10 @@ use App\Models\DemandeAbonnement;
 use App\Models\User;
 use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\ConditionsUtilisation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -132,5 +135,23 @@ class ConsoleTrisTest extends TestCase
 
         $this->actingAs($admin)->get('/plateforme/abonnements')->assertOk()
             ->assertSee('Abonnements')->assertSee('Validés à la main')->assertSee('pawaPay');
+    }
+
+    public function test_les_utilisateurs_se_filtrent_par_conditions_acceptees(): void
+    {
+        $version = ConditionsUtilisation::version();
+        $accepter = fn (string $qui, string $v) => DB::table('acceptations_conditions')->insert([
+            'user_id' => $this->c[$qui]['user']->id, 'version' => $v, 'source' => 'application', 'acceptee_le' => now(),
+        ] + (Schema::hasColumn('acceptations_conditions', 'telephone') ? ['telephone' => $this->c[$qui]['user']->phone] : []));
+        $accepter('awa', $version);
+        $accepter('moussa', '2000-01-01.1');
+
+        $noms = fn (string $c) => collect($this->api()->getJson("/api/plateforme/utilisateurs?page=1&conditions={$c}")->assertOk()->json('data'))->pluck('nom')->all();
+
+        $this->assertSame(['Awa'], $noms('a_jour'));
+        $this->assertSame(['Moussa'], $noms('ancienne'));
+        $this->assertContains('Fanta', $noms('jamais'));
+        $this->assertNotContains('Awa', $noms('jamais'));
+        $this->assertSame('Awa', collect($this->api()->getJson('/api/plateforme/utilisateurs?page=1&tri=acceptation')->json('data'))->first()['nom']);
     }
 }

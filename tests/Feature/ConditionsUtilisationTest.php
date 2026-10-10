@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Annonce;
 use App\Models\User;
 use App\Services\ConditionsUtilisation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -27,7 +29,7 @@ class ConditionsUtilisationTest extends TestCase
     /** En-têtes de l'application 4.9.0 sur un Samsung. */
     private const APPLICATION = ['X-Appareil-Plateforme' => 'android', 'X-Appareil-Modele' => 'Samsung SM-A155F', 'X-App-Version' => '4.9.0'];
 
-    private function inscription(array $en_plus = []): \Illuminate\Testing\TestResponse
+    private function inscription(array $en_plus = []): TestResponse
     {
         return $this->postJson('/api/inscription', [
             'nom_boutique' => 'Épicerie Awa', 'pays' => 'ML', 'telephone' => '76008201',
@@ -174,7 +176,7 @@ class ConditionsUtilisationTest extends TestCase
         $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
 
         // Vue et annoncée hier : le Play Store ne la propose pas encore partout.
-        $annonce = \App\Models\Annonce::create(['type' => 'mise_a_jour', 'titre' => 'Nouvelle version', 'message' => '…', 'version' => '4.11.2',
+        $annonce = Annonce::create(['type' => 'mise_a_jour', 'titre' => 'Nouvelle version', 'message' => '…', 'version' => '4.11.2',
             'audience' => 'tous', 'statut' => 'envoyee', 'derniere_diffusion' => now()->subDay()]);
         $this->getJson('/api/app-version')->assertJsonPath('minimum_version', '4.9.0');
 
@@ -199,5 +201,24 @@ class ConditionsUtilisationTest extends TestCase
 
         $this->actingAs($exploitant)->get('/plateforme/utilisateurs')->assertOk()
             ->assertSee('Conditions acceptées')->assertSee('Samsung SM-A155F');
+    }
+
+    public function test_une_version_archivee_garde_son_texte_mais_prend_les_styles_actuels(): void
+    {
+        DB::table('versions_conditions')->insertOrIgnore([
+            'version' => '1999-01-01.1',
+            'conditions' => '<html><head><link rel="stylesheet" href="https://exemple.test/build/assets/app-ZZZZZZZZ.css"></head><body>Texte accepté</body></html>',
+            'confidentialite' => '<p>…</p>',
+            'archivee_le' => now(),
+        ]);
+        $manifeste = json_decode((string) @file_get_contents(public_path('build/manifest.json')), true);
+        if (! isset($manifeste['resources/css/app.css'])) {
+            $this->markTestSkipped('Styles non compilés sur ce poste.');
+        }
+
+        $this->get('/conditions/archives/1999-01-01.1/conditions')->assertOk()
+            ->assertSee('Texte accepté')
+            ->assertDontSee('app-ZZZZZZZZ.css')
+            ->assertSee('build/'.$manifeste['resources/css/app.css']['file']);
     }
 }

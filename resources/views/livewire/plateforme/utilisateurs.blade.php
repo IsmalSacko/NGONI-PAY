@@ -23,6 +23,9 @@
                 @foreach ($choix as $code => $libelle)<option value="{{ $code }}">{{ $modele === 'etat' && $code === '' ? 'Actifs et désactivés' : $libelle }}</option>@endforeach
             </select>
         @endforeach
+        <select wire:model.live="conditionsFiltre" class="{{ $champ }} pr-8" title="Conditions d’utilisation">
+            @foreach (\App\Services\Console\UtilisateursConsole::CONDITIONS as $code => $libelle)<option value="{{ $code }}">{{ $code === '' ? 'Conditions : toutes' : $libelle }}</option>@endforeach
+        </select>
         <select wire:model.live="pays" class="{{ $champ }} pr-8">
             <option value="">Tous les pays</option>
             @foreach ($listePays as $code => $libelle)<option value="{{ $code }}">{{ $libelle }}</option>@endforeach

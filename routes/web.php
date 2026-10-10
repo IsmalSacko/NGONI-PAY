@@ -52,6 +52,19 @@ Route::get('conditions/archives/{version}/{document}', function (string $version
     $texte = DB::table('versions_conditions')->where('version', $version)->value($document);
     abort_if($texte === null, 404);
 
+    // Le texte archivé reste celui accepté ; seuls ses liens vers les styles et
+    // scripts compilés de l'époque (app-XXXX.css), effacés depuis par une
+    // nouvelle compilation, pointent vers ceux d'aujourd'hui. Sans cela, la
+    // page s'affichait sans aucune mise en forme.
+    $actuels = collect(json_decode((string) @file_get_contents(public_path('build/manifest.json')), true) ?: [])
+        ->pluck('file')->filter(fn ($f) => is_string($f) && preg_match('/\.(css|js)$/', $f))
+        ->mapWithKeys(fn (string $f) => [preg_replace('/-[A-Za-z0-9_-]{8}\.(css|js)$/', '.$1', basename($f)) => $f]);
+    $texte = preg_replace_callback('#(https?://[^"\']*)?/build/assets/([A-Za-z]+)-[A-Za-z0-9_-]{8}\.(css|js)#', function (array $m) use ($actuels) {
+        $courant = $actuels["{$m[2]}.{$m[3]}"] ?? null;
+
+        return $courant === null ? $m[0] : asset('build/'.$courant);
+    }, (string) $texte);
+
     return response($texte)->header('X-Robots-Tag', 'noindex');
 })->where('version', '[0-9.\-]+')->name('conditions.archive');
 // Back-office : accepter la nouvelle version avant de continuer.

@@ -278,6 +278,7 @@ class PlateformeController extends Controller
             'etat' => $request->query('etat'),
             'pays' => $request->query('pays'),
             'appli' => $request->query('appli'),
+            'conditions' => $request->query('conditions'),
             'tri' => $request->query('tri'),
         ]);
         $page = $request->filled('page') ? $requete->paginate(50) : null;
@@ -308,6 +309,7 @@ class PlateformeController extends Controller
                 'roles' => UtilisateursConsole::ROLES,
                 'etats' => UtilisateursConsole::ETATS,
                 'applis' => UtilisateursConsole::APPLIS,
+                'conditions' => UtilisateursConsole::CONDITIONS,
                 'tris' => UtilisateursConsole::TRIS,
                 'pays' => app(ComptesConsole::class)->pays(),
             ],

@@ -40,6 +40,9 @@ class Utilisateurs extends Component
 
     public string $appli = '';
 
+    /** Voir UtilisateursConsole::CONDITIONS. */
+    public string $conditionsFiltre = '';
+
     public ?string $motDePasseProvisoire = null;
 
     public ?string $pour = null;
@@ -59,7 +62,7 @@ class Utilisateurs extends Component
 
     public function updating(string $propriete): void
     {
-        if (in_array($propriete, ['recherche', 'tri', 'role', 'etat', 'pays', 'appli'], true)) {
+        if (in_array($propriete, ['recherche', 'tri', 'role', 'etat', 'pays', 'appli', 'conditionsFiltre'], true)) {
             $this->resetPage();
         }
     }
@@ -132,7 +135,7 @@ class Utilisateurs extends Component
         // Activité et usage, en sous-requêtes : une seule requête pour la page.
         $users = app(UtilisateursConsole::class)->requete([
             'recherche' => $this->recherche, 'role' => $this->role, 'etat' => $this->etat,
-            'pays' => $this->pays, 'appli' => $this->appli, 'tri' => $this->tri,
+            'pays' => $this->pays, 'appli' => $this->appli, 'conditions' => $this->conditionsFiltre, 'tri' => $this->tri,
         ])
             ->paginate(25);
 
