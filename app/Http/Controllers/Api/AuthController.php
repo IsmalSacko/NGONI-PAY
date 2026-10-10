@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
+use App\Models\CommandeFournisseur;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\ConditionsUtilisation;
 use App\Services\ReinitialisationMotDePasse;
@@ -116,6 +117,8 @@ class AuthController extends Controller
             'proprietaire' => $user->peutOuvrirBoutique(),
             // Conditions à (re)accepter : l'application l'exige avant d'ouvrir la caisse.
             'conditions' => app(ConditionsUtilisation::class)->etat($user),
+            // Grossiste à qui des revendeurs commandent : l'écran « Commandes reçues » s'affiche.
+            'commandes_recues' => $boutiqueId !== null && CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->exists(),
         ]);
     }
 
