@@ -14,7 +14,7 @@ class Fournisseur extends Model
 {
     use BelongsToBoutique, HasUuids, SoftDeletes;
 
-    protected $fillable = ['nom', 'telephone', 'notes'];
+    protected $fillable = ['nom', 'telephone', 'notes', 'boutique_liee_id'];
 
     /** @return HasMany<Achat, $this> */
     public function achats(): HasMany

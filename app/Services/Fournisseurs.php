@@ -23,7 +23,11 @@ class Fournisseurs
             'telephone' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:500'],
         ])->validate();
-        $fournisseur->update($data);
+        $fournisseur->fill($data);
+        if ($fournisseur->isDirty('telephone')) {
+            $fournisseur->boutique_liee_id = null; // nouveau numéro : sa boutique Ngoni sera recherchée à nouveau
+        }
+        $fournisseur->save();
 
         return $fournisseur->fresh();
     }
