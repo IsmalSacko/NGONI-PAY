@@ -15,10 +15,15 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
-use App\Services\GestionPlans;
+use App\Services\ConditionsUtilisation;
+use App\Services\Console\AbonnementsConsole;
+use App\Services\Console\ComptesConsole;
+use App\Services\Console\UtilisateursConsole;
 use App\Services\GestionAnnonces;
+use App\Services\GestionPlans;
 use App\Services\Parrainage;
 use App\Services\Plateforme\Activite;
+use App\Services\RechercheDemandes;
 use App\Services\ReinitialisationBoutique;
 use App\Services\SuppressionCompte;
 use App\Support\Periode;
@@ -135,7 +140,7 @@ class PlateformeController extends Controller
     public function demandes(Request $request): JsonResponse
     {
         // Mêmes onglets et même recherche que la console web (RechercheDemandes).
-        $recherche = app(\App\Services\RechercheDemandes::class);
+        $recherche = app(RechercheDemandes::class);
         $q = (string) $request->query('q', '');
         $demandes = $recherche->requete((string) $request->query('filtre', 'en_attente'), $q)->limit(100)->get();
 
@@ -186,24 +191,25 @@ class PlateformeController extends Controller
         return response()->json(['message' => 'Demande refusée.']);
     }
 
-    public function comptes(Request $request): JsonResponse
+    public function comptes(Request $request, ComptesConsole $console): JsonResponse
     {
-        $filtre = (string) $request->query('filtre', '');
+        $requete = $console->requete([
+            'recherche' => $request->query('recherche'),
+            // « filtre » : nom du paramètre dans les applications déjà installées.
+            'statut' => $request->query('statut', $request->query('filtre')),
+            'plan' => $request->query('plan'),
+            'pays' => $request->query('pays'),
+            'activite' => $request->query('activite'),
+            'usage' => $request->query('usage'),
+            'tri' => $request->query('tri'),
+        ])->with(['proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
+            ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
+            ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
+            ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')]);
 
-        $abonnements = Abonnement::query()->avecCompte()
-            // Mêmes détails que la console web : ventes, dernière vente et chiffre sur 30 jours par boutique.
-            ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
-                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-            ]), 'proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
-                ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
-                ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
-                ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
-            ->when($request->filled('recherche'), fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u->recherche((string) $request->query('recherche'))))
-            ->when($filtre === 'actifs', fn ($q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today())))
-            ->when($filtre === 'expires', fn ($q) => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
-            ->latest('updated_at')
-            ->limit(100)
-            ->get();
+        // Page par page (50) ; sans « page », les 100 premiers comme avant.
+        $page = $request->filled('page') ? $requete->paginate(50) : null;
+        $abonnements = $page?->getCollection() ?? $requete->limit(100)->get();
 
         return response()->json([
             'plans' => Plan::ordonnes()->get(['code', 'nom']),
@@ -224,10 +230,23 @@ class PlateformeController extends Controller
                     'total_30j' => (int) $b->total_30j,
                 ])->values() ?? [],
                 'parrain' => $a->proprietaire?->parrain?->name,
-                'derniere_app' => $a->proprietaire?->derniere_app ? Carbon::parse($a->proprietaire->derniere_app)->toIso8601String() : null,
+                'derniere_app' => $a->derniere_app ? Carbon::parse($a->derniere_app)->toIso8601String() : null,
                 'inscrit_le' => $a->proprietaire?->created_at?->toIso8601String(),
+                'ventes' => (int) $a->nb_ventes,
+                'ca_30j' => (int) $a->ca_30j,
                 'abonnement' => $this->abonnement($a),
             ]),
+            'total' => $page?->total() ?? $abonnements->count(),
+            'page' => $page?->currentPage() ?? 1,
+            'pages' => $page?->lastPage() ?? 1,
+            'compteurs' => $console->compteurs(),
+            'filtres' => [
+                'statuts' => ComptesConsole::STATUTS,
+                'usages' => ComptesConsole::USAGES,
+                'tris' => ComptesConsole::TRIS,
+                'pays' => $console->pays(),
+                'activites' => array_combine(Boutique::ACTIVITES, array_map('ucfirst', Boutique::ACTIVITES)),
+            ],
         ]);
     }
 
@@ -251,24 +270,20 @@ class PlateformeController extends Controller
         return response()->json(['message' => "Abonnement de {$user->name} révoqué : ses boutiques passent en lecture seule."]);
     }
 
-    public function utilisateurs(Request $request): JsonResponse
+    public function utilisateurs(Request $request, UtilisateursConsole $console): JsonResponse
     {
+        $requete = $console->requete([
+            'recherche' => $request->query('recherche'),
+            'role' => $request->query('role'),
+            'etat' => $request->query('etat'),
+            'pays' => $request->query('pays'),
+            'appli' => $request->query('appli'),
+            'tri' => $request->query('tri'),
+        ]);
+        $page = $request->filled('page') ? $requete->paginate(50) : null;
+        $users = $page?->getCollection() ?? $requete->limit(100)->get();
 
-        $users = User::query()
-            ->select('users.*')
-            ->addSelect([
-                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-                'nb_appareils' => DB::table('appareils')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id'),
-                'nb_ventes' => DB::table('ventes')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id')->where('statut', 'validee'),
-            ])
-            ->with('boutique')
-            ->when($request->filled('recherche'), fn ($q) => $q->recherche((string) $request->query('recherche')))
-            // Comme la console web : derniers inscrits (par défaut) ou par nom.
-            ->when($request->query('tri') === 'nom', fn ($q) => $q->orderBy('name'), fn ($q) => $q->latest('users.created_at'))
-            ->limit(100)
-            ->get();
-
-        $conditions = app(\App\Services\ConditionsUtilisation::class)->dernieres($users->pluck('id')->map(fn ($id) => (string) $id)->all());
+        $conditions = app(ConditionsUtilisation::class)->dernieres($users->pluck('id')->map(fn ($id) => (string) $id)->all());
 
         return response()->json(['data' => $users->map(fn (User $u) => [
             'id' => $u->id,
@@ -285,7 +300,40 @@ class PlateformeController extends Controller
             'conditions' => $conditions[(string) $u->id] ?? null,
             'derniere_app' => $u->derniere_app ? Carbon::parse($u->derniere_app)->toIso8601String() : null,
             'inscrit_le' => $u->created_at?->toIso8601String(),
-        ])]);
+        ]),
+            'total' => $page?->total() ?? $users->count(),
+            'page' => $page?->currentPage() ?? 1,
+            'pages' => $page?->lastPage() ?? 1,
+            'filtres' => [
+                'roles' => UtilisateursConsole::ROLES,
+                'etats' => UtilisateursConsole::ETATS,
+                'applis' => UtilisateursConsole::APPLIS,
+                'tris' => UtilisateursConsole::TRIS,
+                'pays' => app(ComptesConsole::class)->pays(),
+            ],
+        ]);
+    }
+
+    /** Abonnements payés, par canal (Jèko, pawaPay, FedaPay, validés à la main), avec les totaux. */
+    public function abonnementsPayes(Request $request, AbonnementsConsole $console): JsonResponse
+    {
+        $periode = (string) $request->query('periode', 'tout');
+        $page = $console->requete([
+            'canal' => $request->query('canal'),
+            'periode' => $periode,
+            'recherche' => $request->query('recherche'),
+        ])->paginate(50);
+
+        return response()->json([
+            'data' => $page->getCollection()->map(fn ($d) => AbonnementsConsole::ligne($d))->values(),
+            'total' => $page->total(),
+            'page' => $page->currentPage(),
+            'pages' => $page->lastPage(),
+            'totaux' => $console->totaux($periode),
+            'accordes' => $console->accordes(),
+            'canaux' => AbonnementsConsole::CANAUX,
+            'periodes' => AbonnementsConsole::PERIODES,
+        ]);
     }
 
     public function basculer(User $user, Request $request, ComptesPlateforme $comptes): JsonResponse

@@ -8,10 +8,6 @@
             <p class="text-sm text-muted">Tous les comptes de la plateforme.</p>
         </div>
         <div class="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            <select wire:model.live="tri" class="{{ $champ }} pr-8">
-                <option value="recents">Derniers inscrits</option>
-                <option value="nom">Par nom</option>
-            </select>
             <label class="relative flex-1 md:flex-none">
                 <span class="sr-only">Rechercher</span>
                 <x-plateforme.picto nom="recherche" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
@@ -20,6 +16,22 @@
             </label>
         </div>
     </div>
+
+    <div class="flex flex-wrap gap-3">
+        @foreach (['role' => \App\Services\Console\UtilisateursConsole::ROLES, 'etat' => \App\Services\Console\UtilisateursConsole::ETATS, 'appli' => \App\Services\Console\UtilisateursConsole::APPLIS] as $modele => $choix)
+            <select wire:model.live="{{ $modele }}" class="{{ $champ }} pr-8">
+                @foreach ($choix as $code => $libelle)<option value="{{ $code }}">{{ $modele === 'etat' && $code === '' ? 'Actifs et désactivés' : $libelle }}</option>@endforeach
+            </select>
+        @endforeach
+        <select wire:model.live="pays" class="{{ $champ }} pr-8">
+            <option value="">Tous les pays</option>
+            @foreach ($listePays as $code => $libelle)<option value="{{ $code }}">{{ $libelle }}</option>@endforeach
+        </select>
+        <select wire:model.live="tri" class="{{ $champ }} pr-8 md:ml-auto" title="Trier">
+            @foreach (\App\Services\Console\UtilisateursConsole::TRIS as $code => $libelle)<option value="{{ $code }}">Tri : {{ $libelle }}</option>@endforeach
+        </select>
+    </div>
+    <p class="text-sm text-muted -mt-2">{{ $users->total() }} utilisateur(s)</p>
 
     @if ($alerte)<p class="rounded-xl bg-danger-bg text-danger-fg px-4 py-3 text-sm font-semibold">{{ $alerte }}</p>@endif
 

@@ -10,10 +10,10 @@ use App\Models\Boutique;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
+use App\Services\Console\ComptesConsole;
 use App\Services\RestaurationBoutique;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -31,8 +31,20 @@ class Comptes extends Component
 
     public string $recherche = '';
 
-    /** '' | actifs | expires */
+    /** Voir ComptesConsole::STATUTS. */
     public string $filtre = '';
+
+    public string $planFiltre = '';
+
+    public string $pays = '';
+
+    public string $activite = '';
+
+    /** Voir ComptesConsole::USAGES. */
+    public string $usage = '';
+
+    /** Voir ComptesConsole::TRIS. */
+    public string $tri = 'recents';
 
     public ?string $compteOuvert = null;
 
@@ -58,9 +70,11 @@ class Comptes extends Component
         $this->resetPage();
     }
 
-    public function updatingFiltre(): void
+    public function updating(string $propriete): void
     {
-        $this->resetPage();
+        if (in_array($propriete, ['filtre', 'planFiltre', 'pays', 'activite', 'usage', 'tri'], true)) {
+            $this->resetPage();
+        }
     }
 
     public function gerer(string $userId): void
@@ -158,21 +172,20 @@ class Comptes extends Component
 
     public function render(RestaurationBoutique $restauration)
     {
-        $abonnements = Abonnement::query()->avecCompte()
-            ->with(['proprietaire' => fn ($q) => $q->select('users.*')->addSelect([
-                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-            ]), 'proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
-                ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
-                ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
-                ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
-            ->when($this->recherche !== '', fn ($q) => $q->whereHas('proprietaire', fn ($u) => $u->recherche($this->recherche)))
-            ->when($this->filtre === 'actifs', fn ($q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today())))
-            ->when($this->filtre === 'expires', fn ($q) => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
-            ->latest('updated_at')
+        $console = app(ComptesConsole::class);
+        $abonnements = $console->requete([
+            'recherche' => $this->recherche, 'statut' => $this->filtre, 'plan' => $this->planFiltre,
+            'pays' => $this->pays, 'activite' => $this->activite, 'usage' => $this->usage, 'tri' => $this->tri,
+        ])->with(['proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q
+            ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
+            ->withMax(['ventes as derniere_vente' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')], 'created_at')
+            ->withSum(['ventes as total_30j' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')->where('created_at', '>=', now()->subDays(30))], 'total')])
             ->paginate(20);
 
         return view('livewire.plateforme.comptes', [
             'abonnements' => $abonnements,
+            'compteurs' => $console->compteurs(),
+            'listePays' => $console->pays(),
             'plans' => Plan::ordonnes()->get(),
             'sauvegardes' => $restauration->sauvegardesParBoutique(),
             'aRestaurerResume' => $this->aRestaurer ? ($restauration->sauvegardes($this->aRestaurer)[0] ?? null) : null,

@@ -8,11 +8,6 @@
             <p class="text-sm text-muted">Propriétaires, leurs boutiques et leur abonnement.</p>
         </div>
         <div class="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-            <select wire:model.live="filtre" class="{{ $champ }} pr-8">
-                <option value="">Tous</option>
-                <option value="actifs">Actifs</option>
-                <option value="expires">Expirés</option>
-            </select>
             <label class="relative flex-1 md:flex-none">
                 <span class="sr-only">Rechercher</span>
                 <x-plateforme.picto nom="recherche" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
@@ -21,6 +16,37 @@
             </label>
         </div>
     </div>
+
+    {{-- Statut en puces, avec le nombre de comptes ; puis les filtres fins et le tri. --}}
+    <div class="flex flex-wrap gap-2">
+        @foreach (\App\Services\Console\ComptesConsole::STATUTS as $code => $libelle)
+            <button wire:click="$set('filtre', '{{ $code }}')" wire:key="statut-{{ $code ?: 'tous' }}"
+                    class="h-9 px-3.5 rounded-full text-sm font-bold inline-flex items-center gap-2 {{ $filtre === $code ? 'bg-accent text-white' : 'bg-white shadow-carte text-ink hover:bg-accent-soft' }}">
+                {{ $libelle }} <span class="text-xs {{ $filtre === $code ? 'text-white/80' : 'text-muted' }}">{{ $compteurs[$code] ?? 0 }}</span>
+            </button>
+        @endforeach
+    </div>
+    <div class="flex flex-wrap gap-3">
+        <select wire:model.live="planFiltre" class="{{ $champ }} pr-8">
+            <option value="">Tous les plans</option>
+            @foreach ($plans as $p)<option value="{{ $p->code }}">{{ $p->nom }}</option>@endforeach
+        </select>
+        <select wire:model.live="pays" class="{{ $champ }} pr-8">
+            <option value="">Tous les pays</option>
+            @foreach ($listePays as $code => $libelle)<option value="{{ $code }}">{{ $libelle }}</option>@endforeach
+        </select>
+        <select wire:model.live="activite" class="{{ $champ }} pr-8">
+            <option value="">Toutes activités</option>
+            @foreach (\App\Models\Boutique::ACTIVITES as $a)<option value="{{ $a }}">{{ ucfirst($a) }}</option>@endforeach
+        </select>
+        <select wire:model.live="usage" class="{{ $champ }} pr-8">
+            @foreach (\App\Services\Console\ComptesConsole::USAGES as $code => $libelle)<option value="{{ $code }}">{{ $libelle }}</option>@endforeach
+        </select>
+        <select wire:model.live="tri" class="{{ $champ }} pr-8 md:ml-auto" title="Trier">
+            @foreach (\App\Services\Console\ComptesConsole::TRIS as $code => $libelle)<option value="{{ $code }}">Tri : {{ $libelle }}</option>@endforeach
+        </select>
+    </div>
+    <p class="text-sm text-muted -mt-2">{{ $abonnements->total() }} compte(s)</p>
 
     @if ($info)
         <p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>
@@ -75,7 +101,7 @@
                             </p>
                             <p class="text-xs text-muted mt-1">
                                 Inscrit le {{ $proprietaire?->created_at?->format('d/m/Y à H:i') }}
-                                · {{ $proprietaire?->derniere_app ? 'actif dans l’app '.\Illuminate\Support\Carbon::parse($proprietaire->derniere_app)->locale('fr')->diffForHumans() : 'jamais connecté à l’app' }}
+                                · {{ $abonnement->derniere_app ? 'actif dans l’app '.\Illuminate\Support\Carbon::parse($abonnement->derniere_app)->locale('fr')->diffForHumans() : 'jamais connecté à l’app' }}
                                 @if ($proprietaire?->parrain) · parrainé par <span class="font-semibold text-ink">{{ $proprietaire->parrain->name }}</span> @endif
                                 @if ($abonnement->jours_offerts > 0) · <span class="font-semibold text-warn-fg">{{ $abonnement->jours_offerts }} j offerts en attente</span> @endif
                             </p>

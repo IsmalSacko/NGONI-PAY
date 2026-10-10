@@ -6,11 +6,13 @@ namespace App\Livewire\Plateforme;
 
 use App\Models\User;
 use App\Services\ComptesPlateforme;
+use App\Services\ConditionsUtilisation;
+use App\Services\Console\ComptesConsole;
+use App\Services\Console\UtilisateursConsole;
 use App\Services\SuppressionCompte;
-use Illuminate\Validation\ValidationException;
 use App\Support\WhatsApp;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -26,8 +28,17 @@ class Utilisateurs extends Component
 
     public string $recherche = '';
 
-    /** nom | recents (derniers inscrits d'abord) */
+    /** Voir UtilisateursConsole::TRIS. */
     public string $tri = 'recents';
+
+    /** Voir UtilisateursConsole::ROLES, ETATS, APPLIS. */
+    public string $role = '';
+
+    public string $etat = '';
+
+    public string $pays = '';
+
+    public string $appli = '';
 
     public ?string $motDePasseProvisoire = null;
 
@@ -46,9 +57,11 @@ class Utilisateurs extends Component
 
     public ?string $alerte = null;
 
-    public function updatingRecherche(): void
+    public function updating(string $propriete): void
     {
-        $this->resetPage();
+        if (in_array($propriete, ['recherche', 'tri', 'role', 'etat', 'pays', 'appli'], true)) {
+            $this->resetPage();
+        }
     }
 
     public function basculer(string $userId, ComptesPlateforme $comptes): void
@@ -117,24 +130,18 @@ class Utilisateurs extends Component
     public function render()
     {
         // Activité et usage, en sous-requêtes : une seule requête pour la page.
-        $users = User::query()
-            ->select('users.*')
-            ->addSelect([
-                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'users.id'),
-                'derniere_web' => DB::table('sessions')->selectRaw('MAX(last_activity)')->whereColumn('user_id', 'users.id'),
-                'nb_ventes' => DB::table('ventes')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id')->where('statut', 'validee'),
-                'nb_appareils' => DB::table('appareils')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id'),
-            ])
-            ->with('boutique')
-            ->when($this->recherche !== '', fn ($q) => $q->recherche($this->recherche))
-            ->when($this->tri === 'recents', fn ($q) => $q->latest('users.created_at'), fn ($q) => $q->orderBy('name'))
+        $users = app(UtilisateursConsole::class)->requete([
+            'recherche' => $this->recherche, 'role' => $this->role, 'etat' => $this->etat,
+            'pays' => $this->pays, 'appli' => $this->appli, 'tri' => $this->tri,
+        ])
             ->paginate(25);
 
         return view('livewire.plateforme.utilisateurs', [
             'users' => $users,
+            'listePays' => app(ComptesConsole::class)->pays(),
             // Dernière acceptation des conditions de chacun, et la version en vigueur.
-            'conditions' => app(\App\Services\ConditionsUtilisation::class)->dernieres($users->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all()),
-            'versionConditions' => \App\Services\ConditionsUtilisation::version(),
+            'conditions' => app(ConditionsUtilisation::class)->dernieres($users->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all()),
+            'versionConditions' => ConditionsUtilisation::version(),
         ]);
     }
 }

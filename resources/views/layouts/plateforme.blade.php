@@ -15,6 +15,7 @@
             ['route' => 'plateforme.tableau', 'label' => 'Tableau de bord'],
             ['route' => 'plateforme.comptes', 'label' => 'Comptes'],
             ['route' => 'plateforme.demandes', 'label' => 'Demandes', 'badge' => $enAttente],
+            ['route' => 'plateforme.abonnements', 'label' => 'Abonnements'],
             ['route' => 'plateforme.plans', 'label' => 'Plans et tarifs'],
             ['route' => 'plateforme.utilisateurs', 'label' => 'Utilisateurs'],
             ['route' => 'plateforme.annonces', 'label' => 'Annonces'],
