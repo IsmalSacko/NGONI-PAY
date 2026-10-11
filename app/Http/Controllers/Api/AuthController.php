@@ -129,7 +129,12 @@ class AuthController extends Controller
     {
         try {
             return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->where('statut', 'envoyee')->count()
-                + LiaisonGrossiste::where('boutique_grossiste_id', $boutiqueId)->where('statut', 'demande')->count();
+                // Une demande sans commande : confirmer une commande accepte déjà son revendeur.
+                + LiaisonGrossiste::where('boutique_grossiste_id', $boutiqueId)->where('statut', 'demande')
+                    ->whereNotExists(fn ($q) => $q->from('commandes_fournisseur')
+                        ->whereColumn('commandes_fournisseur.boutique_id', 'liaisons_grossistes.boutique_revendeur_id')
+                        ->whereColumn('commandes_fournisseur.boutique_grossiste_id', 'liaisons_grossistes.boutique_grossiste_id')
+                        ->where('commandes_fournisseur.statut', 'envoyee'))->count();
         } catch (\Throwable $e) {
             report($e);
 
