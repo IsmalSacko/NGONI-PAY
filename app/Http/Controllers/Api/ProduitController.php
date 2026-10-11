@@ -90,6 +90,45 @@ class ProduitController extends Controller
         ]);
     }
 
+    /**
+     * Pertes des 30 derniers jours : le stock sorti sans être vendu (casse,
+     * périmé, vol, consommé, écarts d'inventaire), en francs au prix d'achat,
+     * par motif. Ce que la boutique perd, d'un coup d'œil.
+     */
+    public function pertes(): JsonResponse
+    {
+        $parMotif = [];
+        $mouvements = MouvementStock::with('produit:id,prix_achat,prix_vente')
+            ->where('type', TypeMouvementStock::Ajustement->value)->where('quantite', '<', 0)
+            ->where('created_at', '>=', now()->subDays(30))->get();
+        foreach ($mouvements as $m) {
+            $motif = self::categoriePerte((string) $m->motif);
+            $prix = (int) ($m->produit?->prix_achat ?: $m->produit?->prix_vente ?: 0);
+            $parMotif[$motif] = ($parMotif[$motif] ?? 0) + (int) round(-$m->quantite * $prix);
+        }
+        arsort($parMotif);
+
+        return response()->json([
+            'total' => array_sum($parMotif),
+            'motifs' => collect($parMotif)->map(fn ($valeur, $motif) => ['motif' => $motif, 'valeur' => $valeur])->values(),
+        ]);
+    }
+
+    /** « Casse : 2 bouteilles », « Inventaire du 11/10/2026 »… ramené à son motif. */
+    public static function categoriePerte(string $motif): string
+    {
+        $m = mb_strtolower($motif);
+
+        return match (true) {
+            str_contains($m, 'casse') || str_contains($m, 'cassé') => 'Casse',
+            str_contains($m, 'périm') || str_contains($m, 'perim') => 'Périmé',
+            preg_match('/\\bvol(é|e|s)?\\b/u', $m) === 1 => 'Vol',
+            str_contains($m, 'consomm') || str_contains($m, 'perso') => 'Consommé',
+            str_contains($m, 'inventaire') || str_contains($m, 'comptage') => 'Écart d’inventaire',
+            default => 'Autre',
+        };
+    }
+
     /** Lots entamés qui périment dans les 90 jours, ou déjà périmés : le plus proche d'abord. */
     public function peremption(): JsonResponse
     {

@@ -205,6 +205,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     // Pharmacie : lots qui périment dans les 90 jours (ou déjà périmés).
     Route::get('stocks/peremption', [ProduitController::class, 'peremption'])->middleware('permission:produits.view');
     Route::get('produits/{produit}/mouvements', [ProduitController::class, 'mouvements'])->middleware('permission:stocks.update');
+    Route::get('stocks/pertes', [ProduitController::class, 'pertes'])->middleware('permission:stocks.update');
     // Inventaire guidé : on compte (à plusieurs), on voit les écarts en argent, on valide.
     Route::get('inventaires', [InventaireController::class, 'index'])->middleware('permission:stocks.update');
     Route::get('inventaires/en-cours', [InventaireController::class, 'enCours'])->middleware('permission:stocks.update');

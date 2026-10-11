@@ -241,4 +241,18 @@ class AchatsTest extends TestCase
         $this->api($this->admin)->getJson('/api/inventaires')->assertJsonPath('data.0.valeur_manquante', 8000)->assertJsonPath('data.0.articles_corriges', 1);
         $this->assertNotSame($inv, $this->api($this->admin)->getJson('/api/inventaires/en-cours')->json('id'), 'le suivant repart à zéro');
     }
+
+    public function test_les_pertes_du_mois_par_motif_en_francs(): void
+    {
+        $this->riz->update(['prix_achat' => 4000, 'stock' => 10]);
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 8, 'motif' => 'Casse : sacs déchirés'])->assertOk();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 7, 'motif' => 'Vol'])->assertOk();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 9, 'motif' => 'Réassort'])->assertOk();
+
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertOk()
+            ->assertJsonPath('total', 12000)
+            ->assertJsonPath('motifs.0', ['motif' => 'Casse', 'valeur' => 8000])
+            ->assertJsonPath('motifs.1', ['motif' => 'Vol', 'valeur' => 4000]);
+        $this->api($this->caissier)->getJson('/api/stocks/pertes')->assertForbidden();
+    }
 }
