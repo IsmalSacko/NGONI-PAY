@@ -14,6 +14,7 @@ use App\Services\AchatService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -193,5 +194,65 @@ class AchatsTest extends TestCase
 
         $this->actingAs($this->caissier);
         $this->get('/achats')->assertRedirect();
+    }
+
+    public function test_l_historique_d_un_article_montre_chaque_mouvement_et_le_bilan(): void
+    {
+        $this->api($this->admin)->postJson('/api/achats', ['lignes' => [['produit_id' => $this->riz->id, 'quantite' => 10, 'prix_achat' => 4000]], 'reference' => 'BL-1', 'montant_paye' => 40000])->assertCreated();
+        $this->api($this->admin)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 2]], 'moyen_paiement' => 'especes',
+        ])->assertCreated();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 9, 'motif' => 'Casse'])->assertOk();
+
+        $r = $this->api($this->admin)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertOk()
+            ->assertJsonPath('data.0.type', 'ajustement')->assertJsonPath('data.0.motif', 'Casse')->assertJsonPath('data.0.auteur', 'Awa')
+            ->assertJsonPath('data.1.type', 'sortie')->assertJsonPath('data.2.type', 'entree');
+        $this->assertEquals(-2, $r->json('data.0.quantite'));
+        $this->assertEquals(9, $r->json('data.0.stock_apres'));
+        $this->assertEquals(['entrees' => 10, 'ventes' => 2, 'ajustements_plus' => 0, 'ajustements_moins' => 2], $r->json('bilan'));
+
+        $this->api($this->caissier)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertForbidden();
+    }
+
+    public function test_inventaire_guide_compte_en_vendant_et_corrige_l_ecart(): void
+    {
+        // 3 riz en stock, achetés 4 000 F.
+        $inv = $this->api($this->admin)->getJson('/api/inventaires/en-cours')->assertOk()->assertJsonPath('statut', 'en_cours')->json('id');
+        $this->assertSame($inv, $this->api($this->admin)->getJson('/api/inventaires/en-cours')->json('id'), 'un seul inventaire en cours');
+
+        // On ne trouve qu'1 riz : il en manque 2, soit 8 000 F.
+        $this->api($this->admin)->putJson("/api/inventaires/{$inv}/produits/{$this->riz->id}", ['quantite' => 1])->assertOk()
+            ->assertJsonPath('comptes', 1)->assertJsonPath('valeur_manquante', 8000)->assertJsonPath('lignes.0.ecart', -2);
+
+        // Une vente après le comptage (1 riz) : elle reste comptée à la validation.
+        $this->api($this->admin)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 1]], 'moyen_paiement' => 'especes',
+        ])->assertCreated();
+        $this->assertSame(2, (int) $this->riz->fresh()->stock);
+
+        $this->api($this->caissier)->postJson("/api/inventaires/{$inv}/valider")->assertForbidden();
+        $this->api($this->admin)->postJson("/api/inventaires/{$inv}/valider")->assertOk()->assertJsonPath('statut', 'valide')->assertJsonPath('valeur_manquante', 8000);
+        // 1 trouvé, 1 vendu depuis : 0.
+        $this->assertSame(0, (int) $this->riz->fresh()->stock);
+        $this->assertDatabaseHas('mouvements_stock', ['produit_id' => $this->riz->id, 'type' => 'ajustement', 'quantite' => -2, 'motif' => 'Inventaire du '.now()->format('d/m/Y')]);
+        $this->api($this->admin)->putJson("/api/inventaires/{$inv}/produits/{$this->riz->id}", ['quantite' => 5])->assertUnprocessable();
+        $this->api($this->admin)->getJson('/api/inventaires')->assertJsonPath('data.0.valeur_manquante', 8000)->assertJsonPath('data.0.articles_corriges', 1);
+        $this->assertNotSame($inv, $this->api($this->admin)->getJson('/api/inventaires/en-cours')->json('id'), 'le suivant repart à zéro');
+    }
+
+    public function test_les_pertes_du_mois_par_motif_en_francs(): void
+    {
+        $this->riz->update(['prix_achat' => 4000, 'stock' => 10]);
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 8, 'motif' => 'Casse : sacs déchirés'])->assertOk();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 7, 'motif' => 'Vol'])->assertOk();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 9, 'motif' => 'Réassort'])->assertOk();
+
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertOk()
+            ->assertJsonPath('total', 12000)
+            ->assertJsonPath('motifs.0', ['motif' => 'Casse', 'valeur' => 8000])
+            ->assertJsonPath('motifs.1', ['motif' => 'Vol', 'valeur' => 4000]);
+        $this->api($this->caissier)->getJson('/api/stocks/pertes')->assertForbidden();
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\InventaireController;
 use App\Http\Controllers\Api\CommandeFournisseurController;
 use App\Http\Controllers\Api\ClotureController;
 use App\Http\Controllers\Api\CommandePressingController;
@@ -204,6 +205,15 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('services/{service}', [ServicePressingController::class, 'destroy'])->middleware(['permission:produits.update', 'abonnement']);
     // Pharmacie : lots qui périment dans les 90 jours (ou déjà périmés).
     Route::get('stocks/peremption', [ProduitController::class, 'peremption'])->middleware('permission:produits.view');
+    Route::get('produits/{produit}/mouvements', [ProduitController::class, 'mouvements'])->middleware('permission:stocks.update');
+    Route::get('stocks/pertes', [ProduitController::class, 'pertes'])->middleware('permission:stocks.update');
+    // Inventaire guidé : on compte (à plusieurs), on voit les écarts en argent, on valide.
+    Route::get('inventaires', [InventaireController::class, 'index'])->middleware('permission:stocks.update');
+    Route::get('inventaires/en-cours', [InventaireController::class, 'enCours'])->middleware('permission:stocks.update');
+    Route::put('inventaires/{inventaire}/produits/{produit}', [InventaireController::class, 'compter'])->middleware('permission:stocks.update');
+    Route::delete('inventaires/{inventaire}/produits/{produit}', [InventaireController::class, 'retirer'])->middleware('permission:stocks.update');
+    Route::post('inventaires/{inventaire}/valider', [InventaireController::class, 'valider'])->middleware(['permission:stocks.update', 'abonnement']);
+    Route::post('inventaires/{inventaire}/abandonner', [InventaireController::class, 'abandonner'])->middleware('permission:stocks.update');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
     Route::get('stocks/a-commander', fn (CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
         ->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);

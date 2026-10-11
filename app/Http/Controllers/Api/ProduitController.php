@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TypeMouvementStock;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Models\LigneVente;
 use App\Models\Lot;
+use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Services\Images;
 use App\Services\Lots;
@@ -48,6 +50,83 @@ class ProduitController extends Controller
         }
 
         return response()->json($produits);
+    }
+
+    /**
+     * Historique du stock d'un article : chaque entrée (réception, annulation),
+     * sortie (vente) et ajustement (inventaire, casse), avec qui et pourquoi.
+     * « Où sont passés mes 12 sacs ? » se lit ici. Avec le bilan des 30 jours.
+     */
+    public function mouvements(Produit $produit): JsonResponse
+    {
+        $page = MouvementStock::where('produit_id', $produit->id)->with('auteur:id,name')
+            ->latest()->orderByDesc('id')->paginate(30);
+        $depuis = now()->subDays(30);
+        $somme = fn (string $type, ?bool $positif = null) => (float) MouvementStock::where('produit_id', $produit->id)
+            ->where('type', $type)->where('created_at', '>=', $depuis)
+            ->when($positif !== null, fn ($q) => $q->where('quantite', $positif ? '>' : '<', 0))
+            ->sum('quantite');
+
+        return response()->json([
+            'data' => collect($page->items())->map(fn (MouvementStock $m) => [
+                'id' => $m->id,
+                'type' => $m->type->value,
+                'quantite' => $m->quantite,
+                'stock_apres' => $m->stock_apres,
+                'motif' => $m->motif,
+                'vente_id' => $m->vente_id,
+                'auteur' => $m->auteur?->name,
+                'date' => $m->created_at?->toIso8601String(),
+            ]),
+            'page' => $page->currentPage(),
+            'derniere_page' => $page->lastPage(),
+            // 30 derniers jours : ce qui est entré, vendu, et corrigé à la main.
+            'bilan' => [
+                'entrees' => $somme(TypeMouvementStock::Entree->value),
+                'ventes' => -$somme(TypeMouvementStock::Sortie->value),
+                'ajustements_plus' => $somme(TypeMouvementStock::Ajustement->value, true),
+                'ajustements_moins' => -$somme(TypeMouvementStock::Ajustement->value, false),
+            ],
+        ]);
+    }
+
+    /**
+     * Pertes des 30 derniers jours : le stock sorti sans être vendu (casse,
+     * périmé, vol, consommé, écarts d'inventaire), en francs au prix d'achat,
+     * par motif. Ce que la boutique perd, d'un coup d'œil.
+     */
+    public function pertes(): JsonResponse
+    {
+        $parMotif = [];
+        $mouvements = MouvementStock::with('produit:id,prix_achat,prix_vente')
+            ->where('type', TypeMouvementStock::Ajustement->value)->where('quantite', '<', 0)
+            ->where('created_at', '>=', now()->subDays(30))->get();
+        foreach ($mouvements as $m) {
+            $motif = self::categoriePerte((string) $m->motif);
+            $prix = (int) ($m->produit?->prix_achat ?: $m->produit?->prix_vente ?: 0);
+            $parMotif[$motif] = ($parMotif[$motif] ?? 0) + (int) round(-$m->quantite * $prix);
+        }
+        arsort($parMotif);
+
+        return response()->json([
+            'total' => array_sum($parMotif),
+            'motifs' => collect($parMotif)->map(fn ($valeur, $motif) => ['motif' => $motif, 'valeur' => $valeur])->values(),
+        ]);
+    }
+
+    /** « Casse : 2 bouteilles », « Inventaire du 11/10/2026 »… ramené à son motif. */
+    public static function categoriePerte(string $motif): string
+    {
+        $m = mb_strtolower($motif);
+
+        return match (true) {
+            str_contains($m, 'casse') || str_contains($m, 'cassé') => 'Casse',
+            str_contains($m, 'périm') || str_contains($m, 'perim') => 'Périmé',
+            preg_match('/\\bvol(é|e|s)?\\b/u', $m) === 1 => 'Vol',
+            str_contains($m, 'consomm') || str_contains($m, 'perso') => 'Consommé',
+            str_contains($m, 'inventaire') || str_contains($m, 'comptage') => 'Écart d’inventaire',
+            default => 'Autre',
+        };
     }
 
     /** Lots entamés qui périment dans les 90 jours, ou déjà périmés : le plus proche d'abord. */
