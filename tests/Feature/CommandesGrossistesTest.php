@@ -301,6 +301,31 @@ class CommandesGrossistesTest extends TestCase
         $this->actingAs($this->awa)->get('/commandes-fournisseurs')->assertOk()->assertSee('Envoyées à vos fournisseurs')->assertSee('Livrée')->assertDontSee('Reçues de vos revendeurs');
     }
 
+    public function test_la_dette_du_revendeur_egale_la_facture_du_grossiste_au_franc_pres(): void
+    {
+        // 32 500 F le carton de 12 L : 2 708,33 F le litre, qu'un arrondi ne doit pas faire perdre.
+        $this->dans($this->depot);
+        $carton = Produit::create(['nom' => 'Huile', 'unite' => 'carton', 'prix_vente' => 32500, 'taux_tva' => 0, 'stock' => 100]);
+        $this->dans($this->epicerie);
+        $huile = Produit::create(['nom' => 'Huile', 'unite' => 'l', 'prix_vente' => 3000, 'taux_tva' => 0, 'stock' => 0,
+            'paliers' => [['unite' => 'carton', 'contenance' => 12, 'prix' => 34000]]]);
+        $fournisseur = Fournisseur::create(['nom' => 'Ousmane', 'telephone' => '+22376001122'])->id;
+
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [
+            ['produit_id' => $huile->id, 'quantite' => 120, 'unite_commande' => 'carton', 'produit_grossiste_id' => $carton->id, 'contenance' => 12],
+        ]])->assertCreated()->json();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $carton->id]]])
+            ->assertJsonPath('total_confirme', 325000);
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer")->assertOk();
+
+        $this->api($this->awa)->getJson('/api/fournisseurs')->assertJsonPath('data.0.solde_du', 325000);
+        $this->api($this->awa)->postJson("/api/fournisseurs/{$fournisseur}/paiements", ['montant' => 325000, 'moyen_paiement' => 'especes'])->assertCreated();
+        $client = Client::withoutGlobalScopes()->where('boutique_id', $this->depot->id)->sole();
+        $paiement = $this->api($this->grossiste)->getJson("/api/clients/{$client->id}/paiements-declares")->json('data.0.id');
+        $this->api($this->grossiste)->postJson("/api/paiements-declares/{$paiement}/confirmer")->assertOk()->assertJsonPath('solde_du', 0);
+        $this->assertSame(120, (int) $huile->fresh()->stock);
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {

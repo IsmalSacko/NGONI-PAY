@@ -33,7 +33,9 @@ class AchatService
                 if (! $produits->has($l['produit_id'])) {
                     throw ValidationException::withMessages(['lignes' => ['Article introuvable.']]);
                 }
-                $total += (int) round($l['quantite'] * $l['prix_achat']);
+                // Montant de la ligne : donné tel quel (commande livrée : celui de la
+                // vente du grossiste, au franc près), sinon quantité × prix.
+                $total += self::montantLigne($l);
                 // Reçu à la boîte, compté en comprimés.
                 if ($produits[$l['produit_id']]->palier($l['palier'] ?? null) === null) {
                     throw ValidationException::withMessages(['lignes' => ['« '.$produits[$l['produit_id']]->nom.' » ne se reçoit pas ainsi.']]);
@@ -68,7 +70,7 @@ class AchatService
                     'numero_lot' => $l['numero_lot'] ?? null,
                     'peremption' => $l['peremption'] ?? null,
                     'prix_achat' => $l['prix_achat'],
-                    'total_ligne' => (int) round($l['quantite'] * $l['prix_achat']),
+                    'total_ligne' => self::montantLigne($l),
                 ]);
 
                 $produit->stock = Quantite::normaliser($produit->stock + $base);
@@ -109,5 +111,11 @@ class AchatService
         app(CommandesFournisseur::class)->declarerPaiement($paiement, $fournisseur);
 
         return $fournisseur->soldeDu();
+    }
+
+    /** @param array<string, mixed> $ligne */
+    private static function montantLigne(array $ligne): int
+    {
+        return isset($ligne['total']) ? (int) $ligne['total'] : (int) round($ligne['quantite'] * $ligne['prix_achat']);
     }
 }

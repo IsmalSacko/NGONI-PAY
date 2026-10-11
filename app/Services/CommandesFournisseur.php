@@ -433,8 +433,11 @@ class CommandesFournisseur
                 'montant_paye' => $montantPaye,
             ], $grossiste);
 
-            // Chez le revendeur : l'achat, au prix réellement facturé.
+            // Chez le revendeur : l'achat, au prix réellement facturé. Chaque
+            // ligne reprend le montant de la vente au franc près : 32 500 F le
+            // carton de 12 L ne doit pas devenir 12 × 2 708 F (40 F perdus).
             $prix = $vente->lignes->keyBy('produit_id');
+            $montants = $vente->lignes->groupBy('produit_id')->map(fn ($ls) => (int) $ls->sum('total_ligne'));
             $paye = (int) $vente->montant_paye;
             $this->tenant->setBoutique($commande->boutique_id);
             try {
@@ -445,6 +448,8 @@ class CommandesFournisseur
                         'produit_id' => $l->produit_id,
                         'quantite' => round($l->quantite_confirmee * $l->contenance, 3),
                         'prix_achat' => (int) round(($prix[$l->produit_grossiste_id]?->prix_unitaire ?? $l->prix_grossiste ?? 0) / max(0.001, $l->contenance)),
+                        // Un même article du grossiste sur deux lignes : son montant n'est compté qu'une fois.
+                        'total' => $aLivrer->where('produit_grossiste_id', $l->produit_grossiste_id)->first()?->id === $l->id ? ($montants[$l->produit_grossiste_id] ?? null) : 0,
                     ])->all(),
                     $commande->fournisseur_id,
                     'Commande '.$commande->numero,
