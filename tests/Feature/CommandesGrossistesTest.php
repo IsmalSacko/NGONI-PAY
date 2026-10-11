@@ -176,6 +176,37 @@ class CommandesGrossistesTest extends TestCase
             ->assertJsonPath('data.0.lignes.0.produit_grossiste.id', $carton->id)->assertJsonPath('data.0.lignes.0.contenance', 24);
     }
 
+    public function test_le_revendeur_commande_dans_le_catalogue_du_grossiste_et_recommande(): void
+    {
+        $this->dans($this->depot);
+        $carton = Produit::create(['nom' => 'Faniko carton', 'prix_vente' => 3600, 'prix_gros' => 3400, 'taux_tva' => 0, 'stock' => 50]);
+        Produit::create(['nom' => 'Lait en rupture', 'prix_vente' => 9000, 'taux_tva' => 0, 'stock' => 0]);
+        $this->dans($this->epicerie);
+        $sachet = Produit::create(['nom' => 'Faniko', 'prix_vente' => 300, 'taux_tva' => 0, 'stock' => 0]);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
+
+        $catalogue = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertOk()->json('data'))->keyBy('nom');
+        $this->assertSame(3400, $catalogue['Faniko carton']['prix']);
+        $this->assertFalse($catalogue['Lait en rupture']['disponible']);
+        $this->assertNull($catalogue['Faniko carton']['chez_moi']);
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue?q=lait")->assertJsonCount(1, 'data');
+
+        // 3 cartons de 24 : 72 sachets.
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [
+            ['produit_id' => $sachet->id, 'quantite' => 72, 'produit_grossiste_id' => $carton->id, 'contenance' => 24, 'prix_estime' => 142],
+        ]])->assertCreated()->json();
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")
+            ->assertJsonPath('data.0.chez_moi.produit_id', $sachet->id)->assertJsonPath('data.0.chez_moi.contenance', 24);
+
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/vue")->assertOk();
+        $this->api($this->awa)->getJson('/api/commandes-fournisseur')->assertJsonPath('data.0.statut_libelle', 'Vue');
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $carton->id]]])
+            ->assertJsonPath('lignes.0.quantite_confirmee', 3);
+
+        $this->api($this->awa)->postJson("/api/commandes-fournisseur/{$commande['id']}/recommander")->assertCreated()
+            ->assertJsonPath('lignes.0.quantite', 72)->assertJsonPath('statut', 'envoyee');
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {
@@ -197,6 +228,7 @@ class CommandesGrossistesTest extends TestCase
         ])->assertCreated()->assertJsonPath('grossiste', null)->json();
         $this->assertStringStartsWith('https://wa.me/22365000000?text=', $commande['whatsapp']);
         $this->assertStringContainsString(rawurlencode('5 × Riz 25kg'), $commande['whatsapp']);
+        $this->assertStringContainsString(rawurlencode('ngonipay.ismael-dev.com/app'), $commande['whatsapp']);
 
         $this->api($this->awa)->postJson("/api/commandes-fournisseur/{$commande['id']}/receptionner", [
             'lignes' => [['id' => $commande['lignes'][0]['id'], 'quantite' => 4]], 'montant_paye' => 48800,

@@ -31,12 +31,12 @@ class CommandeFournisseur extends Model
 
     protected $fillable = [
         'boutique_id', 'fournisseur_id', 'boutique_grossiste_id', 'numero', 'statut', 'note', 'motif',
-        'cree_par', 'total_estime', 'vente_id', 'achat_id', 'confirmee_le', 'livree_le',
+        'cree_par', 'total_estime', 'vente_id', 'achat_id', 'vue_le', 'confirmee_le', 'livree_le',
     ];
 
     protected function casts(): array
     {
-        return ['total_estime' => 'integer', 'confirmee_le' => 'datetime', 'livree_le' => 'datetime'];
+        return ['total_estime' => 'integer', 'vue_le' => 'datetime', 'confirmee_le' => 'datetime', 'livree_le' => 'datetime'];
     }
 
     /** @return HasMany<LigneCommandeFournisseur, $this> */

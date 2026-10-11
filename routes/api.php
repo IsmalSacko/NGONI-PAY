@@ -240,6 +240,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('fournisseurs/{fournisseur}/ngoni', [CommandeFournisseurController::class, 'fournisseur'])->middleware(['permission:achats.view', 'fonctionnalite:achats_fournisseurs']);
     Route::post('commandes-fournisseur/{commande}/annuler', [CommandeFournisseurController::class, 'annuler'])->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);
     Route::post('commandes-fournisseur/{commande}/receptionner', [CommandeFournisseurController::class, 'receptionner'])->middleware(['permission:achats.create', 'abonnement', 'fonctionnalite:achats_fournisseurs']);
+    Route::get('fournisseurs/{fournisseur}/catalogue', [CommandeFournisseurController::class, 'catalogue'])->middleware(['permission:achats.view', 'fonctionnalite:achats_fournisseurs']);
+    Route::post('commandes-fournisseur/{commande}/recommander', [CommandeFournisseurController::class, 'recommander'])->middleware(['permission:achats.create', 'abonnement', 'fonctionnalite:achats_fournisseurs']);
+    Route::post('commandes-recues/{commande}/vue', [CommandeFournisseurController::class, 'vue'])->middleware('permission:ventes.view');
     Route::get('commandes-recues', [CommandeFournisseurController::class, 'recues'])->middleware('permission:ventes.view');
     Route::post('commandes-recues/{commande}/confirmer', [CommandeFournisseurController::class, 'confirmer'])->middleware(['permission:ventes.create', 'abonnement']);
     Route::post('commandes-recues/{commande}/refuser', [CommandeFournisseurController::class, 'refuser'])->middleware('permission:ventes.create');

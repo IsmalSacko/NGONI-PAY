@@ -34,6 +34,8 @@ class CommandeFournisseurController extends Controller
             'lignes.*.produit_id' => ['required', 'uuid'],
             'lignes.*.quantite' => ['required', 'numeric', 'gt:0'],
             'lignes.*.prix_estime' => ['nullable', 'integer', 'min:0'],
+            'lignes.*.produit_grossiste_id' => ['nullable', 'uuid'],
+            'lignes.*.contenance' => ['nullable', 'numeric', 'gt:0', 'max:100000'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
         $fournisseur = Fournisseur::findOrFail($data['fournisseur_id']);
@@ -48,6 +50,26 @@ class CommandeFournisseurController extends Controller
         $boutique = $this->commandes->boutiqueDuFournisseur($fournisseur);
 
         return response()->json(['sur_ngoni' => $boutique !== null, 'boutique' => $boutique?->nom]);
+    }
+
+    /** Le catalogue du fournisseur, s'il a Ngoni (vide sinon). */
+    public function catalogue(Request $request, Fournisseur $fournisseur): JsonResponse
+    {
+        return response()->json(['data' => $this->commandes->catalogue($fournisseur, $request->query('q'))]);
+    }
+
+    public function recommander(Request $request, CommandeFournisseur $commande): JsonResponse
+    {
+        $nouvelle = $this->commandes->recommander($commande->load('lignes'), $request->user());
+
+        return response()->json($this->envoyee($nouvelle->load(['fournisseur', 'boutiqueGrossiste'])), 201);
+    }
+
+    public function vue(string $commande): JsonResponse
+    {
+        $this->commandes->marquerVue($this->trouverRecue($commande));
+
+        return response()->json(['message' => 'Vue.']);
     }
 
     public function annuler(CommandeFournisseur $commande): JsonResponse
@@ -168,7 +190,8 @@ class CommandeFournisseurController extends Controller
 
         return [
             'id' => $c->id, 'numero' => $c->numero, 'statut' => $c->statut,
-            'statut_libelle' => CommandeFournisseur::STATUTS[$c->statut] ?? $c->statut,
+            'statut_libelle' => $c->statut === 'envoyee' && $c->vue_le !== null ? 'Vue' : (CommandeFournisseur::STATUTS[$c->statut] ?? $c->statut),
+            'vue_le' => $c->vue_le?->toIso8601String(),
             'note' => $c->note, 'motif' => $c->motif, 'total_estime' => (int) $c->total_estime,
             'total_confirme' => (int) $c->lignes->sum(fn ($l) => round((float) $l->quantite_confirmee * (int) $l->prix_grossiste)),
             'cree_le' => $c->created_at?->toIso8601String(), 'confirmee_le' => $c->confirmee_le?->toIso8601String(), 'livree_le' => $c->livree_le?->toIso8601String(),

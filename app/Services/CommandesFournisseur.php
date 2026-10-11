@@ -73,7 +73,11 @@ class CommandesFournisseur
     /**
      * Le revendeur commande (boutique active : la sienne).
      *
-     * @param  list<array{produit_id: string, quantite: float|int|string, prix_estime?: ?int}>  $lignes
+     * Depuis le catalogue du grossiste, une ligne dit aussi son article
+     * (produit_grossiste_id) et combien d'unités du revendeur il contient :
+     * c'est retenu pour la suite.
+     *
+     * @param  list<array{produit_id: string, quantite: float|int|string, prix_estime?: ?int, produit_grossiste_id?: ?string, contenance?: float|int|string|null}>  $lignes  quantité : dans l'unité du revendeur
      */
     public function commander(User $auteur, Fournisseur $fournisseur, array $lignes, ?string $note = null): CommandeFournisseur
     {
@@ -99,6 +103,12 @@ class CommandesFournisseur
                 // 24 sachets »), sinon le même article chez lui (code-barres, nom).
                 $connue = $grossiste === null ? null : DB::table('correspondances_produits')
                     ->where('boutique_grossiste_id', $grossiste->id)->where('produit_revendeur_id', $produit->id)->first();
+                if ($grossiste !== null && filled($l['produit_grossiste_id'] ?? null)) {
+                    $article = Produit::withoutGlobalScopes()->where('boutique_id', $grossiste->id)->find($l['produit_grossiste_id'])
+                        ?? throw ValidationException::withMessages(['lignes' => ['Article introuvable chez ce fournisseur.']]);
+                    $connue = (object) ['produit_grossiste_id' => $article->id, 'contenance' => max(0.001, (float) ($l['contenance'] ?? 1))];
+                    $this->retenir($grossiste->id, $produit->id, $article->id, $connue->contenance);
+                }
                 $commande->lignes()->create([
                     'produit_id' => $produit->id,
                     'nom' => $produit->nom,
@@ -132,11 +142,85 @@ class CommandesFournisseur
         }
         $boutique = $commande->boutique?->nom;
         $texte = "Bonjour, commande n° {$commande->numero} de {$boutique} :\n"
-            .$commande->lignes->map(fn ($l) => '• '.self::quantite($l->quantite).' × '.$l->nom)->implode("\n")
+            .$commande->lignes->map(fn ($l) => '• '.self::quantite($l->quantite).($l->unite ? " {$l->unite}" : '').' × '.$l->nom)->implode("\n")
             .($commande->note ? "\n\n{$commande->note}" : '')
-            ."\n\nMerci de me confirmer la livraison.";
+            ."\n\nMerci de me confirmer la livraison."
+            // Le fournisseur qui rejoint Ngoni reçoit les commandes suivantes dans son application.
+            ."\n\nRecevez mes prochaines commandes directement dans Ngoni Caisse, avec votre numéro : https://ngonipay.ismael-dev.com/app";
 
         return $lien.'?text='.rawurlencode($texte);
+    }
+
+    /**
+     * Le catalogue du grossiste, vu par le revendeur : ses articles, au prix
+     * qu'il lui facturera, et l'article du revendeur qui leur correspond.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function catalogue(Fournisseur $fournisseur, ?string $recherche = null): array
+    {
+        $grossiste = $this->boutiqueDuFournisseur($fournisseur);
+        if ($grossiste === null) {
+            return [];
+        }
+        $enGros = $this->vendEnGros($grossiste);
+        $produits = Produit::withoutGlobalScopes()->where('boutique_id', $grossiste->id)->where('actif', true)
+            ->when(filled($recherche), fn ($q) => $q->where('nom', 'like', '%'.str_replace(['%', '_'], '', (string) $recherche).'%'))
+            ->orderBy('nom')->limit(300)->get();
+        $correspondances = DB::table('correspondances_produits')->where('boutique_grossiste_id', $grossiste->id)
+            ->whereIn('produit_revendeur_id', Produit::query()->select('id'))
+            ->get()->keyBy('produit_grossiste_id');
+        $miens = Produit::whereIn('id', $correspondances->pluck('produit_revendeur_id'))->get(['id', 'nom', 'unite'])->keyBy('id');
+
+        $suitStock = $grossiste->suitLeStock();
+
+        return $produits->map(function (Produit $p) use ($enGros, $correspondances, $miens, $suitStock) {
+            $c = $correspondances[$p->id] ?? null;
+            $mien = $c === null ? null : ($miens[$c->produit_revendeur_id] ?? null);
+
+            return [
+                'id' => $p->id,
+                'nom' => $p->nom,
+                'unite' => $p->unite,
+                'prix' => (int) ($enGros && $p->prix_gros !== null ? $p->prix_gros : $p->prix_vente),
+                'disponible' => ! $suitStock || $p->stock > 0,
+                'vignette_url' => $p->vignette_url,
+                'chez_moi' => $mien === null ? null : ['produit_id' => $mien->id, 'nom' => $mien->nom, 'unite' => $mien->unite, 'contenance' => (float) $c->contenance],
+            ];
+        })->values()->all();
+    }
+
+    /** « Commander à nouveau » : les mêmes articles, aux mêmes quantités. */
+    public function recommander(CommandeFournisseur $commande, User $auteur): CommandeFournisseur
+    {
+        $fournisseur = Fournisseur::findOrFail($commande->fournisseur_id);
+
+        return $this->commander($auteur, $fournisseur, $commande->lignes->map(fn ($l) => [
+            'produit_id' => $l->produit_id,
+            'quantite' => $l->quantite,
+        ])->all(), $commande->note);
+    }
+
+    /** Le grossiste ouvre la commande : le revendeur voit « Vue ». */
+    public function marquerVue(CommandeFournisseur $commande): void
+    {
+        $this->exigerDestinataire($commande);
+        if ($commande->vue_le === null) {
+            $commande->update(['vue_le' => now()]);
+        }
+    }
+
+    private function retenir(string $grossisteId, string $produitRevendeurId, string $produitGrossisteId, float $contenance): void
+    {
+        DB::table('correspondances_produits')->updateOrInsert(
+            ['produit_revendeur_id' => $produitRevendeurId, 'boutique_grossiste_id' => $grossisteId],
+            ['produit_grossiste_id' => $produitGrossisteId, 'contenance' => $contenance, 'updated_at' => now(), 'created_at' => now()],
+        );
+    }
+
+    private function vendEnGros(Boutique $boutique): bool
+    {
+        return $boutique->venteEnGros() && app(AbonnementService::class)->permet($boutique, Plan::VENTE_GROS);
     }
 
     /** Le revendeur annule tant que rien n'est livré. */
@@ -200,7 +284,7 @@ class CommandesFournisseur
 
         // Le prix annoncé est celui que la caisse appliquera à la livraison.
         $boutique = Boutique::withoutGlobalScopes()->findOrFail($commande->boutique_grossiste_id);
-        $enGros = $boutique->venteEnGros() && app(AbonnementService::class)->permet($boutique, Plan::VENTE_GROS);
+        $enGros = $this->vendEnGros($boutique);
 
         DB::transaction(function () use ($commande, $lignes, $enGros): void {
             $parId = collect($lignes)->keyBy('id');
@@ -220,10 +304,7 @@ class CommandesFournisseur
             }
             // Retenu pour les prochaines commandes de cet article.
             foreach ($commande->lignes()->whereNotNull('produit_grossiste_id')->get() as $ligne) {
-                DB::table('correspondances_produits')->updateOrInsert(
-                    ['produit_revendeur_id' => $ligne->produit_id, 'boutique_grossiste_id' => $commande->boutique_grossiste_id],
-                    ['produit_grossiste_id' => $ligne->produit_grossiste_id, 'contenance' => $ligne->contenance, 'updated_at' => now(), 'created_at' => now()],
-                );
+                $this->retenir($commande->boutique_grossiste_id, $ligne->produit_id, $ligne->produit_grossiste_id, $ligne->contenance);
             }
             $commande->update(['statut' => 'confirmee', 'confirmee_le' => now()]);
         });
