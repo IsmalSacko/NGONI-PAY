@@ -292,6 +292,15 @@ class CommandesGrossistesTest extends TestCase
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 5000])->assertOk();
     }
 
+    public function test_le_back_office_montre_les_commandes_envoyees_et_recues(): void
+    {
+        $this->livrerACredit();
+        $this->actingAs($this->grossiste)->get('/commandes-fournisseurs')->assertOk()->assertSee('Reçues de vos revendeurs')->assertSee('Épicerie Awa');
+        $this->app['auth']->forgetGuards();
+        app(TenantContext::class)->forget();
+        $this->actingAs($this->awa)->get('/commandes-fournisseurs')->assertOk()->assertSee('Envoyées à vos fournisseurs')->assertSee('Livrée')->assertDontSee('Reçues de vos revendeurs');
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {

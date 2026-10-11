@@ -15,6 +15,7 @@
             ['route' => 'produits.index', 'label' => 'Produits', 'permission' => 'produits.view'],
             ['route' => 'stocks.index', 'label' => 'Stocks', 'permission' => 'stocks.view'],
             ['route' => 'achats.index', 'label' => 'Achats', 'permission' => 'achats.view', 'fonctionnalite' => \App\Models\Plan::ACHATS_FOURNISSEURS],
+            ['route' => 'commandes-fournisseurs.index', 'label' => 'Commandes', 'permission' => 'achats.view'],
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
             ['route' => 'statistiques.index', 'label' => 'Statistiques', 'permission' => 'rapports.view'],
             ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
