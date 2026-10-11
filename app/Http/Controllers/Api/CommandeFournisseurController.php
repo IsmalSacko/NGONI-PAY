@@ -71,7 +71,7 @@ class CommandeFournisseurController extends Controller
     /** Les grossistes de Ngoni (mon pays), cherchés par nom ou numéro. */
     public function annuaire(Request $request): JsonResponse
     {
-        return response()->json(['data' => $this->commandes->annuaire($request->query('q'))]);
+        return response()->json(['data' => $this->commandes->annuaire($request->query('q'), $request->query('pays'))]);
     }
 
     /** Ajouter un grossiste de l'annuaire : il reçoit la demande. */

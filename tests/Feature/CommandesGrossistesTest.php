@@ -346,6 +346,11 @@ class CommandesGrossistesTest extends TestCase
             ->assertJsonPath('data.0.nom', 'Dépôt Traoré')->assertJsonPath('data.0.liaison', null);
         $this->api($this->awa)->getJson('/api/grossistes?q=001122')->assertJsonCount(1, 'data');
         $this->api($this->grossiste)->getJson('/api/grossistes?q=awa')->assertJsonCount(0, 'data', 'une épicerie au détail n’y est pas');
+        // Un autre pays se choisit : le Mali vu de Côte d'Ivoire.
+        $this->depot->forceFill(['pays' => 'CI'])->save();
+        $this->api($this->awa)->getJson('/api/grossistes?q=traor')->assertJsonCount(0, 'data');
+        $this->api($this->awa)->getJson('/api/grossistes?q=traor&pays=CI')->assertJsonCount(1, 'data')->assertJsonPath('data.0.pays', 'CI');
+        $this->depot->forceFill(['pays' => 'ML'])->save();
 
         $fournisseur = $this->api($this->awa)->postJson("/api/grossistes/{$this->depot->id}/fournisseur")->assertCreated()->json('id');
         $this->assertDatabaseHas('notifications_app', ['user_id' => $this->grossiste->id, 'titre' => 'Nouveau revendeur']);

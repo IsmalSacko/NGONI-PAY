@@ -249,19 +249,21 @@ class CommandesFournisseur
 
     /**
      * Les grossistes de Ngoni, pour « Ajouter un fournisseur » : boutiques qui
-     * vendent en gros, du même pays, qui reçoivent des commandes. Recherche par
-     * nom de la boutique, nom ou numéro du commerçant.
+     * vendent en gros et reçoivent des commandes, du pays choisi (le mien par
+     * défaut : un Ivoirien peut commander à Bamako). Recherche par nom de la
+     * boutique, nom ou numéro du commerçant.
      *
      * @return list<array<string, mixed>>
      */
-    public function annuaire(?string $recherche = null): array
+    public function annuaire(?string $recherche = null, ?string $pays = null): array
     {
         $moi = Boutique::withoutGlobalScopes()->findOrFail($this->tenant->boutiqueId());
+        $pays = Country::tryFrom(strtoupper((string) $pays))?->value ?? $moi->pays;
         $texte = trim((string) $recherche);
         $chiffres = preg_replace('/\D+/', '', $texte);
         $terme = '%'.str_replace(['%', '_'], '', $texte).'%';
         $boutiques = Boutique::withoutGlobalScopes()
-            ->whereKeyNot($moi->id)->where('pays', $moi->pays)->where('recoit_commandes', true)
+            ->whereKeyNot($moi->id)->where('pays', $pays)->where('recoit_commandes', true)
             ->whereIn('mode_vente', ['detail_gros', 'gros'])
             ->when($texte !== '', fn ($q) => $q->where(fn ($q) => $q->where('nom', 'like', $terme)
                 ->orWhereIn('proprietaire_id', User::where('name', 'like', $terme)->select('id'))
@@ -272,7 +274,7 @@ class CommandesFournisseur
         $dejaFournisseurs = Fournisseur::whereIn('boutique_liee_id', $boutiques->pluck('id'))->pluck('boutique_liee_id')->flip();
 
         return $boutiques->map(fn (Boutique $b) => [
-            'id' => $b->id, 'nom' => $b->nom, 'adresse' => $b->adresse, 'telephone' => $b->telephone,
+            'id' => $b->id, 'nom' => $b->nom, 'adresse' => $b->adresse, 'telephone' => $b->telephone, 'pays' => $b->pays, 'devise' => $b->devise,
             'commercant' => $b->proprietaire?->name,
             'liaison' => $liaisons[$b->id] ?? null,
             'deja_fournisseur' => $dejaFournisseurs->has($b->id),
