@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\Fournisseur;
+use App\Models\LiaisonGrossiste;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
@@ -187,6 +188,7 @@ class CommandesGrossistesTest extends TestCase
         $sachet = Produit::create(['nom' => 'Faniko', 'prix_vente' => 300, 'taux_tva' => 0, 'stock' => 0]);
         $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
 
+        $this->accepte();
         $catalogue = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertOk()->json('data'))->keyBy('nom');
         $this->assertSame(3400, $catalogue['Faniko carton']['prix']);
         $this->assertFalse($catalogue['Lait en rupture']['disponible']);
@@ -226,6 +228,7 @@ class CommandesGrossistesTest extends TestCase
         ]])->assertCreated()->assertJsonPath('lignes.0.unite_commande', 'carton')->assertJsonPath('lignes.0.contenance_commande', 24)->json();
 
         // Le catalogue reconnaît son huile (même nom) : 1 carton = 24 L, sans rien demander.
+        $this->accepte();
         $chezMoi = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->json('data'))->firstWhere('id', $carton->id)['chez_moi'];
         $this->assertSame([$huile->id, 24, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['unite_commande']]);
         $this->api($this->grossiste)->getJson('/api/commandes-recues')
@@ -254,6 +257,7 @@ class CommandesGrossistesTest extends TestCase
         ]);
         $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
 
+        $this->accepte();
         $chezMoi = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->json('data'))->firstWhere('id', $faniko->id)['chez_moi'];
         $this->assertSame([$mien->id, 12, 300, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['prix_vente'], $chezMoi['unite_commande']]);
     }
@@ -324,6 +328,51 @@ class CommandesGrossistesTest extends TestCase
         $paiement = $this->api($this->grossiste)->getJson("/api/clients/{$client->id}/paiements-declares")->json('data.0.id');
         $this->api($this->grossiste)->postJson("/api/paiements-declares/{$paiement}/confirmer")->assertOk()->assertJsonPath('solde_du', 0);
         $this->assertSame(120, (int) $huile->fresh()->stock);
+    }
+
+    /** Le dépôt a accepté l'épicerie : son catalogue lui est visible. */
+    private function accepte(): void
+    {
+        LiaisonGrossiste::updateOrCreate(
+            ['boutique_revendeur_id' => $this->epicerie->id, 'boutique_grossiste_id' => $this->depot->id],
+            ['statut' => 'acceptee'],
+        );
+    }
+
+    public function test_annuaire_demande_acceptation_puis_catalogue(): void
+    {
+        // Seules les boutiques qui vendent en gros paraissent dans l'annuaire.
+        $this->api($this->awa)->getJson('/api/grossistes?q=traor')->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.nom', 'Dépôt Traoré')->assertJsonPath('data.0.liaison', null);
+        $this->api($this->awa)->getJson('/api/grossistes?q=001122')->assertJsonCount(1, 'data');
+        $this->api($this->grossiste)->getJson('/api/grossistes?q=awa')->assertJsonCount(0, 'data', 'une épicerie au détail n’y est pas');
+
+        $fournisseur = $this->api($this->awa)->postJson("/api/grossistes/{$this->depot->id}/fournisseur")->assertCreated()->json('id');
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $this->grossiste->id, 'titre' => 'Nouveau revendeur']);
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertJsonCount(0, 'data')->assertJsonPath('acces', 'demande');
+        $this->api($this->awa)->getJson('/api/fournisseurs')->assertJsonPath('data.0.liaison', 'demande');
+
+        $liaison = $this->api($this->grossiste)->getJson('/api/revendeurs')->assertJsonPath('data.0.nom', 'Épicerie Awa')->assertJsonPath('data.0.statut', 'demande')->json('data.0.id');
+        $this->api($this->awa)->postJson("/api/revendeurs/{$liaison}/accepter")->assertNotFound();
+        $this->api($this->grossiste)->postJson("/api/revendeurs/{$liaison}/accepter")->assertOk();
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $this->awa->id, 'titre' => 'Fournisseur accepté']);
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertJsonPath('acces', 'acceptee')
+            ->assertJsonFragment(['nom' => 'Riz 25 kg']);
+
+        // Retiré : plus de catalogue, ni de commande dans son application (WhatsApp, comme sans Ngoni).
+        $this->api($this->grossiste)->postJson("/api/revendeurs/{$liaison}/refuser")->assertOk();
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertJsonCount(0, 'data');
+        $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 1]]])
+            ->assertCreated()->assertJsonPath('grossiste', null);
+    }
+
+    public function test_une_boutique_qui_ne_recoit_pas_de_commandes_disparait(): void
+    {
+        $this->api($this->grossiste)->putJson('/api/boutique/commandes', ['recoit_commandes' => false])->assertOk();
+        $this->api($this->awa)->getJson('/api/grossistes?q=traor')->assertJsonCount(0, 'data');
+        $this->dans($this->epicerie);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122']);
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur->id}/ngoni")->assertJsonPath('sur_ngoni', false);
     }
 
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */

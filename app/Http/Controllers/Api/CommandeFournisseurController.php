@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\CommandeFournisseur;
 use App\Models\Fournisseur;
@@ -53,10 +54,51 @@ class CommandeFournisseurController extends Controller
         return response()->json(['sur_ngoni' => $boutique !== null, 'boutique' => $boutique?->nom]);
     }
 
-    /** Le catalogue du fournisseur, s'il a Ngoni (vide sinon). */
+    /**
+     * Le catalogue du fournisseur, s'il a Ngoni et m'a accepté (vide sinon).
+     * « acces » : null (pas sur Ngoni), demande (en attente), acceptee, refusee.
+     */
     public function catalogue(Request $request, Fournisseur $fournisseur): JsonResponse
     {
-        return response()->json(['data' => $this->commandes->catalogue($fournisseur, $request->query('q'))]);
+        $grossiste = $this->commandes->boutiqueDuFournisseur($fournisseur);
+
+        return response()->json([
+            'data' => $this->commandes->catalogue($fournisseur, $request->query('q')),
+            'acces' => $grossiste === null ? null : $this->commandes->statutLiaison($fournisseur->boutique_id, $grossiste->id),
+        ]);
+    }
+
+    /** Les grossistes de Ngoni (mon pays), cherchés par nom ou numéro. */
+    public function annuaire(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->commandes->annuaire($request->query('q'))]);
+    }
+
+    /** Ajouter un grossiste de l'annuaire : il reçoit la demande. */
+    public function ajouterGrossiste(string $boutique): JsonResponse
+    {
+        $grossiste = Boutique::withoutGlobalScopes()->findOrFail($boutique);
+
+        return response()->json($this->commandes->ajouterDepuisAnnuaire($grossiste), 201);
+    }
+
+    /** Grossiste : ses revendeurs (demandes, acceptés, refusés). */
+    public function revendeurs(): JsonResponse
+    {
+        return response()->json(['data' => $this->commandes->revendeurs()->map(fn ($l) => [
+            'id' => $l->id, 'statut' => $l->statut, 'nom' => $l->revendeur?->nom, 'telephone' => $l->revendeur?->telephone,
+            'depuis' => $l->created_at?->toIso8601String(),
+        ])]);
+    }
+
+    public function accepterRevendeur(int $liaison): JsonResponse
+    {
+        return response()->json(['statut' => $this->commandes->decider($liaison, true)->statut]);
+    }
+
+    public function refuserRevendeur(int $liaison): JsonResponse
+    {
+        return response()->json(['statut' => $this->commandes->decider($liaison, false)->statut]);
     }
 
     public function recommander(Request $request, CommandeFournisseur $commande): JsonResponse

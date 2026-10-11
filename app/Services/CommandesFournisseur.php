@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\CommandeFournisseur;
 use App\Models\Fournisseur;
+use App\Models\LiaisonGrossiste;
 use App\Models\PaiementFournisseur;
 use App\Models\Plan;
 use App\Models\Produit;
@@ -45,6 +46,18 @@ class CommandesFournisseur
 
     /** La boutique Ngoni du grossiste, reconnue à son numéro ; null s'il n'en a pas. */
     public function boutiqueDuFournisseur(Fournisseur $fournisseur): ?Boutique
+    {
+        $boutique = $this->boutiqueLiee($fournisseur);
+        // Il ne reçoit pas de commandes, ou a refusé ce revendeur : WhatsApp, comme sans Ngoni.
+        if ($boutique === null || ! $boutique->recoit_commandes
+            || $this->statutLiaison($fournisseur->boutique_id, $boutique->id) === 'refusee') {
+            return null;
+        }
+
+        return $boutique;
+    }
+
+    private function boutiqueLiee(Fournisseur $fournisseur): ?Boutique
     {
         if ($fournisseur->boutique_liee_id !== null) {
             return Boutique::withoutGlobalScopes()->find($fournisseur->boutique_liee_id);
@@ -128,6 +141,9 @@ class CommandesFournisseur
 
             return $commande;
         });
+        if ($grossiste !== null) {
+            $this->liaison($commande->boutique_id, $grossiste->id);
+        }
 
         if ($grossiste?->proprietaire_id !== null && ($proprietaire = User::find($grossiste->proprietaire_id)) !== null) {
             $boutique = Boutique::withoutGlobalScopes()->find($commande->boutique_id);
@@ -164,7 +180,8 @@ class CommandesFournisseur
     public function catalogue(Fournisseur $fournisseur, ?string $recherche = null): array
     {
         $grossiste = $this->boutiqueDuFournisseur($fournisseur);
-        if ($grossiste === null) {
+        // Ses prix ne se montrent qu'aux revendeurs qu'il a acceptés.
+        if ($grossiste === null || $this->statutLiaison($fournisseur->boutique_id, $grossiste->id) !== 'acceptee') {
             return [];
         }
         $enGros = $this->vendEnGros($grossiste);
@@ -207,6 +224,92 @@ class CommandesFournisseur
                 ],
             ];
         })->values()->all();
+    }
+
+    /** Où en est ce revendeur chez ce grossiste : null (jamais lié), demande, acceptee, refusee. */
+    public function statutLiaison(string $revendeurId, string $grossisteId): ?string
+    {
+        return LiaisonGrossiste::where('boutique_revendeur_id', $revendeurId)->where('boutique_grossiste_id', $grossisteId)->value('statut');
+    }
+
+    /** La liaison, demandée si elle n'existe pas : le grossiste est prévenu une fois. */
+    public function liaison(string $revendeurId, string $grossisteId): LiaisonGrossiste
+    {
+        $liaison = LiaisonGrossiste::firstOrCreate(['boutique_revendeur_id' => $revendeurId, 'boutique_grossiste_id' => $grossisteId], ['statut' => 'demande']);
+        if ($liaison->wasRecentlyCreated) {
+            $grossiste = Boutique::withoutGlobalScopes()->find($grossisteId);
+            $revendeur = Boutique::withoutGlobalScopes()->find($revendeurId);
+            if (($proprietaire = User::find($grossiste?->proprietaire_id)) !== null) {
+                $this->notifier->envoyer($proprietaire, 'Nouveau revendeur', "{$revendeur?->nom} veut vous commander. Acceptez-le pour qu'il voie votre catalogue et vos prix.", '/commandes-recues', 'commande', false);
+            }
+        }
+
+        return $liaison;
+    }
+
+    /**
+     * Les grossistes de Ngoni, pour « Ajouter un fournisseur » : boutiques qui
+     * vendent en gros, du même pays, qui reçoivent des commandes. Recherche par
+     * nom de la boutique, nom ou numéro du commerçant.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function annuaire(?string $recherche = null): array
+    {
+        $moi = Boutique::withoutGlobalScopes()->findOrFail($this->tenant->boutiqueId());
+        $texte = trim((string) $recherche);
+        $chiffres = preg_replace('/\D+/', '', $texte);
+        $terme = '%'.str_replace(['%', '_'], '', $texte).'%';
+        $boutiques = Boutique::withoutGlobalScopes()
+            ->whereKeyNot($moi->id)->where('pays', $moi->pays)->where('recoit_commandes', true)
+            ->whereIn('mode_vente', ['detail_gros', 'gros'])
+            ->when($texte !== '', fn ($q) => $q->where(fn ($q) => $q->where('nom', 'like', $terme)
+                ->orWhereIn('proprietaire_id', User::where('name', 'like', $terme)->select('id'))
+                ->when(strlen((string) $chiffres) >= 4, fn ($q) => $q->orWhere('telephone', 'like', '%'.$chiffres.'%')
+                    ->orWhereIn('proprietaire_id', User::where('phone', 'like', '%'.$chiffres.'%')->select('id')))))
+            ->with('proprietaire:id,name')->orderBy('nom')->limit(30)->get();
+        $liaisons = LiaisonGrossiste::where('boutique_revendeur_id', $moi->id)->pluck('statut', 'boutique_grossiste_id');
+        $dejaFournisseurs = Fournisseur::whereIn('boutique_liee_id', $boutiques->pluck('id'))->pluck('boutique_liee_id')->flip();
+
+        return $boutiques->map(fn (Boutique $b) => [
+            'id' => $b->id, 'nom' => $b->nom, 'adresse' => $b->adresse, 'telephone' => $b->telephone,
+            'commercant' => $b->proprietaire?->name,
+            'liaison' => $liaisons[$b->id] ?? null,
+            'deja_fournisseur' => $dejaFournisseurs->has($b->id),
+        ])->values()->all();
+    }
+
+    /** « Ajouter » dans l'annuaire : le fournisseur créé (ou retrouvé), et la demande envoyée. */
+    public function ajouterDepuisAnnuaire(Boutique $grossiste): Fournisseur
+    {
+        $moi = (string) $this->tenant->boutiqueId();
+        abort_if($grossiste->id === $moi || ! $grossiste->recoit_commandes, 404);
+        $fournisseur = Fournisseur::where('boutique_liee_id', $grossiste->id)->first()
+            ?? Fournisseur::create(['nom' => $grossiste->nom, 'telephone' => $grossiste->telephone]);
+        $fournisseur->forceFill(['boutique_liee_id' => $grossiste->id])->save();
+        $this->liaison($moi, $grossiste->id);
+
+        return $fournisseur;
+    }
+
+    /** Grossiste : ses revendeurs, les demandes d'abord. @return Collection<int, LiaisonGrossiste> */
+    public function revendeurs(): Collection
+    {
+        return LiaisonGrossiste::where('boutique_grossiste_id', $this->tenant->boutiqueId())->with('revendeur:id,nom,telephone')
+            ->orderByRaw("CASE statut WHEN 'demande' THEN 0 WHEN 'acceptee' THEN 1 ELSE 2 END")->latest()->get();
+    }
+
+    /** Le grossiste accepte (catalogue visible) ou refuse (ou retire) un revendeur. */
+    public function decider(int $liaisonId, bool $accepter): LiaisonGrossiste
+    {
+        $liaison = LiaisonGrossiste::where('boutique_grossiste_id', $this->tenant->boutiqueId())->findOrFail($liaisonId);
+        $liaison->update(['statut' => $accepter ? 'acceptee' : 'refusee']);
+        if ($accepter && ($proprietaire = User::find($liaison->revendeur?->proprietaire_id)) !== null) {
+            $nom = Boutique::withoutGlobalScopes()->whereKey($liaison->boutique_grossiste_id)->value('nom');
+            $this->notifier->envoyer($proprietaire, 'Fournisseur accepté', "{$nom} vous a accepté : son catalogue et ses prix sont dans Achats → Commander.", '/achats', 'commande', false);
+        }
+
+        return $liaison;
     }
 
     /** « Commander à nouveau » : les mêmes articles, aux mêmes quantités. */
@@ -371,6 +474,11 @@ class CommandesFournisseur
                 $this->retenir($commande->boutique_grossiste_id, $ligne->produit_id, $ligne->produit_grossiste_id, $ligne->contenance);
             }
             $commande->update(['statut' => 'confirmee', 'confirmee_le' => now()]);
+            // Confirmer sa commande, c'est accepter ce revendeur : il voit le catalogue.
+            LiaisonGrossiste::updateOrCreate(
+                ['boutique_revendeur_id' => $commande->boutique_id, 'boutique_grossiste_id' => $commande->boutique_grossiste_id],
+                ['statut' => 'acceptee'],
+            );
         });
 
         $this->prevenirRevendeur($commande, 'Commande confirmée', 'confirme votre commande n° '.$commande->numero.'.');

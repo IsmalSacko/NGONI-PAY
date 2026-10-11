@@ -146,6 +146,16 @@ class BoutiqueController extends Controller
         return response()->json(['data' => $boutique->fresh()]);
     }
 
+    /** Recevoir (ou non) des commandes de revendeurs, et paraître dans l'annuaire des grossistes. */
+    public function recoitCommandes(Request $request): JsonResponse
+    {
+        $data = $request->validate(['recoit_commandes' => ['required', 'boolean']]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $boutique->forceFill(['recoit_commandes' => $data['recoit_commandes']])->save();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
     /** Programme de fidélité : seuil d'achats et remise (seuil null : aucun). */
     public function fidelite(Request $request, Fidelite $fidelite): JsonResponse
     {

@@ -28,7 +28,9 @@ class AchatController extends Controller
             'id' => $f->id, 'nom' => $f->nom, 'telephone' => $f->telephone, 'notes' => $f->notes,
             'solde_du' => max(0, (int) $f->achats_total - (int) $f->paiements_total),
             // Sa boutique Ngoni, s'il en a une : les commandes y arrivent.
-            'grossiste' => $commandes->boutiqueDuFournisseur($f)?->nom,
+            'grossiste' => ($g = $commandes->boutiqueDuFournisseur($f))?->nom,
+            // Accepté par le grossiste : son catalogue et ses prix sont visibles.
+            'liaison' => $g === null ? null : $commandes->statutLiaison($f->boutique_id, $g->id),
         ])]);
     }
 
