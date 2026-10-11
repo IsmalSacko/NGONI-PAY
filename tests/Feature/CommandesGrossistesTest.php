@@ -148,6 +148,8 @@ class CommandesGrossistesTest extends TestCase
         $this->assertDatabaseHas('notifications_app', ['user_id' => $this->awa->id, 'titre' => 'Paiement non reçu']);
         $this->api($this->grossiste)->getJson("/api/clients/{$client->id}/credit")->assertOk();
         $this->assertSame(40000, $client->fresh()->soldeDu());
+        // Le ticket de 100 000 F (40 000 payés) : 20 000 remboursés, il en reste 40 000.
+        $this->api($this->grossiste)->getJson('/api/ventes')->assertJsonPath('data.0.reste_du', 60000)->assertJsonPath('data.0.reste_actuel', 40000);
     }
 
     public function test_le_revendeur_commande_en_sachets_le_grossiste_livre_en_cartons_et_s_en_souvient(): void

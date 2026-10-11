@@ -258,4 +258,21 @@ class AnnulationCreditTest extends TestCase
         $this->vendre($this->caissier, ['montant_paye' => 4000, 'client_id' => $fatou->id])
             ->assertForbidden()->assertJsonPath('message', 'Vous n’avez pas le droit de vendre à crédit.');
     }
+
+    public function test_un_reglement_solde_d_abord_les_tickets_les_plus_anciens(): void
+    {
+        $this->dans();
+        $fatou = Client::create(['nom' => 'Fatou', 'telephone' => '+22370000009']);
+        // Deux tickets à crédit de 10 000 F (2 riz), puis 15 000 F remboursés.
+        $ancien = $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated()->json('id');
+        $this->travel(1)->minutes();
+        $recent = $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated()->json('id');
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 15000, 'moyen_paiement' => 'especes'])->assertCreated();
+
+        $ventes = collect($this->api($this->admin)->getJson('/api/ventes')->json('data'))->keyBy('id');
+        $this->assertSame(0, $ventes[$ancien]['reste_actuel']);
+        $this->assertSame(5000, $ventes[$recent]['reste_actuel']);
+        $this->assertSame(10000, $ventes[$recent]['reste_du'], 'le « vendu à crédit » ne bouge pas');
+        $this->api($this->admin)->getJson("/api/ventes/{$recent}")->assertJsonPath('reste_actuel', 5000);
+    }
 }

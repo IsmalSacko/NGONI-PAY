@@ -7,12 +7,14 @@ namespace App\Http\Controllers\Api;
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\ExigeAppPourLesFractions;
+use App\Models\Client;
 use App\Models\Vente;
 use App\Services\VenteService;
 use App\Support\Presence\Appareil;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -65,6 +67,7 @@ class VenteController extends Controller
         };
 
         $page = $filtre(Vente::with(['lignes', 'client', 'caissier']))->latest()->orderByDesc('numero')->paginate(30);
+        self::ajouterRestes(collect($page->items()));
 
         $jours = collect($page->items())->map(fn (Vente $v) => $v->jour_affaire?->toDateString())->filter()->unique()->values();
         $resume = $jours->isEmpty() ? collect() : $filtre(Vente::query())->valides()
@@ -85,7 +88,27 @@ class VenteController extends Controller
             $vente->load('commandeRestaurant:id,numero,table,type,couverts');
         }
 
+        self::ajouterRestes(collect([$vente]));
+
         return response()->json($vente->load(['lignes', 'client', 'caissier']));
+    }
+
+    /**
+     * Ventes à crédit : ce qui en reste dû aujourd'hui (reste_actuel), une
+     * fois les règlements du client imputés aux plus anciennes.
+     *
+     * @param  Collection<int, Vente>  $ventes
+     */
+    private static function ajouterRestes(Collection $ventes): void
+    {
+        $aCredit = $ventes->filter(fn (Vente $v) => (int) $v->reste_du > 0 && $v->client_id !== null);
+        $restes = [];
+        foreach (Client::whereIn('id', $aCredit->pluck('client_id')->unique())->get() as $client) {
+            $restes += $client->restesParVente();
+        }
+        foreach ($aCredit as $v) {
+            $v->setAttribute('reste_actuel', $restes[$v->id] ?? 0);
+        }
     }
 
     public function store(Request $request): JsonResponse

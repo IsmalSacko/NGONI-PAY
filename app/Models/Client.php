@@ -52,6 +52,26 @@ class Client extends Model
             ->withSum('reglements as reglements_total', 'montant');
     }
 
+    /**
+     * Ce qui reste dû sur chacune de ses ventes à crédit : ses règlements
+     * soldent d'abord les plus anciennes. Pour l'affichage (« Soldé »,
+     * « Reste 12 000 F ») ; la dette du client reste [soldeDu].
+     *
+     * @return array<string, int> par identifiant de vente
+     */
+    public function restesParVente(): array
+    {
+        $disponible = (int) $this->reglements()->sum('montant');
+        $restes = [];
+        foreach ($this->ventes()->valides()->where('reste_du', '>', 0)->oldest()->orderBy('numero')->get(['id', 'reste_du']) as $v) {
+            $couvert = min($disponible, (int) $v->reste_du);
+            $restes[$v->id] = (int) $v->reste_du - $couvert;
+            $disponible -= $couvert;
+        }
+
+        return $restes;
+    }
+
     public function soldeDu(): int
     {
         $credit = (int) $this->ventes()->valides()->sum('reste_du');
