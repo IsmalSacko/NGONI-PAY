@@ -180,6 +180,8 @@ class CommandeFournisseurController extends Controller
             'lignes' => $c->lignes->map(fn ($l) => [
                 ...$this->ligne($l),
                 'produit_grossiste' => $l->produitGrossiste?->only(['id', 'nom', 'unite', 'stock', 'prix_vente', 'prix_gros']),
+                // Ce qu'il doit livrer, dans ses unités : 2 (cartons), pas 48 (L).
+                'quantite_grossiste' => round((float) $l->quantite / max(0.001, (float) $l->contenance), 3),
                 // Ses paliers : le grossiste qui choisit son « carton » voit la conversion se faire seule.
                 'paliers_revendeur' => collect($l->produit?->paliers ?? [])->map(fn ($p) => ['unite' => $p['unite'] ?? null, 'contenance' => (float) ($p['contenance'] ?? 1)])->values(),
             ]),

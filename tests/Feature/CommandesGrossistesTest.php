@@ -223,9 +223,13 @@ class CommandesGrossistesTest extends TestCase
             ['produit_id' => $huile->id, 'quantite' => 48, 'unite_commande' => 'carton'],
         ]])->assertCreated()->assertJsonPath('lignes.0.unite_commande', 'carton')->assertJsonPath('lignes.0.contenance_commande', 24)->json();
 
+        // Le catalogue reconnaît son huile (même nom) : 1 carton = 24 L, sans rien demander.
+        $chezMoi = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->json('data'))->firstWhere('id', $carton->id)['chez_moi'];
+        $this->assertSame([$huile->id, 24, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['unite_commande']]);
         $this->api($this->grossiste)->getJson('/api/commandes-recues')
             ->assertJsonPath('data.0.lignes.0.produit_grossiste.id', $carton->id)
             ->assertJsonPath('data.0.lignes.0.contenance', 24)
+            ->assertJsonPath('data.0.lignes.0.quantite_grossiste', 2)
             ->assertJsonPath('data.0.lignes.0.paliers_revendeur.0.contenance', 24);
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $carton->id]]])
             ->assertJsonPath('lignes.0.quantite_confirmee', 2)->assertJsonPath('total_confirme', 76800);

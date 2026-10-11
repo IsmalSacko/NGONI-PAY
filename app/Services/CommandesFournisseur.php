@@ -174,13 +174,22 @@ class CommandesFournisseur
         $correspondances = DB::table('correspondances_produits')->where('boutique_grossiste_id', $grossiste->id)
             ->whereIn('produit_revendeur_id', Produit::query()->select('id'))
             ->get()->keyBy('produit_grossiste_id');
-        $miens = Produit::whereIn('id', $correspondances->pluck('produit_revendeur_id'))->get(['id', 'nom', 'unite'])->keyBy('id');
+        // Mes articles : ceux déjà liés, et de quoi reconnaître les autres
+        // (même code-barres, sinon même nom), la conversion tirée de mes paliers.
+        $miens = Produit::query()->get(['id', 'nom', 'unite', 'code_barre', 'paliers']);
+        $parId = $miens->keyBy('id');
+        $parCode = $miens->filter(fn ($m) => filled($m->code_barre))->keyBy('code_barre');
+        $parNom = $miens->keyBy(fn ($m) => mb_strtolower(trim($m->nom)));
 
         $suitStock = $grossiste->suitLeStock();
 
-        return $produits->map(function (Produit $p) use ($enGros, $correspondances, $miens, $suitStock) {
+        return $produits->map(function (Produit $p) use ($enGros, $correspondances, $parId, $parCode, $parNom, $suitStock) {
             $c = $correspondances[$p->id] ?? null;
-            $mien = $c === null ? null : ($miens[$c->produit_revendeur_id] ?? null);
+            $mien = $c === null ? null : ($parId[$c->produit_revendeur_id] ?? null);
+            if ($mien === null) {
+                $mien = (filled($p->code_barre) ? ($parCode[$p->code_barre] ?? null) : null) ?? ($parNom[mb_strtolower(trim($p->nom))] ?? null);
+                $c = $mien === null ? null : (object) ['contenance' => self::contenanceProposee($mien, $p)];
+            }
 
             return [
                 'id' => $p->id,
@@ -189,7 +198,11 @@ class CommandesFournisseur
                 'prix' => (int) ($enGros && $p->prix_gros !== null ? $p->prix_gros : $p->prix_vente),
                 'disponible' => ! $suitStock || $p->stock > 0,
                 'vignette_url' => $p->vignette_url,
-                'chez_moi' => $mien === null ? null : ['produit_id' => $mien->id, 'nom' => $mien->nom, 'unite' => $mien->unite, 'contenance' => (float) $c->contenance],
+                'chez_moi' => $mien === null ? null : [
+                    'produit_id' => $mien->id, 'nom' => $mien->nom, 'unite' => $mien->unite, 'contenance' => (float) $c->contenance,
+                    // Mon palier du même nom que son unité (carton) : la commande s'y lit.
+                    'unite_commande' => (float) $c->contenance > 1 ? $p->unite : null,
+                ],
             ];
         })->values()->all();
     }
