@@ -41,7 +41,8 @@ class ModeLibre
     {
         DB::transaction(function () use ($boutique, $proprietaire, $request): void {
             $this->tracer($boutique, $proprietaire, $request, 'activation');
-            $boutique->forceFill(['mode_libre' => true, 'mode_libre_version' => self::version()])->save();
+            // Le mode libre est un réglage de boutique qui vend pour de vrai : il met fin au rodage, sans rien effacer.
+            $boutique->forceFill(['mode_libre' => true, 'mode_libre_version' => self::version(), 'mode_rodage' => false])->save();
         });
     }
 

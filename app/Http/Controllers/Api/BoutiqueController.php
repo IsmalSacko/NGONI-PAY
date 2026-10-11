@@ -228,21 +228,35 @@ class BoutiqueController extends Controller
     }
 
     /**
-     * Fin du rodage : tout est effacé sauf les comptes (et le catalogue, les
-     * fournisseurs s'il le veut), les numéros d'essai repartent à zéro, et la
-     * boutique vend pour de vrai.
+     * Fin du rodage : la boutique vend pour de vrai, les prochaines factures
+     * sont numérotées normalement. Rien n'est effacé : beaucoup vendent pour
+     * de vrai dès le rodage. Effacer ses essais (sauf les comptes, et le
+     * catalogue, les fournisseurs s'il le veut) est une option, à cocher.
+     * Une application d'avant le choix (sans « effacer ») efface, comme son
+     * écran l'annonce.
      */
     public function passerEnModeReel(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
     {
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
         abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut passer en mode réel.');
+        $effacer = $request->has('effacer') ? $request->boolean('effacer') : true;
         $request->validate([
-            'confirmation' => ['required', 'in:MODE REEL'],
+            'effacer' => ['boolean'],
+            'confirmation' => [$effacer ? 'required' : 'nullable', 'in:MODE REEL'],
             'garder_catalogue' => ['boolean'],
             'garder_fournisseurs' => ['boolean'],
-        ], ['confirmation.in' => 'Tapez MODE REEL pour confirmer.']);
+        ], ['confirmation.in' => 'Tapez MODE REEL pour confirmer.', 'confirmation.required' => 'Tapez MODE REEL pour confirmer.']);
         if (! $boutique->mode_rodage) {
             throw ValidationException::withMessages(['rodage' => ['Votre boutique est déjà en mode réel.']]);
+        }
+
+        if (! $effacer) {
+            $boutique->forceFill(['mode_rodage' => false])->save();
+
+            return response()->json([
+                'message' => "{$boutique->nom} est en mode réel : vos ventes sont gardées, la prochaine facture sera {$boutique->fresh()->prochaine_facture}.",
+                'data' => $boutique->fresh(),
+            ]);
         }
 
         $reinitialisation->reinitialiser($boutique->id, $request->user(), $request->boolean('garder_catalogue', true), $request->boolean('garder_fournisseurs', true), numerosAZero: true);

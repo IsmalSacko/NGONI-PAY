@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -135,6 +136,31 @@ class FacturesEtRodageTest extends TestCase
         // La première vraie facture porte le numéro 1, sans « ESSAI ».
         Produit::withoutGlobalScopes()->whereKey($this->riz->id)->update(['stock' => 10]);
         $this->assertSame('EAT-'.now()->format('Y').'-0001', $this->vendre()['numero_facture']);
+    }
+
+    public function test_passer_en_mode_reel_en_gardant_ses_ventes(): void
+    {
+        // Beaucoup vendent pour de vrai dès le rodage : rien ne doit se perdre.
+        $this->api()->postJson('/api/boutique/rodage')->assertOk();
+        $essai = $this->vendre();
+        Client::create(['nom' => 'Vrai client', 'telephone' => '+22370000001']);
+
+        $this->api()->postJson('/api/boutique/mode-reel', ['effacer' => false])->assertOk()->assertJsonPath('data.mode_rodage', false);
+
+        $this->assertNotNull(Vente::withoutGlobalScopes()->find($essai['id']), 'la vente est gardée');
+        $this->assertSame(1, Client::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
+        $this->assertEquals(48, $this->riz->fresh()->stock, 'le stock aussi');
+        $this->assertSame('EAT-'.now()->format('Y').'-0001', $this->vendre()['numero_facture'], 'les vraies factures commencent à 1');
+    }
+
+    public function test_activer_le_mode_libre_met_fin_au_rodage_sans_rien_effacer(): void
+    {
+        $this->api()->postJson('/api/boutique/rodage')->assertOk();
+        $essai = $this->vendre();
+        $this->activerModeLibre()->assertOk();
+
+        $this->assertFalse((bool) $this->boutique->fresh()->mode_rodage);
+        $this->assertNotNull(Vente::withoutGlobalScopes()->find($essai['id']));
     }
 
     public function test_repartir_de_zero_efface_aussi_les_commandes_du_pressing(): void
@@ -333,15 +359,15 @@ class FacturesEtRodageTest extends TestCase
     public function test_le_mode_libre_est_une_fonction_pro(): void
     {
         $vente = $this->vendre();
-        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
+        app(AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
 
         $this->activerModeLibre()->assertForbidden()->assertJsonPath('code', 'FONCTIONNALITE_NON_INCLUSE')->assertJsonPath('fonctionnalite', 'mode_libre');
         $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertUnprocessable();
 
         // Activé en Pro, puis retour au Basic : le mode libre dort.
-        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'pro', now()->addMonth(), $this->awa);
+        app(AbonnementService::class)->accorder($this->awa, 'pro', now()->addMonth(), $this->awa);
         $this->activerModeLibre()->assertOk()->assertJsonPath('data.mode_libre_actif', true);
-        app(\App\Services\AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
+        app(AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
         $this->assertFalse($this->boutique->fresh()->mode_libre_actif);
         $this->api()->postJson("/api/ventes/{$vente['id']}/numero-facture", ['numero_facture' => 'FA-1'])->assertUnprocessable();
     }
