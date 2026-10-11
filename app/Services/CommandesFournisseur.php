@@ -77,7 +77,7 @@ class CommandesFournisseur
      * (produit_grossiste_id) et combien d'unités du revendeur il contient :
      * c'est retenu pour la suite.
      *
-     * @param  list<array{produit_id: string, quantite: float|int|string, prix_estime?: ?int, produit_grossiste_id?: ?string, contenance?: float|int|string|null}>  $lignes  quantité : dans l'unité du revendeur
+     * @param  list<array{produit_id: string, quantite: float|int|string, unite_commande?: ?string, prix_estime?: ?int, produit_grossiste_id?: ?string, contenance?: float|int|string|null}>  $lignes  quantité : dans l'unité de base du revendeur ; unite_commande : son palier (carton), pour l'affichage
      */
     public function commander(User $auteur, Fournisseur $fournisseur, array $lignes, ?string $note = null): CommandeFournisseur
     {
@@ -109,14 +109,18 @@ class CommandesFournisseur
                     $connue = (object) ['produit_grossiste_id' => $article->id, 'contenance' => max(0.001, (float) ($l['contenance'] ?? 1))];
                     $this->retenir($grossiste->id, $produit->id, $article->id, $connue->contenance);
                 }
+                $article = $connue === null && $grossiste !== null ? $this->articleCorrespondant($grossiste, $produit) : null;
+                $palier = filled($l['unite_commande'] ?? null) ? $produit->palier($l['unite_commande']) : null;
                 $commande->lignes()->create([
                     'produit_id' => $produit->id,
                     'nom' => $produit->nom,
                     'unite' => $produit->unite,
+                    'unite_commande' => $palier !== null && $palier['contenance'] > 1 ? $palier['unite'] : null,
+                    'contenance_commande' => $palier !== null && $palier['contenance'] > 1 ? $palier['contenance'] : 1,
                     'quantite' => $quantite,
                     'prix_estime' => $prix,
-                    'produit_grossiste_id' => $connue->produit_grossiste_id ?? ($grossiste === null ? null : $this->articleCorrespondant($grossiste, $produit)?->id),
-                    'contenance' => (float) ($connue->contenance ?? 1),
+                    'produit_grossiste_id' => $connue->produit_grossiste_id ?? $article?->id,
+                    'contenance' => (float) ($connue->contenance ?? ($article === null ? 1 : self::contenanceProposee($produit, $article))),
                 ]);
                 $total += (int) round($quantite * $prix);
             }
@@ -142,7 +146,7 @@ class CommandesFournisseur
         }
         $boutique = $commande->boutique?->nom;
         $texte = "Bonjour, commande n° {$commande->numero} de {$boutique} :\n"
-            .$commande->lignes->map(fn ($l) => '• '.self::quantite($l->quantite).($l->unite ? " {$l->unite}" : '').' × '.$l->nom)->implode("\n")
+            .$commande->lignes->map(fn ($l) => '• '.self::quantite($l->quantiteCommandee()).(($l->unite_commande ?? $l->unite) ? ' '.($l->unite_commande ?? $l->unite) : '').' × '.$l->nom)->implode("\n")
             .($commande->note ? "\n\n{$commande->note}" : '')
             ."\n\nMerci de me confirmer la livraison."
             // Le fournisseur qui rejoint Ngoni reçoit les commandes suivantes dans son application.
@@ -210,6 +214,33 @@ class CommandesFournisseur
         }
     }
 
+    /**
+     * Combien d'unités de base du revendeur dans une unité du grossiste, tirées
+     * de ce que le revendeur a déjà renseigné : même unité (1), ou son palier
+     * du même nom (son « carton » de 24 L pour le « carton » du grossiste).
+     */
+    public static function contenanceProposee(Produit $mien, Produit $sien): float
+    {
+        $unite = self::uniteNormalisee($sien->unite);
+        if ($unite === null || $unite === self::uniteNormalisee($mien->unite)) {
+            return 1;
+        }
+        foreach ($mien->paliers ?? [] as $p) {
+            if (self::uniteNormalisee($p['unite'] ?? null) === $unite) {
+                return (float) $p['contenance'];
+            }
+        }
+
+        return 1;
+    }
+
+    private static function uniteNormalisee(?string $unite): ?string
+    {
+        $u = rtrim(mb_strtolower(trim((string) $unite)), 's');
+
+        return $u === '' ? null : $u;
+    }
+
     private function retenir(string $grossisteId, string $produitRevendeurId, string $produitGrossisteId, float $contenance): void
     {
         DB::table('correspondances_produits')->updateOrInsert(
@@ -268,7 +299,7 @@ class CommandesFournisseur
         return CommandeFournisseur::withoutBoutiqueScope()
             ->where('boutique_grossiste_id', $this->tenant->boutiqueId())
             ->when(filled($statut), fn ($q) => $q->where('statut', $statut))
-            ->with(['lignes.produitGrossiste', 'boutique'])
+            ->with(['lignes.produitGrossiste', 'lignes.produit', 'boutique'])
             ->latest()->limit(100)->get();
     }
 
@@ -294,7 +325,9 @@ class CommandesFournisseur
                 if (filled($choix['produit_grossiste_id'] ?? null) && $produit === null) {
                     throw ValidationException::withMessages(['lignes' => ['Article introuvable dans votre boutique.']]);
                 }
-                $contenance = max(0.001, (float) ($choix['contenance'] ?? $ligne->contenance ?? 1));
+                $proposee = $produit !== null && $produit->id !== $ligne->produit_grossiste_id && ($mien = $ligne->produit) !== null
+                    ? self::contenanceProposee($mien, $produit) : ($ligne->contenance ?? 1);
+                $contenance = max(0.001, (float) ($choix['contenance'] ?? $proposee));
                 $ligne->update([
                     'produit_grossiste_id' => $produit?->id,
                     'contenance' => $contenance,

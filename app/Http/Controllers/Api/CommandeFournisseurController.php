@@ -36,6 +36,7 @@ class CommandeFournisseurController extends Controller
             'lignes.*.prix_estime' => ['nullable', 'integer', 'min:0'],
             'lignes.*.produit_grossiste_id' => ['nullable', 'uuid'],
             'lignes.*.contenance' => ['nullable', 'numeric', 'gt:0', 'max:100000'],
+            'lignes.*.unite_commande' => ['nullable', 'string', 'max:30'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
         $fournisseur = Fournisseur::findOrFail($data['fournisseur_id']);
@@ -171,7 +172,7 @@ class CommandeFournisseurController extends Controller
     /** @return array<string, mixed> */
     private function recue(CommandeFournisseur $c): array
     {
-        $c->loadMissing(['lignes.produitGrossiste', 'boutique']);
+        $c->loadMissing(['lignes.produitGrossiste', 'lignes.produit', 'boutique']);
 
         return [
             ...$this->commun($c),
@@ -179,6 +180,8 @@ class CommandeFournisseurController extends Controller
             'lignes' => $c->lignes->map(fn ($l) => [
                 ...$this->ligne($l),
                 'produit_grossiste' => $l->produitGrossiste?->only(['id', 'nom', 'unite', 'stock', 'prix_vente', 'prix_gros']),
+                // Ses paliers : le grossiste qui choisit son « carton » voit la conversion se faire seule.
+                'paliers_revendeur' => collect($l->produit?->paliers ?? [])->map(fn ($p) => ['unite' => $p['unite'] ?? null, 'contenance' => (float) ($p['contenance'] ?? 1)])->values(),
             ]),
         ];
     }
@@ -205,6 +208,7 @@ class CommandeFournisseurController extends Controller
     {
         return [
             'id' => $l->id, 'produit_id' => $l->produit_id, 'nom' => $l->nom, 'unite' => $l->unite, 'contenance' => (float) $l->contenance,
+            'unite_commande' => $l->unite_commande, 'contenance_commande' => (float) $l->contenance_commande,
             'quantite' => (float) $l->quantite, 'prix_estime' => (int) $l->prix_estime,
             'produit_grossiste_id' => $l->produit_grossiste_id,
             'quantite_confirmee' => $l->quantite_confirmee === null ? null : (float) $l->quantite_confirmee,

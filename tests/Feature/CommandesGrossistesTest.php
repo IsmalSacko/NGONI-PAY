@@ -207,6 +207,35 @@ class CommandesGrossistesTest extends TestCase
             ->assertJsonPath('lignes.0.quantite', 72)->assertJsonPath('statut', 'envoyee');
     }
 
+    public function test_les_paliers_du_revendeur_font_la_conversion_sans_rien_demander(): void
+    {
+        // Le grossiste vend l'huile au carton ; le revendeur la vend au litre, son carton fait 24 L.
+        $this->dans($this->depot);
+        $carton = Produit::create(['nom' => "Huile d'arachide", 'unite' => 'carton', 'prix_vente' => 38400, 'taux_tva' => 0, 'stock' => 100]);
+        $this->dans($this->epicerie);
+        $huile = Produit::create([
+            'nom' => "Huile d'arachide", 'unite' => 'l', 'prix_vente' => 1600, 'prix_achat' => 1400, 'taux_tva' => 0, 'stock' => 10,
+            'paliers' => [['unite' => 'carton', 'contenance' => 24, 'prix' => 38400]],
+        ]);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
+
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [
+            ['produit_id' => $huile->id, 'quantite' => 48, 'unite_commande' => 'carton'],
+        ]])->assertCreated()->assertJsonPath('lignes.0.unite_commande', 'carton')->assertJsonPath('lignes.0.contenance_commande', 24)->json();
+
+        $this->api($this->grossiste)->getJson('/api/commandes-recues')
+            ->assertJsonPath('data.0.lignes.0.produit_grossiste.id', $carton->id)
+            ->assertJsonPath('data.0.lignes.0.contenance', 24)
+            ->assertJsonPath('data.0.lignes.0.paliers_revendeur.0.contenance', 24);
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $carton->id]]])
+            ->assertJsonPath('lignes.0.quantite_confirmee', 2)->assertJsonPath('total_confirme', 76800);
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 76800])->assertOk();
+
+        $this->assertSame(58, (int) $huile->fresh()->stock);
+        $this->assertSame(1600, (int) $huile->fresh()->prix_achat);
+        $this->assertSame(98, (int) $carton->fresh()->stock);
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {
