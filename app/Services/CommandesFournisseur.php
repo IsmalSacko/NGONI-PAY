@@ -10,8 +10,10 @@ use App\Models\Boutique;
 use App\Models\Client;
 use App\Models\CommandeFournisseur;
 use App\Models\Fournisseur;
+use App\Models\PaiementFournisseur;
 use App\Models\Plan;
 use App\Models\Produit;
+use App\Models\ReglementCredit;
 use App\Models\User;
 use App\Support\Phone\PhoneNumber;
 use App\Support\Tenancy\TenantContext;
@@ -38,6 +40,7 @@ class CommandesFournisseur
         private readonly VenteService $ventes,
         private readonly AchatService $achats,
         private readonly NotifierCompte $notifier,
+        private readonly ReglementsCredit $reglements,
     ) {}
 
     /** La boutique Ngoni du grossiste, reconnue à son numéro ; null s'il n'en a pas. */
@@ -92,13 +95,18 @@ class CommandesFournisseur
                 $produit = $produits[$l['produit_id']] ?? throw ValidationException::withMessages(['lignes' => ['Article introuvable.']]);
                 $prix = (int) ($l['prix_estime'] ?? $produit->prix_achat ?? 0);
                 $quantite = (float) $l['quantite'];
+                // Ce que le grossiste a déjà dit pour cet article (« 1 carton =
+                // 24 sachets »), sinon le même article chez lui (code-barres, nom).
+                $connue = $grossiste === null ? null : DB::table('correspondances_produits')
+                    ->where('boutique_grossiste_id', $grossiste->id)->where('produit_revendeur_id', $produit->id)->first();
                 $commande->lignes()->create([
                     'produit_id' => $produit->id,
                     'nom' => $produit->nom,
+                    'unite' => $produit->unite,
                     'quantite' => $quantite,
                     'prix_estime' => $prix,
-                    // Même article chez le grossiste (code-barres, sinon nom) : proposé d'avance.
-                    'produit_grossiste_id' => $grossiste === null ? null : $this->articleCorrespondant($grossiste, $produit)?->id,
+                    'produit_grossiste_id' => $connue->produit_grossiste_id ?? ($grossiste === null ? null : $this->articleCorrespondant($grossiste, $produit)?->id),
+                    'contenance' => (float) ($connue->contenance ?? 1),
                 ]);
                 $total += (int) round($quantite * $prix);
             }
@@ -183,7 +191,7 @@ class CommandesFournisseur
     /**
      * Le grossiste confirme : pour chaque ligne, son article et la quantité qu'il livre.
      *
-     * @param  list<array{id: int, produit_grossiste_id: ?string, quantite: float|int|string}>  $lignes
+     * @param  list<array{id: int, produit_grossiste_id: ?string, quantite: float|int|string, contenance?: float|int|string|null}>  $lignes  quantité : dans l'unité du grossiste (cartons) ; contenance : unités du revendeur dans l'une d'elles
      */
     public function confirmer(CommandeFournisseur $commande, array $lignes): CommandeFournisseur
     {
@@ -202,11 +210,20 @@ class CommandesFournisseur
                 if (filled($choix['produit_grossiste_id'] ?? null) && $produit === null) {
                     throw ValidationException::withMessages(['lignes' => ['Article introuvable dans votre boutique.']]);
                 }
+                $contenance = max(0.001, (float) ($choix['contenance'] ?? $ligne->contenance ?? 1));
                 $ligne->update([
                     'produit_grossiste_id' => $produit?->id,
-                    'quantite_confirmee' => $produit === null ? 0 : (float) ($choix['quantite'] ?? $ligne->quantite),
+                    'contenance' => $contenance,
+                    'quantite_confirmee' => $produit === null ? 0 : (float) ($choix['quantite'] ?? ceil($ligne->quantite / $contenance)),
                     'prix_grossiste' => $produit === null ? null : (int) ($enGros && $produit->prix_gros !== null ? $produit->prix_gros : $produit->prix_vente),
                 ]);
+            }
+            // Retenu pour les prochaines commandes de cet article.
+            foreach ($commande->lignes()->whereNotNull('produit_grossiste_id')->get() as $ligne) {
+                DB::table('correspondances_produits')->updateOrInsert(
+                    ['produit_revendeur_id' => $ligne->produit_id, 'boutique_grossiste_id' => $commande->boutique_grossiste_id],
+                    ['produit_grossiste_id' => $ligne->produit_grossiste_id, 'contenance' => $ligne->contenance, 'updated_at' => now(), 'created_at' => now()],
+                );
             }
             $commande->update(['statut' => 'confirmee', 'confirmee_le' => now()]);
         });
@@ -260,10 +277,11 @@ class CommandesFournisseur
             try {
                 $achat = $this->achats->receptionner(
                     User::findOrFail($commande->cree_par),
+                    // 2 cartons à 7 200 F = 48 sachets à 300 F chez le revendeur.
                     $aLivrer->map(fn ($l) => [
                         'produit_id' => $l->produit_id,
-                        'quantite' => $l->quantite_confirmee,
-                        'prix_achat' => (int) ($prix[$l->produit_grossiste_id]?->prix_unitaire ?? $l->prix_grossiste ?? 0),
+                        'quantite' => round($l->quantite_confirmee * $l->contenance, 3),
+                        'prix_achat' => (int) round(($prix[$l->produit_grossiste_id]?->prix_unitaire ?? $l->prix_grossiste ?? 0) / max(0.001, $l->contenance)),
                     ])->all(),
                     $commande->fournisseur_id,
                     'Commande '.$commande->numero,
@@ -279,6 +297,110 @@ class CommandesFournisseur
 
             return $commande->load('lignes');
         });
+    }
+
+    /**
+     * Le revendeur a payé un fournisseur qui a Ngoni, et dont il est client :
+     * le paiement est déclaré au grossiste, qui le confirme (son crédit baisse)
+     * ou le refuse. Rien ne se déduit sans lui.
+     */
+    public function declarerPaiement(PaiementFournisseur $paiement, Fournisseur $fournisseur): void
+    {
+        $grossiste = $this->boutiqueDuFournisseur($fournisseur);
+        $revendeur = Boutique::withoutGlobalScopes()->find($paiement->boutique_id);
+        if ($grossiste === null || $revendeur === null) {
+            return;
+        }
+        $client = $this->clientChez($grossiste, $revendeur);
+        if ($client === null) {
+            return;
+        }
+        $paiement->forceFill(['boutique_grossiste_id' => $grossiste->id, 'client_grossiste_id' => $client->id, 'statut_grossiste' => 'a_confirmer'])->save();
+
+        if (($proprietaire = User::find($grossiste->proprietaire_id)) !== null) {
+            $moyen = MoyenPaiement::tryFrom($paiement->moyen_paiement)?->label() ?? $paiement->moyen_paiement;
+            $this->notifier->envoyer(
+                $proprietaire,
+                'Paiement à confirmer',
+                "{$revendeur->nom} dit vous avoir payé ".self::montant((int) $paiement->montant)." ({$moyen}). Confirmez la réception pour déduire son crédit.",
+                '/clients?client='.$client->id,
+                'commande',
+                false,
+            );
+        }
+    }
+
+    /** Paiements déclarés par ce client, en attente (boutique active : le grossiste). @return Collection<int, PaiementFournisseur> */
+    public function paiementsDeclares(Client $client): Collection
+    {
+        return PaiementFournisseur::withoutBoutiqueScope()
+            ->where('boutique_grossiste_id', $this->tenant->boutiqueId())
+            ->where('client_grossiste_id', $client->id)
+            ->where('statut_grossiste', 'a_confirmer')
+            ->with('boutique')->latest()->get();
+    }
+
+    /** Le grossiste a bien reçu l'argent : remboursement du crédit, reçu à la clé. */
+    public function confirmerPaiement(string $id, User $caissier): ReglementCredit
+    {
+        $paiement = $this->paiementDeclare($id);
+        $client = Client::findOrFail($paiement->client_grossiste_id);
+        $montant = min((int) $paiement->montant, $client->soldeDu());
+        if ($montant <= 0) {
+            throw ValidationException::withMessages(['paiement' => ['Ce client ne vous doit plus rien.']]);
+        }
+        $moyen = MoyenPaiement::tryFrom($paiement->moyen_paiement) !== null && $paiement->moyen_paiement !== MoyenPaiement::CreditClient->value
+            ? $paiement->moyen_paiement : MoyenPaiement::Especes->value;
+
+        $reglement = DB::transaction(function () use ($paiement, $client, $caissier, $montant, $moyen): ReglementCredit {
+            $reglement = $this->reglements->enregistrer($client, $caissier, $montant, $moyen, 'Paiement déclaré par '.$paiement->boutique?->nom);
+            $paiement->forceFill(['statut_grossiste' => 'confirme', 'reglement_credit_id' => $reglement->id])->save();
+
+            return $reglement;
+        });
+        $this->prevenirPayeur($paiement, 'Paiement confirmé', 'a bien reçu votre paiement de '.self::montant($montant).'.');
+
+        return $reglement;
+    }
+
+    public function refuserPaiement(string $id): void
+    {
+        $paiement = $this->paiementDeclare($id);
+        $paiement->forceFill(['statut_grossiste' => 'refuse'])->save();
+        $this->prevenirPayeur($paiement, 'Paiement non reçu', 'n’a pas reçu votre paiement de '.self::montant((int) $paiement->montant).'. Voyez avec lui.');
+    }
+
+    private function paiementDeclare(string $id): PaiementFournisseur
+    {
+        $paiement = PaiementFournisseur::withoutBoutiqueScope()->with('boutique')
+            ->where('boutique_grossiste_id', $this->tenant->boutiqueId())->findOrFail($id);
+        if ($paiement->statut_grossiste !== 'a_confirmer') {
+            throw ValidationException::withMessages(['paiement' => ['Ce paiement est déjà traité.']]);
+        }
+
+        return $paiement;
+    }
+
+    private function prevenirPayeur(PaiementFournisseur $paiement, string $titre, string $suite): void
+    {
+        if (($payeur = User::find($paiement->user_id)) !== null) {
+            $grossiste = Boutique::withoutGlobalScopes()->whereKey($paiement->boutique_grossiste_id)->value('nom') ?? 'Votre fournisseur';
+            $this->notifier->envoyer($payeur, $titre, "{$grossiste} {$suite}", '/achats', 'commande', false);
+        }
+    }
+
+    /** Le client qui représente [revendeur] chez [grossiste] (par téléphone), s'il existe. */
+    private function clientChez(Boutique $grossiste, Boutique $revendeur): ?Client
+    {
+        $telephones = array_values(array_filter([$revendeur->telephone, User::whereKey($revendeur->proprietaire_id)->value('phone')]));
+
+        return $telephones === [] ? null : Client::withoutGlobalScopes()
+            ->where('boutique_id', $grossiste->id)->whereIn('telephone', $telephones)->oldest()->first();
+    }
+
+    private static function montant(int $f): string
+    {
+        return number_format($f, 0, ',', ' ').' F';
     }
 
     /** Le client « revendeur » du grossiste pour cette boutique : retrouvé par téléphone, sinon créé. */

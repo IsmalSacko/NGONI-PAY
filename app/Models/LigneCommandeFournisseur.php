@@ -14,11 +14,11 @@ class LigneCommandeFournisseur extends Model
 
     protected $table = 'lignes_commande_fournisseur';
 
-    protected $fillable = ['commande_id', 'produit_id', 'nom', 'quantite', 'prix_estime', 'produit_grossiste_id', 'quantite_confirmee', 'prix_grossiste'];
+    protected $fillable = ['commande_id', 'produit_id', 'nom', 'unite', 'quantite', 'contenance', 'prix_estime', 'produit_grossiste_id', 'quantite_confirmee', 'prix_grossiste'];
 
     protected function casts(): array
     {
-        return ['quantite' => 'float', 'quantite_confirmee' => 'float', 'prix_estime' => 'integer', 'prix_grossiste' => 'integer'];
+        return ['quantite' => 'float', 'contenance' => 'float', 'quantite_confirmee' => 'float', 'prix_estime' => 'integer', 'prix_grossiste' => 'integer'];
     }
 
     /** @return BelongsTo<Produit, $this> */

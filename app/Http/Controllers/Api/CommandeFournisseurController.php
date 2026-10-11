@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\CommandeFournisseur;
 use App\Models\Fournisseur;
 use App\Services\CommandesFournisseur;
@@ -81,6 +82,7 @@ class CommandeFournisseurController extends Controller
             'lignes.*.id' => ['required', 'integer'],
             'lignes.*.produit_grossiste_id' => ['nullable', 'uuid'],
             'lignes.*.quantite' => ['nullable', 'numeric', 'min:0'],
+            'lignes.*.contenance' => ['nullable', 'numeric', 'gt:0', 'max:100000'],
         ]);
 
         return response()->json($this->recue($this->commandes->confirmer($this->trouverRecue($commande), $data['lignes'])));
@@ -102,6 +104,30 @@ class CommandeFournisseurController extends Controller
         $livree = $this->commandes->livrer($this->trouverRecue($commande), $request->user(), (int) ($data['montant_paye'] ?? 0), $data['moyen_paiement'] ?? 'especes');
 
         return response()->json($this->recue($livree));
+    }
+
+    /** Grossiste : les paiements que ce client dit lui avoir faits, à confirmer. */
+    public function paiementsDeclares(Client $client): JsonResponse
+    {
+        return response()->json(['data' => $this->commandes->paiementsDeclares($client)->map(fn ($p) => [
+            'id' => $p->id, 'montant' => (int) $p->montant, 'moyen_paiement' => $p->moyen_paiement,
+            'note' => $p->note, 'boutique' => $p->boutique?->nom, 'cree_le' => $p->created_at?->toIso8601String(),
+        ])]);
+    }
+
+    public function confirmerPaiement(Request $request, string $paiement): JsonResponse
+    {
+        $reglement = $this->commandes->confirmerPaiement($paiement, $request->user());
+        $client = $reglement->client;
+
+        return response()->json(['solde_du' => $client->soldeDu(), 'recu' => $reglement->load(['caissier', 'client'])->recu()]);
+    }
+
+    public function refuserPaiement(string $paiement): JsonResponse
+    {
+        $this->commandes->refuserPaiement($paiement);
+
+        return response()->json(['message' => 'Paiement refusé : le revendeur est prévenu.']);
     }
 
     private function trouverRecue(string $id): CommandeFournisseur
@@ -130,7 +156,7 @@ class CommandeFournisseurController extends Controller
             'client' => $c->boutique?->only(['nom', 'telephone']),
             'lignes' => $c->lignes->map(fn ($l) => [
                 ...$this->ligne($l),
-                'produit_grossiste' => $l->produitGrossiste?->only(['id', 'nom', 'stock', 'prix_vente', 'prix_gros']),
+                'produit_grossiste' => $l->produitGrossiste?->only(['id', 'nom', 'unite', 'stock', 'prix_vente', 'prix_gros']),
             ]),
         ];
     }
@@ -155,7 +181,7 @@ class CommandeFournisseurController extends Controller
     private function ligne($l): array
     {
         return [
-            'id' => $l->id, 'produit_id' => $l->produit_id, 'nom' => $l->nom,
+            'id' => $l->id, 'produit_id' => $l->produit_id, 'nom' => $l->nom, 'unite' => $l->unite, 'contenance' => (float) $l->contenance,
             'quantite' => (float) $l->quantite, 'prix_estime' => (int) $l->prix_estime,
             'produit_grossiste_id' => $l->produit_grossiste_id,
             'quantite_confirmee' => $l->quantite_confirmee === null ? null : (float) $l->quantite_confirmee,

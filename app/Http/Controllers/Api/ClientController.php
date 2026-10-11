@@ -10,10 +10,9 @@ use App\Models\Client;
 use App\Models\ReglementCredit;
 use App\Models\Vente;
 use App\Services\Fidelite;
-use App\Services\SessionCaisseService;
+use App\Services\ReglementsCredit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -131,15 +130,7 @@ class ClientController extends Controller
             throw ValidationException::withMessages(['montant' => ['Ce client ne doit rien.']]);
         }
 
-        // La séance du caissier : un remboursement en espèces entre dans son
-        // tiroir. Numéro de reçu et dette avant / après, figés maintenant.
-        $reglement = DB::transaction(fn () => $client->reglements()->create($data + [
-            'user_id' => $request->user()->id,
-            'session_caisse_id' => app(SessionCaisseService::class)->courante($request->user())?->id,
-            'numero' => (int) ReglementCredit::lockForUpdate()->max('numero') + 1,
-            'solde_avant' => $solde,
-            'solde_apres' => $solde - (int) $data['montant'],
-        ]));
+        $reglement = app(ReglementsCredit::class)->enregistrer($client, $request->user(), (int) $data['montant'], $data['moyen_paiement'], $data['note'] ?? null);
 
         return response()->json(['solde_du' => $client->soldeDu(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
     }

@@ -104,7 +104,9 @@ class AchatService
         if ($montant < 1 || $montant > $solde) {
             throw ValidationException::withMessages(['montant' => [$solde > 0 ? 'Montant entre 1 et ce que vous devez.' : 'Vous ne devez rien à ce fournisseur.']]);
         }
-        $fournisseur->paiements()->create(['user_id' => $auteur->id, 'montant' => $montant, 'moyen_paiement' => $moyen, 'note' => $note]);
+        $paiement = $fournisseur->paiements()->create(['user_id' => $auteur->id, 'montant' => $montant, 'moyen_paiement' => $moyen, 'note' => $note]);
+        // Fournisseur sur Ngoni : il confirme la réception, le crédit baisse chez lui.
+        app(CommandesFournisseur::class)->declarerPaiement($paiement, $fournisseur);
 
         return $fournisseur->soldeDu();
     }
