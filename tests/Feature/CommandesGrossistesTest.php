@@ -354,6 +354,7 @@ class CommandesGrossistesTest extends TestCase
 
         $fournisseur = $this->api($this->awa)->postJson("/api/grossistes/{$this->depot->id}/fournisseur")->assertCreated()->json('id');
         $this->assertDatabaseHas('notifications_app', ['user_id' => $this->grossiste->id, 'titre' => 'Nouveau revendeur']);
+        $this->api($this->grossiste)->getJson('/api/moi')->assertJsonPath('commandes_recues', true)->assertJsonPath('commandes_a_traiter', 1);
         $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->assertJsonCount(0, 'data')->assertJsonPath('acces', 'demande');
         $this->api($this->awa)->getJson('/api/fournisseurs')->assertJsonPath('data.0.liaison', 'demande');
 

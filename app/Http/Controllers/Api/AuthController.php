@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
 use App\Models\CommandeFournisseur;
+use App\Models\LiaisonGrossiste;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\ConditionsUtilisation;
 use App\Services\ReinitialisationMotDePasse;
@@ -127,7 +128,8 @@ class AuthController extends Controller
     private function commandesATraiter(string $boutiqueId): int
     {
         try {
-            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->where('statut', 'envoyee')->count();
+            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->where('statut', 'envoyee')->count()
+                + LiaisonGrossiste::where('boutique_grossiste_id', $boutiqueId)->where('statut', 'demande')->count();
         } catch (\Throwable $e) {
             report($e);
 
@@ -139,7 +141,8 @@ class AuthController extends Controller
     private function recoitCommandes(string $boutiqueId): bool
     {
         try {
-            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->exists();
+            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->exists()
+                || LiaisonGrossiste::where('boutique_grossiste_id', $boutiqueId)->exists();
         } catch (\Throwable $e) {
             report($e);
 
