@@ -91,7 +91,7 @@ class CommandesGrossistesTest extends TestCase
         ])->assertCreated()->assertJsonPath('statut', 'envoyee')->assertJsonPath('grossiste', 'Dépôt Traoré')
             ->assertJsonPath('whatsapp', null)->assertJsonPath('total_estime', 120000)->json();
         $this->assertDatabaseHas('notifications_app', ['user_id' => $this->grossiste->id, 'titre' => 'Nouvelle commande']);
-        $this->api($this->grossiste)->getJson('/api/moi')->assertJsonPath('commandes_recues', true);
+        $this->api($this->grossiste)->getJson('/api/moi')->assertJsonPath('commandes_recues', true)->assertJsonPath('commandes_a_traiter', 1);
         $this->api($this->awa)->getJson('/api/moi')->assertJsonPath('commandes_recues', false);
 
         // Côté grossiste : l'article est reconnu par son code-barres.

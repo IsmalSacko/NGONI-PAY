@@ -119,7 +119,20 @@ class AuthController extends Controller
             'conditions' => app(ConditionsUtilisation::class)->etat($user),
             // Grossiste à qui des revendeurs commandent : l'écran « Commandes reçues » s'affiche.
             'commandes_recues' => $boutiqueId !== null && $this->recoitCommandes($boutiqueId),
+            // Les nouvelles, à traiter : le compteur du menu.
+            'commandes_a_traiter' => $boutiqueId === null ? 0 : $this->commandesATraiter($boutiqueId),
         ]);
+    }
+
+    private function commandesATraiter(string $boutiqueId): int
+    {
+        try {
+            return CommandeFournisseur::withoutBoutiqueScope()->where('boutique_grossiste_id', $boutiqueId)->where('statut', 'envoyee')->count();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
     }
 
     /** Jamais bloquant : une migration en retard ne doit pas empêcher la connexion. */
