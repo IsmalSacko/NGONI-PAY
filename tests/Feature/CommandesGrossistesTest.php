@@ -240,6 +240,22 @@ class CommandesGrossistesTest extends TestCase
         $this->assertSame(98, (int) $carton->fresh()->stock);
     }
 
+    public function test_une_unite_mal_nommee_chez_le_grossiste_est_rattrapee_par_le_prix(): void
+    {
+        // Son « sachet » à 3 600 F est en vérité un carton ; je revends le sachet 300 F, mon carton en a 12.
+        $this->dans($this->depot);
+        $faniko = Produit::create(['nom' => 'Faniko', 'unite' => 'sachet', 'prix_vente' => 3600, 'taux_tva' => 0, 'stock' => 100]);
+        $this->dans($this->epicerie);
+        $mien = Produit::create([
+            'nom' => 'Faniko', 'unite' => 'sachet', 'prix_vente' => 300, 'taux_tva' => 0, 'stock' => 11,
+            'paliers' => [['unite' => 'carton', 'contenance' => 12, 'prix' => 3600]],
+        ]);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
+
+        $chezMoi = collect($this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue")->json('data'))->firstWhere('id', $faniko->id)['chez_moi'];
+        $this->assertSame([$mien->id, 12, 300, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['prix_vente'], $chezMoi['unite_commande']]);
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {

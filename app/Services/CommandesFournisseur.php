@@ -176,7 +176,7 @@ class CommandesFournisseur
             ->get()->keyBy('produit_grossiste_id');
         // Mes articles : ceux déjà liés, et de quoi reconnaître les autres
         // (même code-barres, sinon même nom), la conversion tirée de mes paliers.
-        $miens = Produit::query()->get(['id', 'nom', 'unite', 'code_barre', 'paliers']);
+        $miens = Produit::query()->get(['id', 'nom', 'unite', 'code_barre', 'paliers', 'prix_vente']);
         $parId = $miens->keyBy('id');
         $parCode = $miens->filter(fn ($m) => filled($m->code_barre))->keyBy('code_barre');
         $parNom = $miens->keyBy(fn ($m) => mb_strtolower(trim($m->nom)));
@@ -188,7 +188,7 @@ class CommandesFournisseur
             $mien = $c === null ? null : ($parId[$c->produit_revendeur_id] ?? null);
             if ($mien === null) {
                 $mien = (filled($p->code_barre) ? ($parCode[$p->code_barre] ?? null) : null) ?? ($parNom[mb_strtolower(trim($p->nom))] ?? null);
-                $c = $mien === null ? null : (object) ['contenance' => self::contenanceProposee($mien, $p)];
+                $c = $mien === null ? null : (object) ['contenance' => self::contenanceProposee($mien, $p, $enGros && $p->prix_gros !== null ? (int) $p->prix_gros : (int) $p->prix_vente)];
             }
 
             return [
@@ -200,8 +200,10 @@ class CommandesFournisseur
                 'vignette_url' => $p->vignette_url,
                 'chez_moi' => $mien === null ? null : [
                     'produit_id' => $mien->id, 'nom' => $mien->nom, 'unite' => $mien->unite, 'contenance' => (float) $c->contenance,
+                    // Mon prix de revente : l'app signale une unité qui coûterait plus qu'elle ne rapporte.
+                    'prix_vente' => (int) $mien->prix_vente,
                     // Mon palier du même nom que son unité (carton) : la commande s'y lit.
-                    'unite_commande' => (float) $c->contenance > 1 ? $p->unite : null,
+                    'unite_commande' => collect($mien->paliers ?? [])->firstWhere(fn ($pl) => (float) $pl['contenance'] === (float) $c->contenance)['unite'] ?? null,
                 ],
             ];
         })->values()->all();
@@ -232,19 +234,33 @@ class CommandesFournisseur
      * de ce que le revendeur a déjà renseigné : même unité (1), ou son palier
      * du même nom (son « carton » de 24 L pour le « carton » du grossiste).
      */
-    public static function contenanceProposee(Produit $mien, Produit $sien): float
+    public static function contenanceProposee(Produit $mien, Produit $sien, ?int $prix = null): float
     {
+        $contenance = 1.0;
         $unite = self::uniteNormalisee($sien->unite);
-        if ($unite === null || $unite === self::uniteNormalisee($mien->unite)) {
-            return 1;
-        }
-        foreach ($mien->paliers ?? [] as $p) {
-            if (self::uniteNormalisee($p['unite'] ?? null) === $unite) {
-                return (float) $p['contenance'];
+        if ($unite !== null && $unite !== self::uniteNormalisee($mien->unite)) {
+            foreach ($mien->paliers ?? [] as $p) {
+                if (self::uniteNormalisee($p['unite'] ?? null) === $unite) {
+                    $contenance = (float) $p['contenance'];
+                }
             }
         }
 
-        return 1;
+        // Contrôle par le prix : payer l'unité plus cher que je ne la revends,
+        // c'est que les unités ne se répondent pas (son « sachet » à 3 600 F est
+        // un carton). Le plus petit de mes paliers où le compte tombe juste.
+        $prix ??= (int) $sien->prix_vente;
+        $revente = (int) $mien->prix_vente;
+        if ($revente > 0 && $prix / $contenance > $revente) {
+            $paliers = collect($mien->paliers ?? [])->sortBy('contenance');
+            foreach ($paliers as $p) {
+                if ((float) $p['contenance'] > 1 && $prix / (float) $p['contenance'] <= $revente) {
+                    return (float) $p['contenance'];
+                }
+            }
+        }
+
+        return $contenance;
     }
 
     private static function uniteNormalisee(?string $unite): ?string
