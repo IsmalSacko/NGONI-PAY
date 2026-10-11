@@ -103,6 +103,9 @@ class ProduitController extends Controller
             ->where('created_at', '>=', now()->subDays(30))->get();
         foreach ($mouvements as $m) {
             $motif = self::categoriePerte((string) $m->motif);
+            if ($motif === null) {
+                continue; // une correction, pas une perte
+            }
             $prix = (int) ($m->produit?->prix_achat ?: $m->produit?->prix_vente ?: 0);
             $parMotif[$motif] = ($parMotif[$motif] ?? 0) + (int) round(-$m->quantite * $prix);
         }
@@ -114,18 +117,24 @@ class ProduitController extends Controller
         ]);
     }
 
-    /** « Casse : 2 bouteilles », « Inventaire du 11/10/2026 »… ramené à son motif. */
-    public static function categoriePerte(string $motif): string
+    /**
+     * Le motif d'une perte déclarée (« Casse : 2 bouteilles », « Inventaire du
+     * 11/10/2026 »), ou null pour une simple correction : sans motif, « Erreur
+     * de comptage », ou un ancien motif libre. Seules les vraies pertes alertent.
+     */
+    public static function categoriePerte(string $motif): ?string
     {
-        $m = mb_strtolower($motif);
+        $m = mb_strtolower(trim($motif));
 
         return match (true) {
             str_contains($m, 'casse') || str_contains($m, 'cassé') => 'Casse',
             str_contains($m, 'périm') || str_contains($m, 'perim') => 'Périmé',
             preg_match('/\\bvol(é|e|s)?\\b/u', $m) === 1 => 'Vol',
-            str_contains($m, 'consomm') || str_contains($m, 'perso') => 'Consommé',
-            str_contains($m, 'inventaire') || str_contains($m, 'comptage') => 'Écart d’inventaire',
-            default => 'Autre',
+            str_contains($m, 'consomm') => 'Consommé',
+            // Un inventaire validé (pas le libellé par défaut d'une correction).
+            str_starts_with($m, 'inventaire du ') => 'Écart d’inventaire',
+            $m === 'autre' => 'Autre',
+            default => null,
         };
     }
 

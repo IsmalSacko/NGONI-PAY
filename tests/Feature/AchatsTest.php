@@ -248,6 +248,9 @@ class AchatsTest extends TestCase
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 8, 'motif' => 'Casse : sacs déchirés'])->assertOk();
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 7, 'motif' => 'Vol'])->assertOk();
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 9, 'motif' => 'Réassort'])->assertOk();
+        // Des corrections, pas des pertes : sans motif, ou « Erreur de comptage ».
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 5])->assertOk();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 4, 'motif' => 'Erreur de comptage'])->assertOk();
 
         $this->api($this->admin)->getJson('/api/stocks/pertes')->assertOk()
             ->assertJsonPath('total', 12000)
