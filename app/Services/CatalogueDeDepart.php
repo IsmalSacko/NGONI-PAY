@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Boutique;
 use App\Models\CategorieProduit;
+use App\Models\LigneVente;
 use App\Models\Produit;
 use App\Support\Money\Currencies;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +29,20 @@ class CatalogueDeDepart
         ['Riz (exemple)', '5 kg', 'RIZ', 3500, 450, 20, 'riz.png'],
         ['Huile (exemple)', '1 L', 'HUI', 1500, 250, 24, 'huile.png'],
     ];
+
+    /**
+     * Les exemples, encore intacts (jamais vendus), retirés : riz et huile
+     * n'ont rien à faire dans une pharmacie, un restaurant ou un pressing.
+     */
+    public function retirer(): void
+    {
+        foreach (Produit::where('nom', 'like', '%(exemple)')->get() as $produit) {
+            if (! LigneVente::where('produit_id', $produit->id)->exists()) {
+                $produit->delete();
+            }
+        }
+        CategorieProduit::where('nom', 'Alimentation')->whereDoesntHave('produits')->delete();
+    }
 
     /** À appeler dans le contexte de la boutique (tenant posé). */
     public function installer(Boutique $boutique): void

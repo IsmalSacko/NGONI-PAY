@@ -6,10 +6,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Boutique;
-use App\Services\AbonnementService;
 use App\Models\Plan;
 use App\Models\Vente;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\CatalogueDeDepart;
 use App\Services\Fidelite;
 use App\Services\Images;
 use App\Services\ModeLibre;
@@ -114,9 +115,33 @@ class BoutiqueController extends Controller
     {
         $data = $request->validate(['activite' => ['required', Rule::in(Boutique::ACTIVITES)]]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
-        $boutique->forceFill(['activite' => $data['activite']])->save();
+        $boutique->forceFill(['activite' => $data['activite'], 'activite_choisie_le' => $boutique->activite_choisie_le ?? now()])->save();
         $boutique->preparerPressing();
         $boutique->preparerRestaurant();
+
+        return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    /**
+     * Premier choix du métier, à l'ouverture : la caisse s'y règle d'un coup
+     * (grossiste : vente au détail et en gros), et les articles d'exemple qui
+     * ne vont pas avec ce métier s'en vont.
+     */
+    public function demarrage(Request $request, CatalogueDeDepart $depart): JsonResponse
+    {
+        $data = $request->validate(['activite' => ['required', Rule::in([...Boutique::ACTIVITES, 'grossiste'])]]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        $grossiste = $data['activite'] === 'grossiste';
+        $boutique->forceFill([
+            'activite' => $grossiste ? 'commerce' : $data['activite'],
+            'activite_choisie_le' => now(),
+            ...($grossiste ? ['mode_vente' => 'detail_gros'] : []),
+        ])->save();
+        $boutique->preparerPressing();
+        $boutique->preparerRestaurant();
+        if (! in_array($boutique->activite, ['commerce'], true)) {
+            $depart->retirer();
+        }
 
         return response()->json(['data' => $boutique->fresh()]);
     }

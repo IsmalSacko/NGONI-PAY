@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Storage;
 class Boutique extends Model
 {
     /** Adresse du logo, pour l'application et les tickets. */
-    protected $appends = ['logo_url', 'logo_vignette_url', 'prochaine_facture', 'mode_libre_actif'];
+    protected $appends = ['logo_url', 'logo_vignette_url', 'prochaine_facture', 'mode_libre_actif', 'activite_a_choisir'];
 
     /** Les compteurs restent au serveur : l'application reçoit `prochaine_facture`. */
     protected $hidden = ['compteurs_facture'];
@@ -127,6 +127,7 @@ class Boutique extends Model
             'facture_annee' => 'boolean',
             'compteurs_facture' => 'array',
             'mode_rodage' => 'boolean',
+            'activite_choisie_le' => 'datetime',
             'mode_libre' => 'boolean',
         ];
     }
@@ -138,6 +139,12 @@ class Boutique extends Model
     }
 
     /** Mode libre actif, accepté dans la version en vigueur du texte. */
+    /** Activité pas encore choisie : le propriétaire la choisit à l'ouverture. */
+    public function getActiviteAChoisirAttribute(): bool
+    {
+        return array_key_exists('activite_choisie_le', $this->attributes) && $this->attributes['activite_choisie_le'] === null;
+    }
+
     public function getModeLibreActifAttribute(): bool
     {
         return ModeLibre::actif($this);
