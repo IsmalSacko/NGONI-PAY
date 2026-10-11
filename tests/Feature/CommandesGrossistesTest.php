@@ -96,13 +96,13 @@ class CommandesGrossistesTest extends TestCase
 
         // Côté grossiste : l'article est reconnu par son code-barres.
         $recue = $this->api($this->grossiste)->getJson('/api/commandes-recues')->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.client.nom', 'Épicerie Awa')->assertJsonPath('data.0.lignes.0.produit_grossiste.id', $this->rizDepot->id)->json('data.0');
+            ->assertJsonPath('data.0.client.nom', 'Épicerie Awa')->assertJsonPath('data.0.statut_libelle', 'Nouvelle')->assertJsonPath('data.0.lignes.0.produit_grossiste.id', $this->rizDepot->id)->json('data.0');
         $this->api($this->awa)->getJson('/api/commandes-recues')->assertJsonCount(0, 'data');
 
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$recue['id']}/livrer")->assertUnprocessable();
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$recue['id']}/confirmer", ['lignes' => [
             ['id' => $recue['lignes'][0]['id'], 'produit_grossiste_id' => $this->rizDepot->id, 'quantite' => 8],
-        ]])->assertOk()->assertJsonPath('statut', 'confirmee')->assertJsonPath('total_confirme', 100000);
+        ]])->assertOk()->assertJsonPath('statut', 'confirmee')->assertJsonPath('statut_libelle', 'À livrer')->assertJsonPath('total_confirme', 100000);
 
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$recue['id']}/livrer", ['montant_paye' => 40000, 'moyen_paiement' => 'orange_money'])
             ->assertOk()->assertJsonPath('statut', 'livree');

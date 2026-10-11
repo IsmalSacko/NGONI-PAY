@@ -176,6 +176,13 @@ class CommandeFournisseurController extends Controller
 
         return [
             ...$this->commun($c),
+            // Vu du grossiste : il ne l'a pas « envoyée », il l'a reçue et la traite.
+            'statut_libelle' => match ($c->statut) {
+                'envoyee' => 'Nouvelle',
+                'confirmee' => 'À livrer',
+                'annulee' => 'Annulée par le client',
+                default => CommandeFournisseur::STATUTS[$c->statut] ?? $c->statut,
+            },
             'client' => $c->boutique?->only(['nom', 'telephone']),
             'lignes' => $c->lignes->map(fn ($l) => [
                 ...$this->ligne($l),

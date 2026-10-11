@@ -329,6 +329,8 @@ class CommandesFournisseur
             ->where('boutique_grossiste_id', $this->tenant->boutiqueId())
             ->when(filled($statut), fn ($q) => $q->where('statut', $statut))
             ->with(['lignes.produitGrossiste', 'lignes.produit', 'boutique'])
+            // Ce qui attend le grossiste d'abord : les nouvelles, puis celles à livrer.
+            ->orderByRaw("CASE statut WHEN 'envoyee' THEN 0 WHEN 'confirmee' THEN 1 ELSE 2 END")
             ->latest()->limit(100)->get();
     }
 
