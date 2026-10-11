@@ -214,4 +214,31 @@ class AchatsTest extends TestCase
 
         $this->api($this->caissier)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertForbidden();
     }
+
+    public function test_inventaire_guide_compte_en_vendant_et_corrige_l_ecart(): void
+    {
+        // 3 riz en stock, achetés 4 000 F.
+        $inv = $this->api($this->admin)->getJson('/api/inventaires/en-cours')->assertOk()->assertJsonPath('statut', 'en_cours')->json('id');
+        $this->assertSame($inv, $this->api($this->admin)->getJson('/api/inventaires/en-cours')->json('id'), 'un seul inventaire en cours');
+
+        // On ne trouve qu'1 riz : il en manque 2, soit 8 000 F.
+        $this->api($this->admin)->putJson("/api/inventaires/{$inv}/produits/{$this->riz->id}", ['quantite' => 1])->assertOk()
+            ->assertJsonPath('comptes', 1)->assertJsonPath('valeur_manquante', 8000)->assertJsonPath('lignes.0.ecart', -2);
+
+        // Une vente après le comptage (1 riz) : elle reste comptée à la validation.
+        $this->api($this->admin)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 1]], 'moyen_paiement' => 'especes',
+        ])->assertCreated();
+        $this->assertSame(2, (int) $this->riz->fresh()->stock);
+
+        $this->api($this->caissier)->postJson("/api/inventaires/{$inv}/valider")->assertForbidden();
+        $this->api($this->admin)->postJson("/api/inventaires/{$inv}/valider")->assertOk()->assertJsonPath('statut', 'valide')->assertJsonPath('valeur_manquante', 8000);
+        // 1 trouvé, 1 vendu depuis : 0.
+        $this->assertSame(0, (int) $this->riz->fresh()->stock);
+        $this->assertDatabaseHas('mouvements_stock', ['produit_id' => $this->riz->id, 'type' => 'ajustement', 'quantite' => -2, 'motif' => 'Inventaire du '.now()->format('d/m/Y')]);
+        $this->api($this->admin)->putJson("/api/inventaires/{$inv}/produits/{$this->riz->id}", ['quantite' => 5])->assertUnprocessable();
+        $this->api($this->admin)->getJson('/api/inventaires')->assertJsonPath('data.0.valeur_manquante', 8000)->assertJsonPath('data.0.articles_corriges', 1);
+        $this->assertNotSame($inv, $this->api($this->admin)->getJson('/api/inventaires/en-cours')->json('id'), 'le suivant repart à zéro');
+    }
 }
