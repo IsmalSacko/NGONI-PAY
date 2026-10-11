@@ -14,6 +14,7 @@ use App\Services\AchatService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -193,5 +194,24 @@ class AchatsTest extends TestCase
 
         $this->actingAs($this->caissier);
         $this->get('/achats')->assertRedirect();
+    }
+
+    public function test_l_historique_d_un_article_montre_chaque_mouvement_et_le_bilan(): void
+    {
+        $this->api($this->admin)->postJson('/api/achats', ['lignes' => [['produit_id' => $this->riz->id, 'quantite' => 10, 'prix_achat' => 4000]], 'reference' => 'BL-1', 'montant_paye' => 40000])->assertCreated();
+        $this->api($this->admin)->postJson('/api/ventes', [
+            'reference_locale' => (string) Str::uuid(),
+            'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 2]], 'moyen_paiement' => 'especes',
+        ])->assertCreated();
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 9, 'motif' => 'Casse'])->assertOk();
+
+        $r = $this->api($this->admin)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertOk()
+            ->assertJsonPath('data.0.type', 'ajustement')->assertJsonPath('data.0.motif', 'Casse')->assertJsonPath('data.0.auteur', 'Awa')
+            ->assertJsonPath('data.1.type', 'sortie')->assertJsonPath('data.2.type', 'entree');
+        $this->assertEquals(-2, $r->json('data.0.quantite'));
+        $this->assertEquals(9, $r->json('data.0.stock_apres'));
+        $this->assertEquals(['entrees' => 10, 'ventes' => 2, 'ajustements_plus' => 0, 'ajustements_moins' => 2], $r->json('bilan'));
+
+        $this->api($this->caissier)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertForbidden();
     }
 }

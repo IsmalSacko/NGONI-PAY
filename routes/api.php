@@ -203,6 +203,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('services/{service}', [ServicePressingController::class, 'destroy'])->middleware(['permission:produits.update', 'abonnement']);
     // Pharmacie : lots qui périment dans les 90 jours (ou déjà périmés).
     Route::get('stocks/peremption', [ProduitController::class, 'peremption'])->middleware('permission:produits.view');
+    Route::get('produits/{produit}/mouvements', [ProduitController::class, 'mouvements'])->middleware('permission:stocks.update');
     // Articles à recommander, par fournisseur du dernier achat (message WhatsApp de l'app).
     Route::get('stocks/a-commander', fn (CommandeFournisseur $commande) => response()->json(['data' => $commande->aCommander()]))
         ->middleware(['permission:achats.create', 'fonctionnalite:achats_fournisseurs']);
