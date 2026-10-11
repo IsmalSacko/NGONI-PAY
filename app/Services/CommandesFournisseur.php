@@ -330,7 +330,7 @@ class CommandesFournisseur
             ->when(filled($statut), fn ($q) => $q->where('statut', $statut))
             ->with(['lignes.produitGrossiste', 'lignes.produit', 'boutique'])
             // Ce qui attend le grossiste d'abord : les nouvelles, puis celles à livrer.
-            ->orderByRaw("CASE statut WHEN 'envoyee' THEN 0 WHEN 'confirmee' THEN 1 ELSE 2 END")
+            ->orderByRaw("CASE statut WHEN 'envoyee' THEN 0 WHEN 'confirmee' THEN 1 WHEN 'en_livraison' THEN 2 ELSE 3 END")
             ->latest()->limit(100)->get();
     }
 
@@ -378,6 +378,19 @@ class CommandesFournisseur
         return $commande->load('lignes');
     }
 
+    /** La marchandise est partie : le revendeur sait qu'elle arrive. */
+    public function expedier(CommandeFournisseur $commande): CommandeFournisseur
+    {
+        $this->exigerDestinataire($commande);
+        if ($commande->statut !== 'confirmee') {
+            throw ValidationException::withMessages(['commande' => ['Confirmez la commande avant de l’envoyer.']]);
+        }
+        $commande->update(['statut' => 'en_livraison', 'expediee_le' => now()]);
+        $this->prevenirRevendeur($commande, 'Commande en route', "a envoyé votre commande n° {$commande->numero} : elle arrive.");
+
+        return $commande;
+    }
+
     public function refuser(CommandeFournisseur $commande, string $motif): CommandeFournisseur
     {
         $this->exigerDestinataire($commande);
@@ -396,8 +409,13 @@ class CommandesFournisseur
     public function livrer(CommandeFournisseur $commande, User $grossiste, int $montantPaye = 0, string $moyen = 'especes'): CommandeFournisseur
     {
         $this->exigerDestinataire($commande);
-        if ($commande->statut !== 'confirmee') {
+        if (! in_array($commande->statut, ['confirmee', 'en_livraison'], true)) {
             throw ValidationException::withMessages(['commande' => ['Confirmez la commande avant de la livrer.']]);
+        }
+        // En rodage, la vente serait un essai, effacé au passage en mode réel,
+        // alors que le stock et la dette du revendeur, eux, sont réels.
+        if (Boutique::withoutGlobalScopes()->whereKey($commande->boutique_grossiste_id)->value('mode_rodage')) {
+            throw ValidationException::withMessages(['commande' => ['Vous êtes en mode rodage : vos ventes sont des essais. Passez en mode réel pour livrer vos revendeurs.']]);
         }
         $aLivrer = $commande->lignes->filter(fn ($l) => $l->produit_grossiste_id !== null && $l->quantite_confirmee > 0)->values();
         if ($aLivrer->isEmpty()) {

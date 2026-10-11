@@ -245,6 +245,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('commandes-recues/{commande}/vue', [CommandeFournisseurController::class, 'vue'])->middleware('permission:ventes.view');
     Route::get('commandes-recues', [CommandeFournisseurController::class, 'recues'])->middleware('permission:ventes.view');
     Route::post('commandes-recues/{commande}/confirmer', [CommandeFournisseurController::class, 'confirmer'])->middleware(['permission:ventes.create', 'abonnement']);
+    Route::post('commandes-recues/{commande}/expedier', [CommandeFournisseurController::class, 'expedier'])->middleware('permission:ventes.create');
     Route::post('commandes-recues/{commande}/refuser', [CommandeFournisseurController::class, 'refuser'])->middleware('permission:ventes.create');
     Route::post('commandes-recues/{commande}/livrer', [CommandeFournisseurController::class, 'livrer'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     // Le revendeur paie : le grossiste confirme, le crédit de son client baisse.

@@ -111,6 +111,11 @@ class CommandeFournisseurController extends Controller
         return response()->json($this->recue($this->commandes->confirmer($this->trouverRecue($commande), $data['lignes'])));
     }
 
+    public function expedier(string $commande): JsonResponse
+    {
+        return response()->json($this->recue($this->commandes->expedier($this->trouverRecue($commande))));
+    }
+
     public function refuser(Request $request, string $commande): JsonResponse
     {
         $data = $request->validate(['motif' => ['required', 'string', 'max:300']]);
@@ -180,6 +185,7 @@ class CommandeFournisseurController extends Controller
             'statut_libelle' => match ($c->statut) {
                 'envoyee' => 'Nouvelle',
                 'confirmee' => 'À livrer',
+                'en_livraison' => 'En livraison',
                 'annulee' => 'Annulée par le client',
                 default => CommandeFournisseur::STATUTS[$c->statut] ?? $c->statut,
             },
@@ -206,7 +212,7 @@ class CommandeFournisseurController extends Controller
             'vue_le' => $c->vue_le?->toIso8601String(),
             'note' => $c->note, 'motif' => $c->motif, 'total_estime' => (int) $c->total_estime,
             'total_confirme' => (int) $c->lignes->sum(fn ($l) => round((float) $l->quantite_confirmee * (int) $l->prix_grossiste)),
-            'cree_le' => $c->created_at?->toIso8601String(), 'confirmee_le' => $c->confirmee_le?->toIso8601String(), 'livree_le' => $c->livree_le?->toIso8601String(),
+            'cree_le' => $c->created_at?->toIso8601String(), 'confirmee_le' => $c->confirmee_le?->toIso8601String(), 'expediee_le' => $c->expediee_le?->toIso8601String(), 'livree_le' => $c->livree_le?->toIso8601String(),
             'vente_id' => $c->vente_id, 'achat_id' => $c->achat_id,
             'lignes' => $c->lignes->map(fn ($l) => $this->ligne($l)),
         ];

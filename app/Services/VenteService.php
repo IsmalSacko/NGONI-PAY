@@ -260,6 +260,7 @@ class VenteService
             $reste = $total - $paye;
             if ($reste > 0) {
                 $this->autoriserCredit($data, $caissier);
+                $this->respecterPlafond($data, $reste);
             }
 
             $montantRecu = $moyenPaiement === MoyenPaiement::Especes ? (int) ($data['montant_recu'] ?? $paye) : null;
@@ -532,6 +533,27 @@ class VenteService
      *
      * @param  array<string, mixed>  $data
      */
+    /**
+     * Plafond de crédit du client (fixé par la boutique) : pas au-delà. Une
+     * vente faite hors connexion passe quand même : elle est déjà conclue.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function respecterPlafond(array $data, int $reste): void
+    {
+        $client = Client::find($data['client_id']);
+        if ($client?->plafond_credit === null || ! empty($data['vendue_hors_ligne'])) {
+            return;
+        }
+        $doit = $client->soldeDu();
+        if ($doit + $reste > $client->plafond_credit) {
+            $format = fn (int $f) => number_format($f, 0, ',', ' ').' F';
+            throw ValidationException::withMessages(['client_id' => [
+                "Plafond de crédit atteint : {$client->nom} doit déjà {$format($doit)}, son plafond est de {$format((int) $client->plafond_credit)}. Faites-le payer davantage.",
+            ]]);
+        }
+    }
+
     private function autoriserCredit(array $data, User $caissier): void
     {
         if (empty($data['client_id'])) {

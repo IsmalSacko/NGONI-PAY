@@ -76,6 +76,7 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
             'revendeur' => ['nullable', 'boolean'],
+            'plafond_credit' => ['nullable', 'integer', 'min:0'],
         ]);
 
         return response()->json(Client::create($data), 201);
@@ -90,6 +91,7 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
             'revendeur' => ['nullable', 'boolean'],
+            'plafond_credit' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $client->update($data);

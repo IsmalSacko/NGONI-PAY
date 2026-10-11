@@ -258,6 +258,40 @@ class CommandesGrossistesTest extends TestCase
         $this->assertSame([$mien->id, 12, 300, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['prix_vente'], $chezMoi['unite_commande']]);
     }
 
+    public function test_en_livraison_puis_livree_et_pas_de_livraison_en_rodage(): void
+    {
+        $this->dans($this->epicerie);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 2]]])->json();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/expedier")->assertUnprocessable();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $this->rizDepot->id]]])->assertOk();
+
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/expedier")->assertOk()
+            ->assertJsonPath('statut', 'en_livraison')->assertJsonPath('statut_libelle', 'En livraison');
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $this->awa->id, 'titre' => 'Commande en route']);
+        $this->api($this->awa)->getJson('/api/commandes-fournisseur')->assertJsonPath('data.0.statut_libelle', 'En livraison');
+
+        $this->depot->forceFill(['mode_rodage' => true])->save();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 25000])
+            ->assertUnprocessable()->assertJsonPath('errors.commande.0', 'Vous êtes en mode rodage : vos ventes sont des essais. Passez en mode réel pour livrer vos revendeurs.');
+        $this->depot->forceFill(['mode_rodage' => false])->save();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 25000])->assertOk()->assertJsonPath('statut', 'livree');
+    }
+
+    public function test_le_plafond_de_credit_du_revendeur_bloque_la_livraison_a_credit(): void
+    {
+        $fournisseur = $this->livrerACredit(); // 60 000 F à crédit
+        $client = Client::withoutGlobalScopes()->where('boutique_id', $this->depot->id)->sole();
+        $this->api($this->grossiste)->putJson("/api/clients/{$client->id}", ['nom' => $client->nom, 'plafond_credit' => 70000])->assertOk();
+
+        $this->dans($this->epicerie);
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [['produit_id' => $this->riz->id, 'quantite' => 1]]])->json();
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/confirmer", ['lignes' => [['id' => $commande['lignes'][0]['id'], 'produit_grossiste_id' => $this->rizDepot->id]]])->assertOk();
+        // 12 500 F de plus à crédit : 72 500 F, au-delà des 70 000 F.
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer")->assertUnprocessable()->assertJsonValidationErrors('client_id');
+        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 5000])->assertOk();
+    }
+
     /** Une commande de riz livrée : 100 000 F, 40 000 payés, 60 000 au crédit du client. Rend l'id du fournisseur. */
     private function livrerACredit(): string
     {
