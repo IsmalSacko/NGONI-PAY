@@ -64,6 +64,9 @@ class Plan extends Model
      */
     public const RESTAURANT_AVANCE = 'restaurant_avance';
 
+    /** Contrôle du stock : inventaire guidé et pertes déclarées (casse, périmé, vol). */
+    public const CONTROLE_STOCK = 'controle_stock';
+
     /** Mode libre : supprimer, corriger et renuméroter ses ventes et factures, même passées. */
     public const MODE_LIBRE = 'mode_libre';
 
@@ -87,6 +90,7 @@ class Plan extends Model
         self::DEPENSES => 'Dépenses et bilan',
         self::RESTAURANT_AVANCE => 'Restaurant : cuisine, réservations, livraison, recettes',
         self::MODE_LIBRE => 'Mode libre : supprimer, corriger, renuméroter ses factures',
+        self::CONTROLE_STOCK => 'Contrôle du stock : inventaire et pertes',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */

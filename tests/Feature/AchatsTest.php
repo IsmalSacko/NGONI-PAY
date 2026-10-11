@@ -8,6 +8,7 @@ use App\Livewire\Achats\Index;
 use App\Livewire\Achats\Index as AchatsIndex;
 use App\Models\Boutique;
 use App\Models\Fournisseur;
+use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\AchatService;
@@ -257,5 +258,19 @@ class AchatsTest extends TestCase
             ->assertJsonPath('motifs.0', ['motif' => 'Casse', 'valeur' => 8000])
             ->assertJsonPath('motifs.1', ['motif' => 'Vol', 'valeur' => 4000]);
         $this->api($this->caissier)->getJson('/api/stocks/pertes')->assertForbidden();
+    }
+
+    public function test_inventaire_et_pertes_en_pro_seulement(): void
+    {
+        $this->admin->abonnement()->update(['plan' => 'basic', 'fin' => now()->addMonth()->toDateString()]);
+        $this->api($this->admin)->getJson('/api/inventaires/en-cours')->assertForbidden()->assertJsonPath('code', 'FONCTIONNALITE_NON_INCLUSE');
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertForbidden();
+        // L'historique d'un article reste à tous.
+        $this->api($this->admin)->getJson("/api/produits/{$this->riz->id}/mouvements")->assertOk();
+
+        $this->admin->abonnement()->update(['plan' => 'pro']);
+        $this->api($this->admin)->getJson('/api/inventaires/en-cours')->assertOk();
+        $this->assertStringContainsString('contrôle du stock', (string) Plan::where('code', 'pro')->value('description'));
+        $this->assertStringContainsString('séances de caisse', (string) Plan::where('code', 'basic')->value('description'));
     }
 }
