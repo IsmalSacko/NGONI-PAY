@@ -522,11 +522,6 @@ class CommandesFournisseur
         if (! in_array($commande->statut, ['confirmee', 'en_livraison'], true)) {
             throw ValidationException::withMessages(['commande' => ['Confirmez la commande avant de la livrer.']]);
         }
-        // En rodage, la vente serait un essai, effacé au passage en mode réel,
-        // alors que le stock et la dette du revendeur, eux, sont réels.
-        if (Boutique::withoutGlobalScopes()->whereKey($commande->boutique_grossiste_id)->value('mode_rodage')) {
-            throw ValidationException::withMessages(['commande' => ['Vous êtes en mode rodage : vos ventes sont des essais. Passez en mode réel pour livrer vos revendeurs.']]);
-        }
         $aLivrer = $commande->lignes->filter(fn ($l) => $l->produit_grossiste_id !== null && $l->quantite_confirmee > 0)->values();
         if ($aLivrer->isEmpty()) {
             throw ValidationException::withMessages(['commande' => ['Aucun article à livrer.']]);

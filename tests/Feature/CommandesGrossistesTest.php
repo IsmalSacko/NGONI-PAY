@@ -262,7 +262,7 @@ class CommandesGrossistesTest extends TestCase
         $this->assertSame([$mien->id, 12, 300, 'carton'], [$chezMoi['produit_id'], (int) $chezMoi['contenance'], $chezMoi['prix_vente'], $chezMoi['unite_commande']]);
     }
 
-    public function test_en_livraison_puis_livree_et_pas_de_livraison_en_rodage(): void
+    public function test_en_livraison_puis_livree_meme_en_rodage(): void
     {
         $this->dans($this->epicerie);
         $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
@@ -275,10 +275,8 @@ class CommandesGrossistesTest extends TestCase
         $this->assertDatabaseHas('notifications_app', ['user_id' => $this->awa->id, 'titre' => 'Commande en route']);
         $this->api($this->awa)->getJson('/api/commandes-fournisseur')->assertJsonPath('data.0.statut_libelle', 'En livraison');
 
+        // Des grossistes vendent pour de vrai en rodage : ils livrent comme ils vendent.
         $this->depot->forceFill(['mode_rodage' => true])->save();
-        $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 25000])
-            ->assertUnprocessable()->assertJsonPath('errors.commande.0', 'Vous êtes en mode rodage : vos ventes sont des essais. Passez en mode réel pour livrer vos revendeurs.');
-        $this->depot->forceFill(['mode_rodage' => false])->save();
         $this->api($this->grossiste)->postJson("/api/commandes-recues/{$commande['id']}/livrer", ['montant_paye' => 25000])->assertOk()->assertJsonPath('statut', 'livree');
     }
 
