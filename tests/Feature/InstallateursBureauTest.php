@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\ConditionsUtilisation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /** Versions Windows et macOS : boutons de la vitrine et téléchargement. */
@@ -45,7 +46,7 @@ class InstallateursBureauTest extends TestCase
     private function exploitant(): User
     {
         $u = User::factory()->create(['est_admin_plateforme' => true]);
-        app(\App\Services\ConditionsUtilisation::class)->accepter($u, request(), 'test');
+        app(ConditionsUtilisation::class)->accepter($u, request(), 'test');
 
         return $u;
     }

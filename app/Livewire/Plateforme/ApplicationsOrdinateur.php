@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plateforme;
 
+use App\Http\Controllers\Plateforme\EnvoiInstallateurController;
 use App\Support\InstallateursBureau;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -11,7 +12,7 @@ use Livewire\Component;
 /**
  * Applications ordinateur : les installateurs Windows et macOS proposés sur
  * la vitrine. Un nouveau fichier se dépose ici, envoyé par morceaux avec sa
- * progression ({@see \App\Http\Controllers\Plateforme\EnvoiInstallateurController}).
+ * progression ({@see EnvoiInstallateurController}).
  */
 #[Layout('layouts.plateforme', ['title' => 'Applications ordinateur'])]
 class ApplicationsOrdinateur extends Component
