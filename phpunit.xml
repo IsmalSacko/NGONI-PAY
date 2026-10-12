@@ -34,5 +34,7 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <!-- Les tests vendent en mode réel ; le rodage à l'inscription a ses propres tests. -->
         <env name="ECAISSE_RODAGE_A_L_INSCRIPTION" value="false"/>
+        <!-- Jamais le jeton pawaPay du .env local : les tests le posent eux-mêmes. -->
+        <env name="PAWAPAY_TOKEN" value=""/>
     </php>
 </phpunit>
