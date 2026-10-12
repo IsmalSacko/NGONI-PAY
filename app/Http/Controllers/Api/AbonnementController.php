@@ -76,7 +76,8 @@ class AbonnementController extends Controller
         // les fonctions du plan comme incluses (le serveur les refuse déjà).
         // Seul ce qui reste consultable après l'échéance demeure : le
         // back-office et l'historique des achats.
-        $fonctions = $plan?->fonctionnalitesIncluses() ?? [];
+        // La formule et les fonctions accordées à la main par l'exploitant.
+        $fonctions = $abonnement?->fonctionnalites() ?? [];
         if (! ($abonnement?->estEnCours() ?? false)) {
             $fonctions = array_values(array_intersect($fonctions, [Plan::BACKOFFICE_WEB, Plan::ACHATS_FOURNISSEURS]));
         }

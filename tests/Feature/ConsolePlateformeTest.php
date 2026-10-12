@@ -339,4 +339,46 @@ class ConsolePlateformeTest extends TestCase
             ->assertSee('créée le')
             ->assertSee('actif dans l’app il y a 2 heures', false);
     }
+
+    public function test_accorder_une_fonction_hors_formule_sans_toucher_a_celles_de_la_formule(): void
+    {
+        $basic = Plan::parCode('basic');
+        $hors = collect(array_keys(Plan::FONCTIONNALITES))->first(fn (string $f) => ! $basic->inclut($f));
+        $dedans = collect(array_keys(Plan::FONCTIONNALITES))->first(fn (string $f) => $basic->inclut($f));
+        $this->actingAs($this->exploitant);
+
+        Livewire::test(Comptes::class)
+            ->call('gerer', $this->awa->id)
+            ->set('plan', 'basic')
+            ->assertSee('dans la formule')
+            ->set('fin', now()->addMonth()->toDateString())
+            // Une fonction de la formule cochée en plus n'est pas gardée en double.
+            ->set('accordees', array_values(array_filter([$hors, $dedans])))
+            ->call('accorder')
+            ->assertHasNoErrors()
+            ->assertSee('+ 1 fonction accordée');
+
+        $abonnement = $this->awa->abonnement()->first();
+        $this->assertSame([$hors], $abonnement->fonctionsAccordees());
+        $this->assertTrue(app(AbonnementService::class)->permet($this->boutique, $hors));
+        $this->assertContains($hors, $abonnement->fonctionnalites());
+
+        // L'application la voit incluse.
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->awa->createToken('t')->plainTextToken)
+            ->withHeader('X-Boutique', $this->boutique->id)
+            ->getJson('/api/abonnement')->assertOk()
+            ->assertJsonFragment([$hors]);
+
+        // Retirée : fermée de nouveau ; celles de la formule restent.
+        $this->actingAs($this->exploitant);
+        Livewire::test(Comptes::class)->call('gerer', $this->awa->id)
+            ->assertSet('accordees', [$hors])
+            ->set('accordees', [])
+            ->call('accorder');
+        $this->assertFalse(app(AbonnementService::class)->permet($this->boutique->fresh(), $hors));
+        if ($dedans !== null) {
+            $this->assertTrue(app(AbonnementService::class)->permet($this->boutique->fresh(), $dedans));
+        }
+    }
 }

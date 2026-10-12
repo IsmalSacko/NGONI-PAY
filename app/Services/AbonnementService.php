@@ -102,7 +102,8 @@ class AbonnementService
             return false;
         }
 
-        return $this->planDe($abonnement)?->inclut($fonctionnalite) ?? false;
+        // La formule, ou une fonction accordée à la main par l'exploitant.
+        return $abonnement->inclut($fonctionnalite);
     }
 
     /**
@@ -112,7 +113,7 @@ class AbonnementService
      */
     public function planInclut(?Boutique $boutique, string $fonctionnalite): bool
     {
-        return $this->planDe($this->pourBoutique($boutique))?->inclut($fonctionnalite) ?? false;
+        return $this->pourBoutique($boutique)?->inclut($fonctionnalite) ?? false;
     }
 
     public function peutAjouterMembre(Boutique $boutique, int $membresActuels): bool
@@ -387,13 +388,24 @@ class AbonnementService
      * commercial, prolongation d'essai). `$fin` NULL = sans échéance. Une
      * demande en attente du même compte est soldée.
      */
-    public function accorder(User $proprietaire, string $plan, ?Carbon $fin, User $exploitant, ?string $note = null): Abonnement
+    /**
+     * @param  list<string>|null  $fonctions  fonctions accordées en plus de la formule ;
+     *                                        null : celles déjà accordées restent
+     */
+    public function accorder(User $proprietaire, string $plan, ?Carbon $fin, User $exploitant, ?string $note = null, ?array $fonctions = null): Abonnement
     {
-        if (Plan::parCode($plan) === null) {
+        $modele = Plan::parCode($plan);
+        if ($modele === null) {
             throw ValidationException::withMessages(['plan' => ['Plan inconnu.']]);
         }
+        // Seules les fonctions hors de la formule s'accordent : celles qu'elle
+        // inclut ne se retirent pas, et n'ont pas à être gardées en double.
+        $accordees = $fonctions === null ? null : array_values(array_filter(
+            array_intersect(array_keys(Plan::FONCTIONNALITES), $fonctions),
+            fn (string $f) => ! $modele->inclut($f),
+        ));
 
-        $abonnement = DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note): Abonnement {
+        $abonnement = DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note, $accordees): Abonnement {
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $proprietaire->id],
                 [
@@ -404,6 +416,7 @@ class AbonnementService
                     'est_manuel' => true,
                     'accorde_par' => $exploitant->id,
                     'note_admin' => $note,
+                    ...($accordees === null ? [] : ['fonctions_accordees' => $accordees]),
                 ],
             );
 

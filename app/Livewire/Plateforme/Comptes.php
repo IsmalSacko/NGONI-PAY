@@ -56,6 +56,9 @@ class Comptes extends Component
 
     public string $note = '';
 
+    /** @var list<string> Fonctions accordées à la main, hors de la formule choisie. */
+    public array $accordees = [];
+
     public ?string $info = null;
 
     /** Boutique dont on choisit la sauvegarde à restaurer, et la sauvegarde choisie. */
@@ -85,6 +88,7 @@ class Comptes extends Component
         $this->fin = ($abonnement?->fin && $abonnement->estEnCours() ? $abonnement->fin : now()->addMonth())->toDateString();
         $this->sansEcheance = $abonnement !== null && $abonnement->fin === null;
         $this->note = (string) ($abonnement?->note_admin ?? '');
+        $this->accordees = $abonnement?->fonctionsAccordees() ?? [];
         $this->resetValidation();
     }
 
@@ -103,6 +107,7 @@ class Comptes extends Component
             $this->sansEcheance ? null : Carbon::parse($data['fin']),
             Auth::user(),
             $data['note'] ?: null,
+            $this->accordees,
         );
 
         $this->info = "Abonnement de {$proprietaire->name} mis à jour.";

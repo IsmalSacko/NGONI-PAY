@@ -115,10 +115,34 @@
                         @if ($demande->note)<p class="mt-2 rounded-xl bg-fond-tableau px-3 py-2">{{ $demande->note }}</p>@endif
                         @if ($demande->preuve_note)<p class="mt-2 rounded-xl bg-fond-tableau px-3 py-2"><span class="font-bold">SMS / preuve :</span> {{ $demande->preuve_note }}</p>@endif
                         @if ($demande->preuve_chemin)
-                            <a href="{{ route('plateforme.preuve', $demande) }}" target="_blank"
-                               class="mt-2 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-accent-soft text-accent font-bold hover:bg-accent hover:text-white">
-                                <x-plateforme.picto nom="document" class="w-4 h-4" />Voir la preuve de paiement
-                            </a>
+                            {{-- Dans une fenêtre par-dessus la page : dans l'application installée,
+                                 ouvrir la preuve à la place de la console laissait sans retour possible. --}}
+                            <div x-data="{ ouvert: false }" @keydown.escape.window="ouvert = false" wire:key="preuve-{{ $demande->id }}">
+                                <button type="button" @click="ouvert = true"
+                                        class="mt-2 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-accent-soft text-accent font-bold hover:bg-accent hover:text-white">
+                                    <x-plateforme.picto nom="document" class="w-4 h-4" />Voir la preuve de paiement
+                                </button>
+                                <template x-teleport="body">
+                                    <div x-show="ouvert" x-cloak class="fixed inset-0 z-[60] bg-black/90 flex flex-col p-3 sm:p-6" @click.self="ouvert = false">
+                                        <div class="flex items-center justify-between gap-3 text-white mb-3">
+                                            <span class="font-bold truncate">Preuve de paiement · {{ $demande->proprietaire?->name }}</span>
+                                            <span class="flex gap-2 shrink-0">
+                                                <a href="{{ route('plateforme.preuve', $demande) }}" download class="h-10 px-4 rounded-xl bg-white/15 font-bold inline-flex items-center hover:bg-white/25">Télécharger</a>
+                                                <button type="button" @click="ouvert = false" class="h-10 px-4 rounded-xl bg-white text-accent font-bold">✕ Fermer</button>
+                                            </span>
+                                        </div>
+                                        <template x-if="ouvert">
+                                            @if (str_ends_with(strtolower((string) $demande->preuve_chemin), '.pdf'))
+                                                <iframe src="{{ route('plateforme.preuve', $demande) }}" class="flex-1 w-full rounded-xl bg-white" title="Preuve de paiement"></iframe>
+                                            @else
+                                                <div class="flex-1 min-h-0 flex items-center justify-center" @click.self="ouvert = false">
+                                                    <img src="{{ route('plateforme.preuve', $demande) }}" alt="Preuve de paiement" class="max-w-full max-h-full rounded-xl bg-white object-contain">
+                                                </div>
+                                            @endif
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
                         @endif
                         @if ($tranchee)
                             <p class="mt-2 text-muted">{{ $demande->statut->libelle() }} {{ $demande->decide_le?->format('d/m/Y H:i') }}

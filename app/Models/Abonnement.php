@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Abonnement extends Model
 {
     protected $fillable = [
-        'user_id', 'plan', 'debut', 'fin', 'est_actif', 'est_manuel', 'accorde_par', 'note_admin', 'rappel_fin_pour', 'jours_offerts',
+        'user_id', 'plan', 'debut', 'fin', 'est_actif', 'est_manuel', 'accorde_par', 'note_admin', 'rappel_fin_pour', 'jours_offerts', 'fonctions_accordees',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class Abonnement extends Model
             'rappel_fin_pour' => 'date',
             'est_actif' => 'boolean',
             'est_manuel' => 'boolean',
+            'fonctions_accordees' => 'array',
         ];
     }
 
@@ -70,6 +71,35 @@ class Abonnement extends Model
     public function planModele(): ?Plan
     {
         return Plan::parCode($this->plan);
+    }
+
+    /**
+     * Fonctions accordées à la main par l'exploitant, en plus de la formule
+     * (seulement celles que la formule n'inclut pas).
+     *
+     * @return list<string>
+     */
+    public function fonctionsAccordees(): array
+    {
+        return array_values(array_intersect(array_keys(Plan::FONCTIONNALITES), (array) ($this->fonctions_accordees ?? [])));
+    }
+
+    /** La formule inclut cette fonction, ou l'exploitant l'a accordée. */
+    public function inclut(string $fonctionnalite): bool
+    {
+        return ($this->planModele()?->inclut($fonctionnalite) ?? false)
+            || in_array($fonctionnalite, $this->fonctionsAccordees(), true);
+    }
+
+    /**
+     * Les fonctions ouvertes par cet abonnement : celles de la formule et
+     * celles accordées à la main.
+     *
+     * @return list<string>
+     */
+    public function fonctionnalites(): array
+    {
+        return array_values(array_unique([...($this->planModele()?->fonctionnalitesIncluses() ?? []), ...$this->fonctionsAccordees()]));
     }
 
     /** Fin immédiate (révocation) : « hier », car `fin` est incluse. */
