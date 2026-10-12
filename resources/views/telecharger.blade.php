@@ -31,6 +31,8 @@
         p { color: #4b5563; line-height: 1.5; }
         a.bouton { display: inline-block; margin-top: 12px; padding: 14px 26px; border-radius: 12px;
                    background: #0F2A5C; color: #fff; font-weight: 700; text-decoration: none; }
+        a.bureau { margin: 6px 4px 0; padding: 12px 20px; background: #fff; color: #0F2A5C; border: 2px solid #0F2A5C; }
+        a.bureau small { font-weight: 400; }
     </style>
 </head>
 <body>
@@ -39,6 +41,13 @@
     <h1>Ngoni Caisse @if ($version)<span class="version">{{ $version }}</span>@endif</h1>
     <p>{{ $description }}</p>
     <a class="bouton" href="{{ $storeUrl }}" rel="noopener">Télécharger sur Google Play</a>
+    @if (($bureau ?? []) !== [])
+        <p style="margin-top: 22px;">Sur ordinateur :</p>
+        @foreach ($bureau as $b)
+            <a class="bouton bureau" href="{{ route('telecharger.bureau', $b['systeme']) }}">{{ $b['nom'] }} <small>· {{ $b['mo'] }} Mo</small></a>
+        @endforeach
+        <p style="font-size: 13px;">Windows 10 ou 11 · macOS 10.15 et plus. Au premier lancement, si l’ordinateur demande une confirmation, choisissez « Exécuter quand même » (Windows) ou « Ouvrir quand même » dans Réglages › Confidentialité et sécurité (Mac).</p>
+    @endif
 </main>
 </body>
 </html>

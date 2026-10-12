@@ -85,7 +85,18 @@ Route::get('telecharger', fn () => view('telecharger', [
     'description' => 'Ventes, stocks, reçus et équipe depuis votre téléphone, même hors ligne.',
     'version' => VersionApplication::derniere(),
     'storeUrl' => config('mobile.store_url'),
+    'bureau' => \App\Support\InstallateursBureau::disponibles(),
 ]))->name('telecharger');
+
+// Installateurs Windows et macOS (config/bureau.php), déposés dans storage.
+Route::get('telecharger/{systeme}', function (string $systeme) {
+    $chemin = \App\Support\InstallateursBureau::chemin($systeme);
+    abort_if($chemin === null || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($chemin), 404);
+
+    return \Illuminate\Support\Facades\Storage::disk('local')->download($chemin, basename($chemin), [
+        'Content-Type' => config("bureau.systemes.{$systeme}.type"),
+    ]);
+})->whereIn('systeme', ['windows', 'mac'])->name('telecharger.bureau');
 
 // Référencement automatique : plan du site et consignes aux robots.
 // Retour du commerçant après son paiement Mobile Money (Jèko) : le paiement

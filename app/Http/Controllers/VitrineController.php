@@ -58,6 +58,8 @@ class VitrineController extends Controller
             'aVie' => Plan::offreAVie($payants),
             'communes' => Plan::COMMUNES,
             'storeUrl' => (string) config('mobile.store_url'),
+            // Versions Windows et macOS présentes sur le serveur.
+            'bureau' => \App\Support\InstallateursBureau::disponibles(),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
             'version' => \App\Support\VersionApplication::derniere(),
             'parrainage' => [

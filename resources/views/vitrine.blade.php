@@ -153,8 +153,18 @@
                         <svg viewBox="0 0 24 24" class="w-7 h-7" aria-hidden="true"><path fill="#34A853" d="M3.6 1.8 13.3 12l-9.7 10.2c-.4-.2-.6-.7-.6-1.2V3c0-.5.2-1 .6-1.2z"/><path fill="#FBBC04" d="m16.8 8.5-3.5 3.5 3.5 3.5 3.9-2.2c.8-.5.8-2.1 0-2.6z"/><path fill="#4285F4" d="M3.6 1.8c.3-.2.8-.2 1.2 0l12 6.7-3.5 3.5z"/><path fill="#EA4335" d="m13.3 12 3.5 3.5-12 6.7c-.4.2-.9.2-1.2 0z"/></svg>
                         <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">Disponible sur</span><span class="font-bold text-lg">Google Play</span></span>
                     </a>
+                    {{-- Versions ordinateur : affichées seulement si l'installateur est sur le serveur. --}}
+                    @foreach ($bureau as $b)
+                        <a href="{{ route('telecharger.bureau', $b['systeme']) }}" title="{{ $b['requis'] }} · {{ $b['mo'] }} Mo" class="inline-flex items-center gap-3 h-14 pl-4 pr-6 rounded-2xl bg-ink text-white hover:bg-black">
+                            <svg viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                            <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">Télécharger pour</span><span class="font-bold text-lg">{{ $b['nom'] }}</span></span>
+                        </a>
+                    @endforeach
                     <a href="#tarifs" class="inline-flex items-center h-14 px-6 rounded-2xl border-2 border-ink/80 font-bold hover:bg-white">Essai gratuit {{ $essaiJours }} jours</a>
                 </div>
+                @if ($bureau !== [])
+                    <p class="mt-3 text-sm text-muted">Aussi sur ordinateur, avec le même compte : vos ventes se retrouvent sur le téléphone et sur le PC.</p>
+                @endif
                 <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
                     <li class="flex items-center gap-2"><span class="text-accent font-bold">✓</span> Sans engagement</li>
                     <li class="flex items-center gap-2"><span class="text-accent font-bold">✓</span> Orange Money, Wave, Moov</li>
@@ -405,6 +415,9 @@
             </div>
             <div class="relative flex flex-wrap gap-3">
                 <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl bg-white text-accent-dark font-bold hover:bg-accent-soft">Télécharger l’application</a>
+                @foreach ($bureau as $b)
+                    <a href="{{ route('telecharger.bureau', $b['systeme']) }}" class="inline-flex h-12 px-6 items-center rounded-xl border-2 border-white/80 text-white font-bold hover:bg-white/10">{{ $b['nom'] }}</a>
+                @endforeach
             </div>
         </div>
     </section>
