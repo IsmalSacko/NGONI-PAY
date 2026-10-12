@@ -283,7 +283,13 @@ class AchatsTest extends TestCase
 
         // … mais 3 avaient été mal comptés : la correction rattrape 12 000 F.
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 8, 'motif' => 'Erreur de comptage'])->assertOk();
-        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 8000);
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 8000)
+            // L'article qui manque, pour savoir quoi recompter.
+            ->assertJsonPath('articles.0.produit_id', $this->riz->id)
+            ->assertJsonPath('articles.0.nom', $this->riz->nom)
+            ->assertJsonPath('articles.0.quantite', 2)
+            ->assertJsonPath('articles.0.valeur', 8000)
+            ->assertJsonPath('articles.0.motifs', ['Écart d’inventaire']);
 
         // Un réassort ne rattrape rien ; un nouvel inventaire qui retrouve tout, si.
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 12, 'motif' => 'Réassort'])->assertOk();

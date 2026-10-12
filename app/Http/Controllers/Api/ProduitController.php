@@ -97,7 +97,7 @@ class ProduitController extends Controller
      */
     public function pertes(): JsonResponse
     {
-        $mouvements = MouvementStock::with('produit:id,prix_achat,prix_vente')
+        $mouvements = MouvementStock::with('produit:id,nom,prix_achat,prix_vente')
             ->where('type', TypeMouvementStock::Ajustement->value)
             ->where('created_at', '>=', now()->subDays(30))
             ->orderBy('created_at')->orderBy('id')->get();
@@ -108,6 +108,7 @@ class ProduitController extends Controller
         // d'abord. Sans cela, un écart d'inventaire corrigé restait affiché en
         // rouge pendant 30 jours. Un réassort, lui, ne rattrape rien.
         $parMotif = [];
+        $articles = [];
         foreach ($mouvements->groupBy('produit_id') as $liste) {
             $pertes = [];
             foreach ($liste as $m) {
@@ -131,8 +132,16 @@ class ProduitController extends Controller
             }
             foreach ($pertes as $p) {
                 if ($p['reste'] > 0) {
-                    $prix = (int) ($p['mouvement']->produit?->prix_achat ?: $p['mouvement']->produit?->prix_vente ?: 0);
-                    $parMotif[$p['motif']] = ($parMotif[$p['motif']] ?? 0) + (int) round($p['reste'] * $prix);
+                    $produit = $p['mouvement']->produit;
+                    $prix = (int) ($produit?->prix_achat ?: $produit?->prix_vente ?: 0);
+                    $valeur = (int) round($p['reste'] * $prix);
+                    $parMotif[$p['motif']] = ($parMotif[$p['motif']] ?? 0) + $valeur;
+                    // Par article : ce qui manque, pour savoir quoi recompter ou corriger.
+                    $id = (string) $p['mouvement']->produit_id;
+                    $articles[$id] ??= ['produit_id' => $id, 'nom' => (string) ($produit?->nom ?? 'Article supprimé'), 'quantite' => 0, 'valeur' => 0, 'motifs' => []];
+                    $articles[$id]['quantite'] += $p['reste'];
+                    $articles[$id]['valeur'] += $valeur;
+                    $articles[$id]['motifs'][$p['motif']] = true;
                 }
             }
         }
@@ -142,6 +151,8 @@ class ProduitController extends Controller
         return response()->json([
             'total' => array_sum($parMotif),
             'motifs' => collect($parMotif)->map(fn ($valeur, $motif) => ['motif' => $motif, 'valeur' => $valeur])->values(),
+            'articles' => collect($articles)->filter(fn (array $a) => $a['valeur'] > 0)->sortByDesc('valeur')->take(30)
+                ->map(fn (array $a) => [...$a, 'motifs' => array_keys($a['motifs'])])->values(),
         ]);
     }
 
