@@ -46,7 +46,7 @@ class ReinitialisationBoutique
         // Pressing et restaurant d'abord : leurs commandes tiennent aux clients.
         'encaissements_pressing', 'commandes_pressing', 'forfaits_pressing', 'depenses',
         'encaissements_restaurant', 'reservations_restaurant', 'commandes_restaurant',
-        'ventes', 'mouvements_stock', 'lots', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur', 'achats', 'clotures', 'clients',
+        'ventes', 'mouvements_stock', 'lots', 'sessions_caisse', 'reglements_credit', 'paiements_fournisseur', 'achats', 'clotures', 'clotures_annulees', 'clients',
     ];
 
     /** Le propriétaire de la boutique, ou l'exploitant de la plateforme : personne d'autre (ni admin employé, ni gérant). */

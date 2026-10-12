@@ -38,6 +38,11 @@
         </div>
         <button wire:click="cloturer" wire:confirm="Clôturer la journée du {{ $journee->format('d/m/Y') }} ? Ses chiffres seront figés et ses ventes ne pourront plus être annulées."
                 class="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-accent text-white font-bold shadow-carte"><x-charte.icone nom="lock_clock" />Clôturer la journée</button>
+        @if ($rouvrable)
+            {{-- Clôturée par erreur : le jour même, la journée se rouvre. --}}
+            <button wire:click="rouvrir" wire:confirm="Rouvrir la journée du {{ $rouvrable->jour_affaire->format('d/m/Y') }} ? Le ticket Z n° {{ $rouvrable->numero }} est annulé, ses ventes s’annulent de nouveau et les ventes faites depuis la clôture y reviennent."
+                    class="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-border-strong bg-white font-bold"><x-charte.icone nom="lock_open" />Rouvrir la journée du {{ $rouvrable->jour_affaire->format('d/m') }}</button>
+        @endif
     </div>
 
     <div class="flex flex-wrap items-center gap-2">

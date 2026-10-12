@@ -186,6 +186,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('journee', [ClotureController::class, 'journee']);
     Route::get('clotures', [ClotureController::class, 'index'])->middleware('permission:rapports.view');
     Route::post('clotures', [ClotureController::class, 'store'])->middleware('permission:rapports.view');
+    Route::post('clotures/rouvrir', [ClotureController::class, 'rouvrir'])->middleware('permission:rapports.view');
 
     Route::get('categories', [CategorieProduitController::class, 'index'])->middleware('permission:categories.view');
     Route::post('categories', [CategorieProduitController::class, 'store'])->middleware(['permission:categories.create', 'abonnement']);

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Cloture;
 use App\Models\User;
 use App\Models\Vente;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -50,11 +51,65 @@ class Journee
             }
 
             return Cloture::create([
-                'numero' => (int) Cloture::lockForUpdate()->max('numero') + 1,
+                // Le numéro d'un Z annulé (journée rouverte) ne resert pas.
+                'numero' => max(
+                    (int) Cloture::lockForUpdate()->max('numero'),
+                    (int) DB::table('clotures_annulees')->where('boutique_id', app(TenantContext::class)->boutiqueId())->max('numero'),
+                ) + 1,
                 'jour_affaire' => $jour->toDateString(),
                 'user_id' => $auteur->id,
                 'totaux' => $this->rapports->periode($jour, $jour),
             ]);
+        });
+    }
+
+    /** La dernière clôture, si elle porte sur aujourd'hui : la seule qui se rouvre. */
+    public function rouvrable(): ?Cloture
+    {
+        $z = Cloture::latest('numero')->first();
+
+        return $z !== null && $z->jour_affaire->isToday() ? $z : null;
+    }
+
+    /**
+     * Rouvre la journée d'aujourd'hui, clôturée par erreur : le ticket Z est
+     * annulé (sa trace va dans clotures_annulees, son numéro ne resert pas),
+     * et les ventes faites depuis, comptées pour demain, reviennent sur
+     * aujourd'hui, numérotées à la suite des tickets du jour.
+     *
+     * Le jour même seulement : le lendemain, la journée était finie, et ses
+     * chiffres ont pu être remis (ticket Z imprimé, comptable).
+     */
+    public function rouvrir(User $auteur): Carbon
+    {
+        return DB::transaction(function () use ($auteur): Carbon {
+            $z = Cloture::latest('numero')->lockForUpdate()->first();
+            if ($z === null || ! $z->jour_affaire->isToday()) {
+                throw ValidationException::withMessages(['journee' => [
+                    'Seule la journée d’aujourd’hui se rouvre, le jour même de sa clôture.',
+                ]]);
+            }
+
+            DB::table('clotures_annulees')->insert([
+                'boutique_id' => $z->boutique_id,
+                'numero' => $z->numero,
+                'jour_affaire' => $z->jour_affaire->toDateString(),
+                'cloturee_par' => $z->user_id,
+                'cloturee_le' => $z->created_at,
+                'totaux' => json_encode($z->totaux),
+                'rouverte_par' => $auteur->id,
+                'rouverte_par_nom' => $auteur->name,
+                'rouverte_le' => now(),
+            ]);
+
+            $jour = $z->jour_affaire->copy();
+            $numero = (int) Vente::whereDate('jour_affaire', $jour)->max('numero_jour');
+            foreach (Vente::whereDate('jour_affaire', $jour->copy()->addDay())->orderBy('numero_jour')->orderBy('created_at')->get(['id']) as $vente) {
+                Vente::whereKey($vente->id)->update(['jour_affaire' => $jour->toDateString(), 'numero_jour' => ++$numero]);
+            }
+            $z->delete();
+
+            return $jour;
         });
     }
 }

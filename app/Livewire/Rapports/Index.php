@@ -51,6 +51,15 @@ class Index extends Component
         $this->statut = ('Journée du '.$z->jour_affaire->format('d/m/Y').' clôturée : Z n° '.$z->numero.'. Les tickets repartent à 1.');
     }
 
+    /** Journée clôturée par erreur aujourd'hui : rouverte, ses ventes reviennent. */
+    public function rouvrir(Journee $journee): void
+    {
+        abort_unless(auth()->user()->can('rapports.view'), 403);
+        $jour = $journee->rouvrir(auth()->user());
+        $this->du = $this->au = $jour->toDateString();
+        $this->statut = 'Journée du '.$jour->format('d/m/Y').' rouverte : ses ventes s’annulent de nouveau, et les ventes faites depuis la clôture y sont revenues.';
+    }
+
     public function periode(string $choix): void
     {
         [$du, $au] = match ($choix) {
@@ -79,6 +88,7 @@ class Index extends Component
             'r' => $rapports->periode($du, $au),
             'boutique' => Boutique::find($this->boutiqueActiveId()),
             'journee' => $jour = app(Journee::class)->courante(),
+            'rouvrable' => app(Journee::class)->rouvrable(),
             'ticketsJour' => (int) Vente::whereDate('jour_affaire', $jour)->max('numero_jour'),
             'clotures' => Cloture::with('auteur:id,name')->latest('numero')->limit(15)->get(),
         ]);

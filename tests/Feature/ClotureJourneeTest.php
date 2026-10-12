@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Rapports\Index;
 use App\Models\Boutique;
+use App\Models\Cloture;
 use App\Models\Produit;
 use App\Models\User;
 use App\Models\Vente;
@@ -124,7 +125,56 @@ class ClotureJourneeTest extends TestCase
             ->assertSee('Clôturer la journée')
             ->call('cloturer')
             ->assertSee('Z n° 1')
-            ->assertSee('Les tickets repartent à 1');
-        $this->get('/rapports/imprimer?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertSee('Clôture Z n° 1');
+            ->assertSee('Les tickets repartent à 1')
+            // Clôturée par erreur : le bouton pour la rouvrir apparaît, et la rouvre.
+            ->assertSee('Rouvrir la journée du')
+            ->call('rouvrir')
+            ->assertSee('rouverte')
+            ->assertDontSee('Rouvrir la journée du');
+        $this->assertSame(0, Cloture::count());
+        $this->actingAs($this->admin);
+        Livewire::test(Index::class)->call('cloturer')->assertSee('Z n° 2');
+        $this->get('/rapports/imprimer?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertSee('Clôture Z n° 2');
+    }
+
+    public function test_une_journee_cloturee_par_erreur_se_rouvre_le_jour_meme(): void
+    {
+        $a = $this->vendre($this->caissier);
+        $this->vendre($this->caissier);
+        $this->api($this->admin)->postJson('/api/clotures')->assertCreated()->assertJsonPath('numero', 1);
+        $this->api($this->admin)->getJson('/api/journee')->assertJsonPath('peut_rouvrir', true);
+
+        // Vendue après la clôture : comptée pour demain…
+        $apres = $this->vendre($this->caissier);
+        $this->assertSame(today()->addDay()->toDateString(), Vente::withoutGlobalScopes()->find($apres)->jour_affaire->toDateString());
+
+        $this->api($this->caissier)->postJson('/api/clotures/rouvrir')->assertForbidden();
+        $this->api($this->admin)->postJson('/api/clotures/rouvrir')->assertOk();
+
+        // … elle revient sur aujourd'hui, à la suite des tickets du jour.
+        $vente = Vente::withoutGlobalScopes()->find($apres);
+        $this->assertSame(today()->toDateString(), $vente->jour_affaire->toDateString());
+        $this->assertSame(3, $vente->numero_jour);
+        $this->api($this->admin)->getJson('/api/journee')
+            ->assertJsonPath('jour_affaire', today()->toDateString())
+            ->assertJsonPath('tickets', 3)
+            ->assertJsonPath('peut_rouvrir', false);
+        $this->assertDatabaseHas('clotures_annulees', ['boutique_id' => $this->boutique->id, 'numero' => 1, 'rouverte_par' => $this->admin->id]);
+
+        // Les ventes du jour s'annulent de nouveau ; la nouvelle clôture prend le Z suivant.
+        $this->api($this->admin)->postJson("/api/ventes/{$a}/annuler", ['motif' => 'Erreur'])->assertOk();
+        $this->api($this->admin)->postJson('/api/clotures')->assertCreated()
+            ->assertJsonPath('numero', 2)
+            ->assertJsonPath('totaux.ventes.nombre', 2);
+    }
+
+    public function test_une_journee_d_hier_ne_se_rouvre_pas(): void
+    {
+        $this->vendre($this->caissier);
+        $this->api($this->admin)->postJson('/api/clotures')->assertCreated();
+        $this->travelTo(now()->addDay());
+
+        $this->api($this->admin)->getJson('/api/journee')->assertJsonPath('peut_rouvrir', false);
+        $this->api($this->admin)->postJson('/api/clotures/rouvrir')->assertUnprocessable();
     }
 }
