@@ -48,7 +48,7 @@ class Index extends Component
         abort_unless(auth()->user()->can('rapports.view'), 403);
         $z = $journee->cloturer(auth()->user());
         $this->du = $this->au = $z->jour_affaire->toDateString();
-        $this->statut = ('Journée du '.$z->jour_affaire->format('d/m/Y').' clôturée : Z n° '.$z->numero.'. Les tickets repartent à 1.');
+        $this->statut = ('Journée du '.$z->jour_affaire->format('d/m/Y').' clôturée : bilan n° '.$z->numero.'. Les tickets repartent à 1.');
     }
 
     /** Journée clôturée par erreur aujourd'hui : rouverte, ses ventes reviennent. */

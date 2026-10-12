@@ -32,7 +32,7 @@
             <span class="text-sm font-semibold text-muted">Journée en cours</span>
             <span class="font-display font-extrabold text-xl text-accent">{{ $journee->translatedFormat('l d/m/Y') }} · {{ $ticketsJour }} ticket{{ $ticketsJour > 1 ? 's' : '' }}</span>
             <span class="text-xs text-muted">
-                La clôture fige les chiffres de la journée (ticket Z) ; les tickets repartent à 1 et les ventes suivantes comptent pour le lendemain.
+                La clôture fige les chiffres de la journée dans un bilan ; les tickets repartent à 1 et les ventes suivantes comptent pour le lendemain.
             </span>
         </div>
         </div>
@@ -40,7 +40,7 @@
                 class="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-accent text-white font-bold shadow-carte"><x-charte.icone nom="lock_clock" />Clôturer la journée</button>
         @if ($rouvrable)
             {{-- Clôturée par erreur : le jour même, la journée se rouvre. --}}
-            <button wire:click="rouvrir" wire:confirm="Rouvrir la journée du {{ $rouvrable->jour_affaire->format('d/m/Y') }} ? Le ticket Z n° {{ $rouvrable->numero }} est annulé, ses ventes s’annulent de nouveau et les ventes faites depuis la clôture y reviennent."
+            <button wire:click="rouvrir" wire:confirm="Rouvrir la journée du {{ $rouvrable->jour_affaire->format('d/m/Y') }} ? Le bilan n° {{ $rouvrable->numero }} est annulé, ses ventes s’annulent de nouveau et les ventes faites depuis la clôture y reviennent."
                     class="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-border-strong bg-white font-bold"><x-charte.icone nom="lock_open" />Rouvrir la journée du {{ $rouvrable->jour_affaire->format('d/m') }}</button>
         @endif
     </div>
@@ -139,11 +139,11 @@
     </div>
 
     <div class="bg-white rounded-[20px] shadow-carte p-5 flex flex-col gap-3">
-        <x-charte.en-tete-section icone="lock_clock" titre="Clôtures (tickets Z)" sous-titre="Les journées figées, à réimprimer." />
+        <x-charte.en-tete-section icone="lock_clock" titre="Bilans des journées clôturées" sous-titre="Les journées figées, à réimprimer." />
         @forelse ($clotures as $z)
             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-separateur pt-3 text-sm">
                 <button wire:click="$set('du', '{{ $z->jour_affaire->toDateString() }}'); $set('au', '{{ $z->jour_affaire->toDateString() }}')" class="text-left">
-                    <strong>Z n° {{ $z->numero }}</strong> · {{ $z->jour_affaire->format('d/m/Y') }}
+                    <strong>Bilan n° {{ $z->numero }}</strong> · {{ $z->jour_affaire->format('d/m/Y') }}
                     <span class="text-muted">· clôturée le {{ \App\Support\Fuseau::heure($z->created_at, 'd/m/Y à H:i') }} par {{ $z->auteur?->name }}</span>
                 </button>
                 <span class="flex items-center gap-3">

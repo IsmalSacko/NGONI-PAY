@@ -19,7 +19,7 @@
 </head>
 <body>
     <div class="actions"><button onclick="window.print()">Imprimer ou enregistrer en PDF</button></div>
-    <h1>{{ $boutique->nom }} — @if ($z) Clôture Z n° {{ $z->numero }} @else Rapport d’activité @endif</h1>
+    <h1>{{ $boutique->nom }} — @if ($z) Bilan de la journée n° {{ $z->numero }} @else Rapport d’activité @endif</h1>
     @if ($z)<p class="muted">Journée clôturée le {{ \App\Support\Fuseau::heure($z->created_at, 'd/m/Y à H:i', $boutique->pays) }} par {{ $z->auteur?->name }}</p>@endif
     <p class="muted">
         Du {{ \Illuminate\Support\Carbon::parse($r['du'])->format('d/m/Y') }} au {{ \Illuminate\Support\Carbon::parse($r['au'])->format('d/m/Y') }}

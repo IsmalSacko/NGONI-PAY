@@ -124,7 +124,7 @@ class ClotureJourneeTest extends TestCase
         Livewire::test(Index::class)
             ->assertSee('Clôturer la journée')
             ->call('cloturer')
-            ->assertSee('Z n° 1')
+            ->assertSee('bilan n° 1')
             ->assertSee('Les tickets repartent à 1')
             // Clôturée par erreur : le bouton pour la rouvrir apparaît, et la rouvre.
             ->assertSee('Rouvrir la journée du')
@@ -133,8 +133,8 @@ class ClotureJourneeTest extends TestCase
             ->assertDontSee('Rouvrir la journée du');
         $this->assertSame(0, Cloture::count());
         $this->actingAs($this->admin);
-        Livewire::test(Index::class)->call('cloturer')->assertSee('Z n° 2');
-        $this->get('/rapports/imprimer?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertSee('Clôture Z n° 2');
+        Livewire::test(Index::class)->call('cloturer')->assertSee('bilan n° 2');
+        $this->get('/rapports/imprimer?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertSee('Bilan de la journée n° 2');
     }
 
     public function test_une_journee_cloturee_par_erreur_se_rouvre_le_jour_meme(): void
