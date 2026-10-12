@@ -38,7 +38,8 @@
             </button>
             {{-- La vitrine telle que la voient les visiteurs (aperçu, même connecté). --}}
             <a href="{{ route('vitrine', ['apercu' => 1]) }}" target="_blank" rel="noopener"
-               class="shrink-0 inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl bg-jaune text-accent text-sm font-extrabold" title="Ouvrir le site vitrine">
+               {{-- Contour seul : le fond jaune est réservé à l'onglet de la page en cours. --}}
+               class="shrink-0 inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl border-2 border-jaune/70 text-jaune text-sm font-extrabold hover:bg-jaune hover:text-accent" title="Ouvrir le site vitrine">
                 <x-icone nom="site" class="w-4 h-4" />
                 <span class="hidden sm:inline">Voir le site</span>
             </a>
