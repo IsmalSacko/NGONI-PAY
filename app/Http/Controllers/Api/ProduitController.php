@@ -97,24 +97,63 @@ class ProduitController extends Controller
      */
     public function pertes(): JsonResponse
     {
-        $parMotif = [];
         $mouvements = MouvementStock::with('produit:id,prix_achat,prix_vente')
-            ->where('type', TypeMouvementStock::Ajustement->value)->where('quantite', '<', 0)
-            ->where('created_at', '>=', now()->subDays(30))->get();
-        foreach ($mouvements as $m) {
-            $motif = self::categoriePerte((string) $m->motif);
-            if ($motif === null) {
-                continue; // une correction, pas une perte
+            ->where('type', TypeMouvementStock::Ajustement->value)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at')->orderBy('id')->get();
+
+        // Par article, dans l'ordre : une correction à la hausse (« Erreur de
+        // comptage », un nouvel inventaire qui retrouve la marchandise, un
+        // ajustement sans motif) rattrape les pertes d'avant, la plus récente
+        // d'abord. Sans cela, un écart d'inventaire corrigé restait affiché en
+        // rouge pendant 30 jours. Un réassort, lui, ne rattrape rien.
+        $parMotif = [];
+        foreach ($mouvements->groupBy('produit_id') as $liste) {
+            $pertes = [];
+            foreach ($liste as $m) {
+                if ($m->quantite < 0) {
+                    $motif = self::categoriePerte((string) $m->motif);
+                    if ($motif !== null) { // sinon une correction, pas une perte
+                        $pertes[] = ['mouvement' => $m, 'motif' => $motif, 'reste' => -$m->quantite];
+                    }
+
+                    continue;
+                }
+                if (! self::estCorrection((string) $m->motif)) {
+                    continue;
+                }
+                $rattrape = $m->quantite;
+                for ($i = count($pertes) - 1; $i >= 0 && $rattrape > 0; $i--) {
+                    $pris = min($pertes[$i]['reste'], $rattrape);
+                    $pertes[$i]['reste'] -= $pris;
+                    $rattrape -= $pris;
+                }
             }
-            $prix = (int) ($m->produit?->prix_achat ?: $m->produit?->prix_vente ?: 0);
-            $parMotif[$motif] = ($parMotif[$motif] ?? 0) + (int) round(-$m->quantite * $prix);
+            foreach ($pertes as $p) {
+                if ($p['reste'] > 0) {
+                    $prix = (int) ($p['mouvement']->produit?->prix_achat ?: $p['mouvement']->produit?->prix_vente ?: 0);
+                    $parMotif[$p['motif']] = ($parMotif[$p['motif']] ?? 0) + (int) round($p['reste'] * $prix);
+                }
+            }
         }
+        $parMotif = array_filter($parMotif);
         arsort($parMotif);
 
         return response()->json([
             'total' => array_sum($parMotif),
             'motifs' => collect($parMotif)->map(fn ($valeur, $motif) => ['motif' => $motif, 'valeur' => $valeur])->values(),
         ]);
+    }
+
+    /** Un ajustement à la hausse qui corrige une erreur, et non une marchandise ajoutée (réassort). */
+    public static function estCorrection(string $motif): bool
+    {
+        $m = mb_strtolower(trim($motif));
+
+        // « Ajustement d'inventaire » : le libellé enregistré quand l'application
+        // remonte le stock sans motif (la correction la plus courante).
+        return $m === '' || str_contains($m, 'erreur') || str_starts_with($m, 'inventaire du ')
+            || str_starts_with($m, 'correction') || str_starts_with($m, 'ajustement d');
     }
 
     /**

@@ -273,4 +273,28 @@ class AchatsTest extends TestCase
         $this->assertStringContainsString('contrôle du stock', (string) Plan::where('code', 'pro')->value('description'));
         $this->assertStringContainsString('séances de caisse', (string) Plan::where('code', 'basic')->value('description'));
     }
+
+    public function test_un_ecart_d_inventaire_corrige_ne_compte_plus_comme_perte(): void
+    {
+        $this->riz->update(['prix_achat' => 4000, 'stock' => 10]);
+        // Inventaire : 5 trouvés au lieu de 10, soit 20 000 F d'écart…
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 5, 'motif' => 'Inventaire du '.now()->format('d/m/Y')])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 20000);
+
+        // … mais 3 avaient été mal comptés : la correction rattrape 12 000 F.
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 8, 'motif' => 'Erreur de comptage'])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 8000);
+
+        // Un réassort ne rattrape rien ; un nouvel inventaire qui retrouve tout, si.
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 12, 'motif' => 'Réassort'])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 8000);
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 14, 'motif' => 'Inventaire du '.now()->format('d/m/Y')])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 0)->assertJsonPath('motifs', []);
+
+        // Depuis l'application, remonter le stock sans motif corrige aussi.
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 11, 'motif' => 'Inventaire du '.now()->format('d/m/Y')])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 12000);
+        $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 14])->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 0);
+    }
 }
