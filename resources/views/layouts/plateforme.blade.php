@@ -20,6 +20,7 @@
             ['route' => 'plateforme.utilisateurs', 'label' => 'Utilisateurs'],
             ['route' => 'plateforme.annonces', 'label' => 'Annonces'],
             ['route' => 'plateforme.tutoriels', 'label' => 'Tutoriels'],
+            ['route' => 'plateforme.applications', 'label' => 'Applications ordinateur'],
         ];
     @endphp
     <header class="bg-accent text-white sticky top-0 z-40">

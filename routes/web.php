@@ -208,6 +208,8 @@ Route::middleware(['auth', 'conditions', 'plateforme'])->prefix('plateforme')->n
     Route::get('utilisateurs', Utilisateurs::class)->name('utilisateurs');
     Route::get('annonces', Annonces::class)->name('annonces');
     Route::get('tutoriels', Tutoriels::class)->name('tutoriels');
+    Route::get('applications-ordinateur', \App\Livewire\Plateforme\ApplicationsOrdinateur::class)->name('applications');
+    Route::post('applications-ordinateur/envoi', \App\Http\Controllers\Plateforme\EnvoiInstallateurController::class)->name('applications.envoi');
 
     // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
     Route::get('demandes/{demande}/preuve', function (DemandeAbonnement $demande) {
