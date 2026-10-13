@@ -9,9 +9,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
-use App\Http\Controllers\Api\InventaireController;
-use App\Http\Controllers\Api\CommandeFournisseurController;
 use App\Http\Controllers\Api\ClotureController;
+use App\Http\Controllers\Api\CommandeFournisseurController;
 use App\Http\Controllers\Api\CommandePressingController;
 use App\Http\Controllers\Api\CommandeRestaurantController;
 use App\Http\Controllers\Api\DashboardController;
@@ -20,6 +19,7 @@ use App\Http\Controllers\Api\EquipeController;
 use App\Http\Controllers\Api\FedapayWebhookController;
 use App\Http\Controllers\Api\GestionPressingController;
 use App\Http\Controllers\Api\GestionRestaurantController;
+use App\Http\Controllers\Api\InventaireController;
 use App\Http\Controllers\Api\JekoWebhookController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PawapayWebhookController;
@@ -148,6 +148,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('boutique/fidelite', [BoutiqueController::class, 'fidelite'])->middleware(['permission:boutique.update', 'fonctionnalite:fidelite']);
     Route::post('boutique/logo', [BoutiqueController::class, 'logo'])->middleware('permission:boutique.update');
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
+    // « D'après ma facture » : la facture du commerçant lue par l'IA, pour préremplir Ma boutique.
+    Route::post('boutique/lecture-facture', [BoutiqueController::class, 'lireFacture'])->middleware(['permission:boutique.update', 'throttle:6,1']);
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
     // Remise à zéro des essais : le propriétaire seul (vérifié par le service).
     Route::get('boutique/reinitialisation', [BoutiqueController::class, 'apercuReinitialisation']);

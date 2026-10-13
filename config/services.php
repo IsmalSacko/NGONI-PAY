@@ -35,10 +35,18 @@ return [
         ],
     ],
 
-
     // Clé du compte de service Firebase (notifications push), hors du dépôt.
     'firebase' => [
         'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
+    // Lecture d'une facture envoyée par le commerçant (Ma boutique → modèle
+    // « D'après ma facture »). Des modèles figés, jamais un alias `-latest`, et
+    // un repli sur la même clé : un modèle qui ne répond plus ne bloque rien.
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'fallback_model' => env('GEMINI_FALLBACK_MODEL', 'gemini-3.5-flash'),
     ],
 
 ];

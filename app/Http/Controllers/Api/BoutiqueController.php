@@ -12,6 +12,7 @@ use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\CatalogueDeDepart;
 use App\Services\Fidelite;
+use App\Services\Ia\LectureFacture;
 use App\Services\Images;
 use App\Services\ModeLibre;
 use App\Services\ReglagesBoutique;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 /**
  * Boutiques du compte : celles où il a un rôle, la création d'une nouvelle
@@ -176,6 +178,21 @@ class BoutiqueController extends Controller
         $boutique->update(['logo' => $images->enregistrer($request->file('logo'), 'logos', $boutique->id, $boutique->logo)]);
 
         return response()->json(['data' => $boutique->fresh()]);
+    }
+
+    /**
+     * « D'après ma facture » : la facture du commerçant (photo ou PDF) lue par
+     * l'IA. Rien n'est enregistré : l'app préremplit les réglages à vérifier.
+     */
+    public function lireFacture(Request $request, LectureFacture $lecture): JsonResponse
+    {
+        $request->validate(['facture' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,heic,pdf', 'max:8192']]);
+
+        try {
+            return response()->json(['data' => $lecture->lire($request->file('facture'))]);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 503);
+        }
     }
 
     public function supprimerLogo(Images $images): JsonResponse
