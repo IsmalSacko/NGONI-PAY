@@ -126,6 +126,8 @@ class VenteController extends Controller
             'lignes.*.libelle' => ['nullable', 'string', 'max:120', 'required_without:lignes.*.produit_id'],
             'lignes.*.prix_unitaire' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_with:lignes.*.libelle'],
             'lignes.*.taux_tva' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            // Ligne libre des frais d'enlèvement (facture « distributeur ») : à part sur la facture.
+            'lignes.*.frais' => ['nullable', 'boolean'],
             // Au poids ou au demi : jusqu'à trois décimales (1,250 kg).
             'lignes.*.quantite' => ['required', 'numeric', 'min:0.001', 'max:1000000', 'decimal:0,3'],
             // Pharmacie : le palier vendu (boîte, plaquette, comprimé).

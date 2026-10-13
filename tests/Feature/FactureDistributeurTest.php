@@ -77,13 +77,15 @@ class FactureDistributeurTest extends TestCase
         $this->assertNotNull($client);
 
         app(TenantContext::class)->setBoutique($this->boutique->id);
-        $biere = Produit::create(['nom' => 'Bière 65 cl', 'reference' => 'EXP50C', 'prix_vente' => 10000, 'taux_tva' => 19.25, 'stock' => 50]);
-        $frais = Produit::create(['nom' => 'Frais enlèvement', 'reference' => 'ENL', 'est_frais' => true, 'prix_vente' => 500, 'taux_tva' => 19.25, 'stock' => 0]);
+        $biere = Produit::create(['nom' => 'Bière 65 cl', 'reference' => 'EXP50C', 'frais_enlevement' => 250, 'prix_vente' => 10000, 'taux_tva' => 19.25, 'stock' => 50]);
 
         $vente = $this->api()->postJson('/api/ventes', [
             'reference_locale' => (string) Str::uuid(),
             'client_id' => $client,
-            'lignes' => [['produit_id' => $biere->id, 'quantite' => 2], ['produit_id' => $frais->id, 'quantite' => 1]],
+            'lignes' => [
+                ['produit_id' => $biere->id, 'quantite' => 2],
+                ['libelle' => 'Frais d’enlèvement', 'prix_unitaire' => 500, 'taux_tva' => 19.25, 'quantite' => 1, 'frais' => true],
+            ],
             'moyen_paiement' => 'especes',
             'montant_recu' => 20500,
         ])->assertCreated();
@@ -93,7 +95,8 @@ class FactureDistributeurTest extends TestCase
             ->assertJsonPath('lignes.0.reference', 'EXP50C')
             ->assertJsonPath('lignes.0.frais', false)
             ->assertJsonPath('lignes.1.frais', true);
-        // Les frais ne sortent pas de stock.
-        $this->assertSame(0.0, (float) $frais->fresh()->stock);
+        $this->assertSame(20500, $vente->json('total'));
+        $this->assertSame(250, $biere->fresh()->frais_enlevement);
+        $this->assertSame(48.0, (float) $biere->fresh()->stock);
     }
 }

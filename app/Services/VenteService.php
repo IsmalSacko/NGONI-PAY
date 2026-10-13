@@ -129,6 +129,7 @@ class VenteService
                         // Une prestation est souvent hors TVA : 0 par défaut.
                         'taux_tva' => (float) ($ligne['taux_tva'] ?? 0),
                         'total_ligne' => $totalLigne,
+                        'frais' => (bool) ($ligne['frais'] ?? false),
                     ];
 
                     continue;
@@ -210,7 +211,7 @@ class VenteService
                 $base = Quantite::normaliser($ligne['quantite'] * $palier['contenance']);
                 $besoin[$produit->id] = Quantite::normaliser(($besoin[$produit->id] ?? 0) + $base);
 
-                if ($boutique->suitLeStock() && ! $produit->est_frais && round($produit->stock - $besoin[$produit->id], 3) < 0) {
+                if ($boutique->suitLeStock() && round($produit->stock - $besoin[$produit->id], 3) < 0) {
                     $reste = Quantite::formater($produit->stock, $produit->unite);
                     throw ValidationException::withMessages(['lignes' => ["Stock insuffisant pour « {$produit->nom} » (reste {$reste})."]]);
                 }
@@ -338,13 +339,13 @@ class VenteService
                     'total_ligne' => $l['total_ligne'],
                     'service' => $l['service'] ?? null,
                     'express' => $l['express'] ?? false,
-                    // Figés à la vente : référence de l'article, et frais (enlèvement…) à part sur la facture.
+                    // Figée à la vente : la référence de l'article ; les frais d'enlèvement à part sur la facture.
                     'reference' => $l['produit']?->reference,
-                    'frais' => (bool) $l['produit']?->est_frais,
+                    'frais' => $l['frais'] ?? false,
                 ]);
 
-                // Ligne libre, prestation d'un pressing ou frais (enlèvement…) : ni stock ni mouvement à écrire.
-                if ($l['produit'] === null || isset($l['service']) || $l['produit']->est_frais || ! $boutique->suitLeStock()) {
+                // Ligne libre, ou prestation d'un pressing : ni stock ni mouvement à écrire.
+                if ($l['produit'] === null || isset($l['service']) || ! $boutique->suitLeStock()) {
                     continue;
                 }
 

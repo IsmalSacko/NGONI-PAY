@@ -305,9 +305,9 @@ class ProduitController extends Controller
             'nom' => [$requis, 'string', 'max:255'],
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
-            // Facture « distributeur » : la référence (EXP50C) et les frais (enlèvement, livraison).
+            // Facture « distributeur » : la référence (EXP50C) et les frais d'enlèvement par unité.
             'reference' => ['nullable', 'string', 'max:30'],
-            'est_frais' => ['nullable', 'boolean'],
+            'frais_enlevement' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
             // Déjà pris : on dit par quel article, pour que le commerçant le retrouve.
             'code_barre' => ['nullable', 'string', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec) use ($boutiqueId, $produit): void {
                 $existant = Produit::withoutGlobalScopes()->where('boutique_id', $boutiqueId)->where('code_barre', $valeur)

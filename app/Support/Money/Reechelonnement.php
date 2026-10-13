@@ -16,7 +16,7 @@ class Reechelonnement
 {
     /** Colonnes de montants, par table rattachée à la boutique. */
     private const COLONNES = [
-        'produits' => ['prix_vente', 'prix_achat'],
+        'produits' => ['prix_vente', 'prix_achat', 'frais_enlevement'],
         'ventes' => ['sous_total', 'remise', 'tva', 'total', 'montant_recu', 'monnaie_rendue'],
         'sessions_caisse' => ['fond_initial', 'fond_final', 'ecart'],
     ];
