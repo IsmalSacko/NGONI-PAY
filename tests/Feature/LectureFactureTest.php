@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Abonnement;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -58,6 +60,38 @@ class LectureFactureTest extends TestCase
             ->assertJsonMissingPath('data.pirate');
         // Rien n'est enregistré.
         $this->assertNull($this->admin->fresh()->boutique?->boite_postale);
+    }
+
+    public function test_quota_du_mois_selon_l_offre(): void
+    {
+        Http::fake(['*' => Http::response(self::reponse(['modele' => 'standard']))]);
+
+        // Essai : une facture par mois.
+        $this->envoyer()->assertOk()->assertJsonPath('quota.restantes', 0);
+        $this->envoyer()->assertStatus(429)->assertJsonPath('code', 'QUOTA_LECTURE_FACTURE')
+            ->assertJsonPath('message', fn (string $m) => str_starts_with($m, 'Vous avez déjà importé votre facture ce mois-ci.'));
+
+        // Pro : deux par mois.
+        Abonnement::where('user_id', $this->admin->id)->update(['plan' => 'pro', 'fin' => now()->addYear()->toDateString()]);
+        $this->withToken($this->admin->createToken('t')->plainTextToken)->getJson('/api/boutique/lecture-facture')
+            ->assertJsonPath('data.par_mois', 2)->assertJsonPath('data.restantes', 1);
+        $this->envoyer()->assertOk();
+        $this->envoyer()->assertStatus(429);
+
+        // Le mois suivant, le compteur repart.
+        $this->travel(1)->months();
+        $this->envoyer()->assertOk()->assertJsonPath('quota.restantes', 1);
+
+        // Offre terminée : plus d'import.
+        Abonnement::where('user_id', $this->admin->id)->update(['fin' => now()->subDay()->toDateString()]);
+        $this->envoyer()->assertStatus(429)->assertJsonPath('message', 'L’import de facture n’est pas compris dans votre offre actuelle.');
+    }
+
+    public function test_une_lecture_qui_echoue_ne_compte_pas(): void
+    {
+        Http::fake(['*' => Http::response('', 503)]);
+        $this->envoyer()->assertStatus(503);
+        $this->assertSame(0, DB::table('lectures_facture')->count());
     }
 
     public function test_un_modele_en_panne_passe_la_main_au_repli(): void

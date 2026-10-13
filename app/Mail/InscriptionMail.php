@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Enums\Country;
 use App\Models\Boutique;
 use App\Models\User;
 use App\Support\WhatsApp;
@@ -39,7 +40,7 @@ class InscriptionMail extends Mailable
                 'user' => $this->user,
                 'boutique' => $this->boutique,
                 'nouveauCompte' => $this->nouveauCompte,
-                'pays' => \App\Enums\Country::tryFrom((string) $this->boutique->pays)?->label() ?? $this->boutique->pays,
+                'pays' => Country::tryFrom((string) $this->boutique->pays)?->label() ?? $this->boutique->pays,
                 'whatsapp' => WhatsApp::link($this->user->phone),
                 'finEssai' => $abonnement?->fin?->format('d/m/Y'),
                 'lienConsole' => url('/plateforme/comptes'),

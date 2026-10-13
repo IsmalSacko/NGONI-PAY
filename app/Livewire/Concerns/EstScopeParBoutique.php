@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Models\Boutique;
+use App\Services\AbonnementService;
 use App\Support\Tenancy\BoutiqueActive;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -37,7 +40,7 @@ trait EstScopeParBoutique
     /** Boutique active de la requête en cours. */
     protected function boutiqueActiveId(): ?string
     {
-        return app(\App\Support\Tenancy\TenantContext::class)->boutiqueId();
+        return app(TenantContext::class)->boutiqueId();
     }
 
     /**
@@ -46,9 +49,9 @@ trait EstScopeParBoutique
      */
     protected function abonnementActif(): bool
     {
-        $boutique = \App\Models\Boutique::find($this->boutiqueActiveId());
+        $boutique = Boutique::find($this->boutiqueActiveId());
 
-        if (app(\App\Services\AbonnementService::class)->boutiqueActive($boutique)) {
+        if (app(AbonnementService::class)->boutiqueActive($boutique)) {
             return true;
         }
 

@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CommandePressing;
 use App\Services\CommandesPressing;
 use App\Services\Images;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -72,8 +73,8 @@ class CommandePressingController extends Controller
      * Sur les commandes ouvertes : à rendre aujourd'hui, en retard, ou
      * abandonnées (rendez-vous passé depuis plus de 30 jours).
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<CommandePressing>  $r
-     * @return \Illuminate\Database\Eloquent\Builder<CommandePressing>
+     * @param  Builder<CommandePressing>  $r
+     * @return Builder<CommandePressing>
      */
     private function filtrer($r, string $filtre)
     {

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\Presence\Appareil;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -125,7 +126,7 @@ class ConditionsUtilisation
 
         return $dernieres->mapWithKeys(fn ($l) => [(string) $l->user_id => [
             'version' => (string) $l->version,
-            'acceptee_le' => \Illuminate\Support\Carbon::parse($l->acceptee_le)->toIso8601String(),
+            'acceptee_le' => Carbon::parse($l->acceptee_le)->toIso8601String(),
             'appareil' => $l->appareil,
             'source' => (string) $l->source,
             'a_jour' => $l->version === self::version(),

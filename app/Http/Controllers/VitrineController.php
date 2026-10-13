@@ -6,6 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Enums\CycleFacturation;
 use App\Models\Plan;
+use App\Services\Parrainage;
+use App\Support\InstallateursBureau;
+use App\Support\VersionApplication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -59,13 +62,13 @@ class VitrineController extends Controller
             'communes' => Plan::COMMUNES,
             'storeUrl' => (string) config('mobile.store_url'),
             // Versions Windows et macOS présentes sur le serveur.
-            'bureau' => \App\Support\InstallateursBureau::disponibles(),
+            'bureau' => InstallateursBureau::disponibles(),
             'whatsapp' => (string) config('ecaisse.support_whatsapp'),
-            'version' => \App\Support\VersionApplication::derniere(),
+            'version' => VersionApplication::derniere(),
             'parrainage' => [
-                'filleul' => \App\Services\Parrainage::JOURS_ESSAI_FILLEUL,
-                'parrain' => \App\Services\Parrainage::JOURS_PARRAIN,
-                'plafond' => \App\Services\Parrainage::MAX_PAR_AN,
+                'filleul' => Parrainage::JOURS_ESSAI_FILLEUL,
+                'parrain' => Parrainage::JOURS_PARRAIN,
+                'plafond' => Parrainage::MAX_PAR_AN,
             ],
         ]);
     }

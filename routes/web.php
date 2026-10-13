@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutDemande;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\Plateforme\EnvoiInstallateurController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\VitrineController;
 use App\Livewire\Auth\Login;
@@ -16,6 +17,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\MonCompte;
 use App\Livewire\Plateforme\Abonnements;
 use App\Livewire\Plateforme\Annonces;
+use App\Livewire\Plateforme\ApplicationsOrdinateur;
 use App\Livewire\Plateforme\Comptes;
 use App\Livewire\Plateforme\Demandes;
 use App\Livewire\Plateforme\Plans;
@@ -30,6 +32,7 @@ use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Services\ConditionsUtilisation;
 use App\Services\PaiementMobile;
+use App\Support\InstallateursBureau;
 use App\Support\Tenancy\BoutiqueActive;
 use App\Support\VersionApplication;
 use Illuminate\Http\Request;
@@ -85,15 +88,15 @@ Route::get('telecharger', fn () => view('telecharger', [
     'description' => 'Ventes, stocks, reçus et équipe depuis votre téléphone, même hors ligne.',
     'version' => VersionApplication::derniere(),
     'storeUrl' => config('mobile.store_url'),
-    'bureau' => \App\Support\InstallateursBureau::disponibles(),
+    'bureau' => InstallateursBureau::disponibles(),
 ]))->name('telecharger');
 
 // Installateurs Windows et macOS (config/bureau.php), déposés dans storage.
 Route::get('telecharger/{systeme}', function (string $systeme) {
-    $chemin = \App\Support\InstallateursBureau::chemin($systeme);
-    abort_if($chemin === null || ! \Illuminate\Support\Facades\Storage::disk('local')->exists($chemin), 404);
+    $chemin = InstallateursBureau::chemin($systeme);
+    abort_if($chemin === null || ! Storage::disk('local')->exists($chemin), 404);
 
-    return \Illuminate\Support\Facades\Storage::disk('local')->download($chemin, basename($chemin), [
+    return Storage::disk('local')->download($chemin, basename($chemin), [
         'Content-Type' => config("bureau.systemes.{$systeme}.type"),
     ]);
 })->whereIn('systeme', ['windows', 'mac'])->name('telecharger.bureau');
@@ -208,8 +211,8 @@ Route::middleware(['auth', 'conditions', 'plateforme'])->prefix('plateforme')->n
     Route::get('utilisateurs', Utilisateurs::class)->name('utilisateurs');
     Route::get('annonces', Annonces::class)->name('annonces');
     Route::get('tutoriels', Tutoriels::class)->name('tutoriels');
-    Route::get('applications-ordinateur', \App\Livewire\Plateforme\ApplicationsOrdinateur::class)->name('applications');
-    Route::post('applications-ordinateur/envoi', \App\Http\Controllers\Plateforme\EnvoiInstallateurController::class)->name('applications.envoi');
+    Route::get('applications-ordinateur', ApplicationsOrdinateur::class)->name('applications');
+    Route::post('applications-ordinateur/envoi', EnvoiInstallateurController::class)->name('applications.envoi');
 
     // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
     Route::get('demandes/{demande}/preuve', function (DemandeAbonnement $demande) {

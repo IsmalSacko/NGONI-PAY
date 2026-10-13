@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Storage;
  * pour la même raison que {@see User} : elle EST le tenant, elle ne lui
  * appartient pas.
  */
-#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket', 'boite_postale', 'psa_taux', 'modele_facture', 'facture_prefixe', 'facture_suffixe', 'facture_annee', 'mode_rodage', 'recoit_commandes'])]
+#[Fillable(['proprietaire_id', 'nom', 'pays', 'devise', 'telephone', 'email', 'adresse', 'logo', 'identifiant_fiscal', 'rccm', 'message_ticket', 'boite_postale', 'psa_taux', 'modele_facture', 'libelle_marchandises', 'libelle_frais', 'facture_prefixe', 'facture_suffixe', 'facture_annee', 'mode_rodage', 'recoit_commandes'])]
 class Boutique extends Model
 {
     /** Adresse du logo, pour l'application et les tickets. */

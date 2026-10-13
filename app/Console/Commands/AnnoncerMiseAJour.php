@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Annonce;
 use App\Services\DiffusionAnnonces;
+use App\Support\VersionApplication;
 use Illuminate\Console\Command;
 
 /**
@@ -67,6 +68,6 @@ class AnnoncerMiseAJour extends Command
 
     private function derniereVersionAnnoncee(): ?string
     {
-        return \App\Support\VersionApplication::derniereAnnoncee();
+        return VersionApplication::derniereAnnoncee();
     }
 }

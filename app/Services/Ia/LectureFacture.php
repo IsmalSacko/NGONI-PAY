@@ -32,6 +32,8 @@ Tu lis la facture d'un commerçant d'Afrique (photo ou PDF). Rends UNIQUEMENT un
 - "psa_taux" : le taux du PSA ou précompte sur achats en pourcentage (2.5), ou null s'il n'y en a pas. S'il n'est pas écrit mais que les montants le montrent, déduis-le.
 - "tva_taux" : le taux de TVA principal en pourcentage (19.25, 18), ou null.
 - "message_ticket" : la phrase de fin adressée au client (« Merci de votre visite »), au plus 160 caractères, ou null.
+- "libelle_marchandises" : l'intitulé du bloc qui totalise les articles s'il en a un (« Liquide nu », « Marchandises »), ou null.
+- "libelle_frais" : l'intitulé des frais ajoutés aux articles (« Frais d'enlèvement », « Frais de livraison »), ou null.
 - "mentions" : la liste courte, en français, des rubriques présentes sur la facture (« Code client », « NIU du client », « Frais d'enlèvement », « Consignation d'emballages », « Ristournes »…).
 N'invente rien : une information absente vaut null.
 TXT;
@@ -119,6 +121,8 @@ TXT;
             'psa_taux' => $taux('psa_taux', 20),
             'tva_taux' => $taux('tva_taux', 100),
             'message_ticket' => $texte('message_ticket', 160),
+            'libelle_marchandises' => $texte('libelle_marchandises', 40),
+            'libelle_frais' => $texte('libelle_frais', 40),
             'mentions' => array_values(array_slice(array_filter(
                 array_map(static fn ($m) => is_scalar($m) ? mb_substr(trim((string) $m), 0, 60) : '', (array) ($lu['mentions'] ?? [])),
             ), 0, 15)),

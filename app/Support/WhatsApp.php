@@ -28,6 +28,6 @@ class WhatsApp
             return null; // format local, pays inconnu
         }
 
-        return strlen($digits) >= 8 ? 'https://wa.me/' . $digits : null;
+        return strlen($digits) >= 8 ? 'https://wa.me/'.$digits : null;
     }
 }

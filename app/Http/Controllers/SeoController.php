@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Plan;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 
 /**
  * Référencement en pilote automatique : le plan du site et les consignes aux
@@ -31,7 +32,7 @@ class SeoController extends Controller
 
         $pages = collect(self::PAGES)->map(fn (array $p) => [
             'loc' => route($p[0]),
-            'lastmod' => $p[0] === 'vitrine' && $tarifs ? \Illuminate\Support\Carbon::parse($tarifs)->toDateString() : $this->dateVue($p[0]),
+            'lastmod' => $p[0] === 'vitrine' && $tarifs ? Carbon::parse($tarifs)->toDateString() : $this->dateVue($p[0]),
             'priority' => $p[1],
             'changefreq' => $p[2],
         ]);

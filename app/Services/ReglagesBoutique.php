@@ -43,6 +43,9 @@ class ReglagesBoutique
             'boite_postale' => ['nullable', 'string', 'max:60'],
             'psa_taux' => ['nullable', 'numeric', 'min:0', 'max:20'],
             'modele_facture' => ['nullable', Rule::in(['standard', 'distributeur'])],
+            // Intitulés des blocs de la facture « distributeur » (« Liquide nu », « Frais de livraison »).
+            'libelle_marchandises' => ['nullable', 'string', 'max:40'],
+            'libelle_frais' => ['nullable', 'string', 'max:40'],
             // Numéro de facture : PRÉFIXE-2026-0001-SUFFIXE (lettres et chiffres).
             'facture_prefixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
             'facture_suffixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
@@ -90,6 +93,8 @@ class ReglagesBoutique
             'boite_postale' => array_key_exists('boite_postale', $donnees) ? ($data['boite_postale'] ?? null) : $boutique->boite_postale,
             'psa_taux' => array_key_exists('psa_taux', $donnees) ? ((float) ($data['psa_taux'] ?? 0) ?: null) : $boutique->psa_taux,
             'modele_facture' => array_key_exists('modele_facture', $donnees) ? ($data['modele_facture'] ?? 'standard') : $boutique->modele_facture,
+            'libelle_marchandises' => array_key_exists('libelle_marchandises', $donnees) ? ($data['libelle_marchandises'] ?? null) : $boutique->libelle_marchandises,
+            'libelle_frais' => array_key_exists('libelle_frais', $donnees) ? ($data['libelle_frais'] ?? null) : $boutique->libelle_frais,
             'facture_prefixe' => array_key_exists('facture_prefixe', $donnees) ? (strtoupper((string) ($data['facture_prefixe'] ?? '')) ?: null) : $boutique->facture_prefixe,
             'facture_suffixe' => array_key_exists('facture_suffixe', $donnees) ? (strtoupper((string) ($data['facture_suffixe'] ?? '')) ?: null) : $boutique->facture_suffixe,
             'facture_annee' => array_key_exists('facture_annee', $donnees) ? (bool) ($data['facture_annee'] ?? true) : $boutique->facture_annee,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\Rule;
 
 /** Une vidéo d'aide (YouTube), proposée dans l'application. */
 class Tutoriel extends Model
@@ -40,7 +41,7 @@ class Tutoriel extends Model
         return [
             'titre' => [$requis, 'string', 'max:120'],
             'sous_titre' => ['nullable', 'string', 'max:160'],
-            'categorie' => [$requis, \Illuminate\Validation\Rule::in(array_keys(self::CATEGORIES))],
+            'categorie' => [$requis, Rule::in(array_keys(self::CATEGORIES))],
             'url' => [$requis, 'url', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec): void {
                 if (self::idYoutube((string) $valeur) === null) {
                     $echec('Collez le lien d’une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).');

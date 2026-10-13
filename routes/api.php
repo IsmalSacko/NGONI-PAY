@@ -150,6 +150,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('boutique/logo', [BoutiqueController::class, 'supprimerLogo'])->middleware('permission:boutique.update');
     // « D'après ma facture » : la facture du commerçant lue par l'IA, pour préremplir Ma boutique.
     Route::post('boutique/lecture-facture', [BoutiqueController::class, 'lireFacture'])->middleware(['permission:boutique.update', 'throttle:6,1']);
+    Route::get('boutique/lecture-facture', [BoutiqueController::class, 'quotaLectureFacture'])->middleware('permission:boutique.update');
     Route::put('boutiques/{boutique}/par-defaut', [BoutiqueController::class, 'parDefaut']);
     // Remise à zéro des essais : le propriétaire seul (vérifié par le service).
     Route::get('boutique/reinitialisation', [BoutiqueController::class, 'apercuReinitialisation']);

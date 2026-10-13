@@ -13,6 +13,7 @@ use App\Services\BoutiqueRegistrationService;
 use App\Services\CatalogueDeDepart;
 use App\Services\Fidelite;
 use App\Services\Ia\LectureFacture;
+use App\Services\Ia\QuotaLectureFacture;
 use App\Services\Images;
 use App\Services\ModeLibre;
 use App\Services\ReglagesBoutique;
@@ -20,6 +21,7 @@ use App\Services\ReinitialisationBoutique;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -184,15 +186,39 @@ class BoutiqueController extends Controller
      * « D'après ma facture » : la facture du commerçant (photo ou PDF) lue par
      * l'IA. Rien n'est enregistré : l'app préremplit les réglages à vérifier.
      */
-    public function lireFacture(Request $request, LectureFacture $lecture): JsonResponse
+    public function lireFacture(Request $request, LectureFacture $lecture, QuotaLectureFacture $quota): JsonResponse
     {
         $request->validate(['facture' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,heic,pdf', 'max:8192']]);
+        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+
+        // Le quota du mois (selon l'offre), compté sur les seules lectures réussies.
+        if ($quota->restantes($boutique) <= 0) {
+            $etat = $quota->etat($boutique);
+
+            return response()->json([
+                'message' => $etat['par_mois'] === 0
+                    ? 'L’import de facture n’est pas compris dans votre offre actuelle.'
+                    : 'Vous avez déjà importé '.($etat['par_mois'] === 1 ? 'votre facture' : "vos {$etat['par_mois']} factures").' ce mois-ci. '
+                        .'Vous pourrez recommencer le '.Carbon::parse($etat['renouvellement'])->translatedFormat('j F').'.',
+                'code' => 'QUOTA_LECTURE_FACTURE',
+                'quota' => $etat,
+            ], 429);
+        }
 
         try {
-            return response()->json(['data' => $lecture->lire($request->file('facture'))]);
+            $lue = $lecture->lire($request->file('facture'));
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 503);
         }
+        $quota->compter($boutique, (string) $request->user()->id);
+
+        return response()->json(['data' => $lue, 'quota' => $quota->etat($boutique)]);
+    }
+
+    /** « Ma facture » : ce qu'il reste d'imports ce mois-ci. */
+    public function quotaLectureFacture(QuotaLectureFacture $quota): JsonResponse
+    {
+        return response()->json(['data' => $quota->etat(Boutique::findOrFail(app(TenantContext::class)->boutiqueId()))]);
     }
 
     public function supprimerLogo(Images $images): JsonResponse

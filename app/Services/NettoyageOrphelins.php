@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -32,7 +33,7 @@ class NettoyageOrphelins
     public function restesDeComptes(): array
     {
         $comptes = DB::table('users')->select('id');
-        $morph = (new \App\Models\User)->getMorphClass();
+        $morph = (new User)->getMorphClass();
 
         return collect(self::PAR_COMPTE)
             ->mapWithKeys(fn (string $t) => [$t => DB::table($t)->whereNotNull('user_id')->whereNotIn('user_id', $comptes)->count()])
@@ -87,7 +88,7 @@ class NettoyageOrphelins
             return ['boutiques' => 0, 'lignes' => 0, 'sauvegarde' => ''];
         }
         $comptes = DB::table('users')->select('id');
-        $morph = (new \App\Models\User)->getMorphClass();
+        $morph = (new User)->getMorphClass();
 
         // Copie complète avant d'effacer, comme pour une suppression de compte.
         $tables = [];

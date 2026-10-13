@@ -2,6 +2,7 @@
 
 use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
+use App\Services\CommandesRestaurant;
 use App\Services\DiffusionAnnonces;
 use App\Services\NettoyageOrphelins;
 use App\Services\PaiementMobile;
@@ -27,7 +28,7 @@ Schedule::command('ecaisse:diffuser-annonces')->everyMinute()->withoutOverlappin
 
 // Restaurant : les commandes différées partent en cuisine 30 minutes avant leur heure.
 Artisan::command('ecaisse:lancer-commandes-differees', function () {
-    $n = app(\App\Services\CommandesRestaurant::class)->lancerDifferees(toutes: true);
+    $n = app(CommandesRestaurant::class)->lancerDifferees(toutes: true);
     if ($n > 0) {
         $this->info("{$n} commande(s) différée(s) partie(s) en cuisine.");
     }

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\MoyenPaiement;
 use App\Http\Controllers\Controller;
 use App\Models\CategorieProduit;
+use App\Models\CommandeRestaurant;
 use App\Models\FormuleRestaurant;
 use App\Models\IngredientRestaurant;
 use App\Models\OptionRestaurant;
@@ -126,8 +127,8 @@ class GestionRestaurantController extends Controller
         $this->commandes->boutique();
         $data = $request->validate(['table' => ['nullable', 'string', 'max:40'], 'toutes' => ['nullable', 'boolean']]);
         $noms = ($data['toutes'] ?? false)
-            ? \App\Models\CommandeRestaurant::where('type', 'sur_place')->whereNull('terminee_le')
-                ->where('statut', '!=', \App\Models\CommandeRestaurant::ANNULEE)->whereNotNull('table')->distinct()->pluck('table')->all()
+            ? CommandeRestaurant::where('type', 'sur_place')->whereNull('terminee_le')
+                ->where('statut', '!=', CommandeRestaurant::ANNULEE)->whereNotNull('table')->distinct()->pluck('table')->all()
             : array_filter([$data['table'] ?? null]);
         $bloquees = [];
         foreach ($noms as $nom) {
