@@ -96,71 +96,25 @@ class FacturesEtRodageTest extends TestCase
         $this->reglages(['facture_prefixe' => 'FAC'])->assertOk()->assertJsonPath('data.prochaine_facture', 'FAC-'.now()->format('Y').'-0458');
     }
 
-    public function test_le_rodage_numerote_en_essai_et_les_essais_se_suppriment(): void
+    public function test_plus_de_rodage_les_anciens_boutons_sont_sans_effet_et_les_ventes_reelles_ne_se_suppriment_pas(): void
     {
-        $this->api()->postJson('/api/boutique/rodage')->assertOk()->assertJsonPath('data.mode_rodage', true);
+        $this->api()->postJson('/api/boutique/rodage')->assertOk()->assertJsonPath('data.mode_rodage', false);
+        $this->api()->postJson('/api/boutique/mode-reel', ['confirmation' => 'MODE REEL'])->assertOk()->assertJsonMissingPath('message');
 
         $vente = $this->vendre();
-        $this->assertSame('ESSAI-EAT-'.now()->format('Y').'-0001', $vente['numero_facture']);
-        $this->assertTrue((bool) $vente['essai']);
-        $this->assertEquals(48, $this->riz->fresh()->stock);
-
-        $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertOk();
-        $this->assertNull(Vente::withoutGlobalScopes()->find($vente['id']));
-        $this->assertEquals(50, $this->riz->fresh()->stock, 'le stock revient');
-    }
-
-    public function test_pas_de_rodage_ni_de_suppression_avec_de_vraies_ventes(): void
-    {
-        $vente = $this->vendre();
-
+        $this->assertSame('EAT-'.now()->format('Y').'-0001', $vente['numero_facture']);
+        $this->assertFalse((bool) ($vente['essai'] ?? false));
         $this->api()->deleteJson("/api/ventes/{$vente['id']}")->assertUnprocessable();
-        $this->api()->postJson('/api/boutique/rodage')->assertUnprocessable()->assertJsonValidationErrors('rodage');
     }
 
-    public function test_le_passage_en_mode_reel_efface_tout_sauf_les_comptes_et_le_catalogue(): void
+    public function test_les_ventes_d_essai_d_avant_restent_dans_l_historique(): void
     {
-        $this->api()->postJson('/api/boutique/rodage')->assertOk();
-        $this->vendre();
-        Client::create(['nom' => 'Client essai', 'telephone' => '+22370000001']);
+        $vente = $this->vendre();
+        Vente::withoutGlobalScopes()->whereKey($vente['id'])->update(['essai' => true, 'numero_facture' => 'ESSAI-EAT-2026-0001']);
+        $this->artisan('migrate:refresh', ['--path' => 'database/migrations/2026_10_13_000400_fin_du_mode_rodage.php'])->assertSuccessful();
 
-        $this->api()->postJson('/api/boutique/mode-reel', ['confirmation' => 'non'])->assertUnprocessable();
-        $this->api()->postJson('/api/boutique/mode-reel', ['confirmation' => 'MODE REEL', 'garder_catalogue' => true])
-            ->assertOk()->assertJsonPath('data.mode_rodage', false);
-
-        $this->assertSame(0, Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
-        $this->assertSame(0, Client::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
-        $this->assertEquals(0, $this->riz->fresh()->stock, 'le catalogue reste, le stock repart de 0');
-        $this->assertNotNull(User::find($this->awa->id));
-
-        // La première vraie facture porte le numéro 1, sans « ESSAI ».
-        Produit::withoutGlobalScopes()->whereKey($this->riz->id)->update(['stock' => 10]);
-        $this->assertSame('EAT-'.now()->format('Y').'-0001', $this->vendre()['numero_facture']);
-    }
-
-    public function test_passer_en_mode_reel_en_gardant_ses_ventes(): void
-    {
-        // Beaucoup vendent pour de vrai dès le rodage : rien ne doit se perdre.
-        $this->api()->postJson('/api/boutique/rodage')->assertOk();
-        $essai = $this->vendre();
-        Client::create(['nom' => 'Vrai client', 'telephone' => '+22370000001']);
-
-        $this->api()->postJson('/api/boutique/mode-reel', ['effacer' => false])->assertOk()->assertJsonPath('data.mode_rodage', false);
-
-        $this->assertNotNull(Vente::withoutGlobalScopes()->find($essai['id']), 'la vente est gardée');
-        $this->assertSame(1, Client::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
-        $this->assertEquals(48, $this->riz->fresh()->stock, 'le stock aussi');
-        $this->assertSame('EAT-'.now()->format('Y').'-0001', $this->vendre()['numero_facture'], 'les vraies factures commencent à 1');
-    }
-
-    public function test_activer_le_mode_libre_met_fin_au_rodage_sans_rien_effacer(): void
-    {
-        $this->api()->postJson('/api/boutique/rodage')->assertOk();
-        $essai = $this->vendre();
-        $this->activerModeLibre()->assertOk();
-
-        $this->assertFalse((bool) $this->boutique->fresh()->mode_rodage);
-        $this->assertNotNull(Vente::withoutGlobalScopes()->find($essai['id']));
+        $this->assertNotNull(Vente::withoutGlobalScopes()->find($vente['id']));
+        $this->api()->getJson("/api/ventes/{$vente['id']}")->assertOk()->assertJsonPath('numero_facture', 'ESSAI-EAT-2026-0001');
     }
 
     public function test_repartir_de_zero_efface_aussi_les_commandes_du_pressing(): void
@@ -212,21 +166,15 @@ class FacturesEtRodageTest extends TestCase
         $this->assertSame(2, Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
     }
 
-    public function test_une_nouvelle_boutique_demarre_en_rodage(): void
+    public function test_une_nouvelle_boutique_demarre_en_mode_reel(): void
     {
-        config(['ecaisse.rodage_a_l_inscription' => true]);
-        $inscrire = fn (string $tel, ?string $version) => $this->withHeaders(array_filter([
-            'X-Appareil-Plateforme' => 'android', 'X-App-Version' => $version,
-        ]))->postJson('/api/inscription', [
-            'nom_boutique' => "Boutique {$tel}", 'pays' => 'ML', 'telephone' => $tel, 'password' => 'password123', 'nom_utilisateur' => 'Neuve',
+        $id = $this->withHeaders(['X-Appareil-Plateforme' => 'android', 'X-App-Version' => '4.15.5+41505'])->postJson('/api/inscription', [
+            'nom_boutique' => 'Boutique neuve', 'pays' => 'ML', 'telephone' => '76008299', 'password' => 'password123', 'nom_utilisateur' => 'Neuve',
         ])->assertCreated()->json('boutique.id');
 
-        $neuve = Boutique::withoutGlobalScopes()->find($inscrire('76008299', '4.12.0+41200'));
-        $this->assertTrue($neuve->mode_rodage);
-        $this->assertStringStartsWith('ESSAI-', $neuve->prochaine_facture);
-
-        // Une application plus ancienne ne sait pas quitter le rodage : pas de rodage.
-        $this->assertFalse(Boutique::withoutGlobalScopes()->find($inscrire('76008298', '4.11.2'))->mode_rodage);
+        $neuve = Boutique::withoutGlobalScopes()->find($id);
+        $this->assertFalse((bool) $neuve->mode_rodage);
+        $this->assertStringStartsNotWith('ESSAI-', $neuve->prochaine_facture);
     }
 
     public function test_tout_a_zero_efface_tout_sauf_les_comptes_et_la_numerotation_repart_a_1(): void

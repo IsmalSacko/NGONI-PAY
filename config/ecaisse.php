@@ -29,10 +29,4 @@ return [
 
     'notification_email' => env('ECAISSE_NOTIFICATION_EMAIL', 'ismalsacko@yahoo.fr'),
 
-    /*
-     * Une boutique nouvellement créée démarre en mode rodage : ses ventes sont
-     * des essais (ESSAI-…), effacés au passage en mode réel, qu'un bandeau
-     * rappelle dans l'application.
-     */
-    'rodage_a_l_inscription' => (bool) env('ECAISSE_RODAGE_A_L_INSCRIPTION', true),
 ];

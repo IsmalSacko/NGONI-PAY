@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Produits\Index;
 use App\Models\Boutique;
 use App\Models\Produit;
 use App\Services\BoutiqueRegistrationService;
@@ -11,6 +12,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -61,21 +63,21 @@ class ImagesTest extends TestCase
         app(TenantContext::class)->setBoutique($boutique->id);
         app(PermissionRegistrar::class)->setPermissionsTeamId($boutique->id);
 
-        \Livewire\Livewire::test(\App\Livewire\Produits\Index::class)
+        Livewire::test(Index::class)
             ->call('nouveauProduit')
             ->set('nom', 'Savon')->set('prix_vente', '500')->set('taux_tva', '0')->set('stock', '5')->set('seuil_alerte', '1')
             ->set('photo', UploadedFile::fake()->image('savon.jpg'))
             ->call('enregistrer')->assertHasNoErrors();
         $this->assertNotNull(Produit::where('nom', 'Savon')->value('photo'));
 
-        \Livewire\Livewire::test(\App\Livewire\Produits\Index::class)
+        Livewire::test(Index::class)
             ->call('nouveauProduit')
             ->set('nom', 'Mauvais')->set('prix_vente', '500')->set('taux_tva', '0')->set('stock', '5')->set('seuil_alerte', '1')
             ->set('photo', UploadedFile::fake()->create('doc.pdf', 10, 'application/pdf'))
             ->call('enregistrer')->assertHasErrors('photo');
         $this->assertNull(Produit::where('nom', 'Mauvais')->first());
 
-        \Livewire\Livewire::test(\App\Livewire\Boutiques\Index::class)
+        Livewire::test(\App\Livewire\Boutiques\Index::class)
             ->set('logo', UploadedFile::fake()->image('logo.png'))->call('envoyerLogo')->assertHasNoErrors();
         $this->assertNotNull($boutique->fresh()->logo);
     }

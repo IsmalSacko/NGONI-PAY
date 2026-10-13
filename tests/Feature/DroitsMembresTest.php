@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Dashboard;
 use App\Livewire\Stocks\Index as StocksIndex;
+use App\Livewire\Ventes\Index;
 use App\Models\Boutique;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
@@ -159,7 +160,7 @@ class DroitsMembresTest extends TestCase
             app(TenantContext::class)->forget();
             app(PermissionRegistrar::class)->setPermissionsTeamId(null);
             session([BoutiqueActive::CLE_SESSION => $this->boutique->id]);
-            $this->assertCount($nombre, Livewire::actingAs($membre)->test(\App\Livewire\Ventes\Index::class)->viewData('ventes')->items());
+            $this->assertCount($nombre, Livewire::actingAs($membre)->test(Index::class)->viewData('ventes')->items());
         }
     }
 

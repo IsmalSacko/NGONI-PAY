@@ -10,9 +10,11 @@ use App\Models\DemandeAbonnement;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\PaiementJeko;
+use App\Services\PawapayPays;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
@@ -46,7 +48,7 @@ class PaiementPawapayTest extends TestCase
             'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Awa',
         ]);
 
-        \Illuminate\Support\Facades\Cache::forget('pawapay-pays-actifs');
+        Cache::forget('pawapay-pays-actifs');
         Http::preventStrayRequests();
         Http::fake([
             'api.sandbox.pawapay.io/v2/paymentpage' => Http::response(['redirectUrl' => 'https://paywith.pawapay.io/?token=abc']),
@@ -68,7 +70,7 @@ class PaiementPawapayTest extends TestCase
 
     public function test_tous_les_pays_du_franc_cfa_actifs_chez_pawapay_sont_servis(): void
     {
-        $pays = app(\App\Services\PawapayPays::class)->actifs();
+        $pays = app(PawapayPays::class)->actifs();
 
         $this->assertSame(['SN', 'BJ', 'CM'], array_keys($pays), 'ni la Côte d\'Ivoire (Jèko) ni le Kenya (devise locale)');
         $this->assertSame(['orange_sen' => 'Orange Money', 'free_sen' => 'Free Money'], $pays['SN']['moyens']);
@@ -85,7 +87,7 @@ class PaiementPawapayTest extends TestCase
             'amount' => ($demande->montant + $demande->frais_mobile).'.00', 'currency' => 'XAF',
         ]];
         $this->postJson('/api/webhooks/pawapay', ['depositId' => $demande->pawapay_deposit_id])->assertOk();
-        $this->assertSame(\App\Enums\StatutDemande::Approuvee, $demande->fresh()->statut);
+        $this->assertSame(StatutDemande::Approuvee, $demande->fresh()->statut);
     }
 
     private function api()

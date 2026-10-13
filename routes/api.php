@@ -155,8 +155,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     // Remise à zéro des essais : le propriétaire seul (vérifié par le service).
     Route::get('boutique/reinitialisation', [BoutiqueController::class, 'apercuReinitialisation']);
     Route::post('boutique/reinitialiser', [BoutiqueController::class, 'reinitialiser'])->middleware('abonnement');
-    Route::post('boutique/rodage', [BoutiqueController::class, 'activerRodage']);
-    Route::post('boutique/mode-reel', [BoutiqueController::class, 'passerEnModeReel']);
+    // Mode rodage supprimé : sans effet pour les applications d'avant.
+    Route::post('boutique/rodage', [BoutiqueController::class, 'rodageSupprime']);
+    Route::post('boutique/mode-reel', [BoutiqueController::class, 'rodageSupprime']);
     Route::get('boutique/mode-libre', [BoutiqueController::class, 'modeLibre']);
     Route::post('boutique/mode-libre', [BoutiqueController::class, 'reglerModeLibre']);
     Route::get('boutique/journal-suppressions', [BoutiqueController::class, 'journalSuppressions'])->middleware('permission:boutique.update');

@@ -440,16 +440,14 @@ class VenteService
 
     /**
      * Supprimer une vente pour de bon (le stock revient d'abord, si elle
-     * n'était pas déjà annulée) : une vente d'essai en mode rodage, ou toute
-     * vente en mode libre. Chaque suppression reste au journal.
+     * n'était pas déjà annulée), en mode libre. Chaque suppression reste au journal.
      */
     public function supprimer(Vente $vente, User $auteur): void
     {
         DB::transaction(function () use ($vente, $auteur): void {
             $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
             $boutique = Boutique::find($vente->boutique_id);
-            $essai = $vente->essai && (bool) $boutique?->mode_rodage;
-            if (! $essai && ! ModeLibre::actif($boutique)) {
+            if (! ModeLibre::actif($boutique)) {
                 throw ValidationException::withMessages(['vente' => [
                     'Une vente réelle s’annule. Pour supprimer vos ventes, activez le mode libre (Ma boutique), sous votre responsabilité.',
                 ]]);
@@ -458,7 +456,7 @@ class VenteService
             // pressing) suit sa commande : elle s'efface au passage en mode réel.
             if ($vente->commande_restaurant_id !== null || DB::table('commandes_pressing')->where('vente_id', $vente->id)->exists()) {
                 throw ValidationException::withMessages(['vente' => [
-                    'Cette vente vient d’une commande : elle s’efface avec les autres essais au passage en mode réel.',
+                    'Cette vente vient d’une commande : annulez-la, ou effacez-la avec « Réinitialiser » (Ma boutique).',
                 ]]);
             }
             if (! $vente->estAnnulee()) {
@@ -471,8 +469,7 @@ class VenteService
     }
 
     /**
-     * Le commerçant choisit le numéro d'une facture (mode libre, ou vente
-     * d'essai en rodage). Unique dans la boutique ; l'ancien numéro est gardé
+     * Le commerçant choisit le numéro d'une facture (mode libre). Unique dans la boutique ; l'ancien numéro est gardé
      * au journal.
      */
     public function changerNumeroFacture(Vente $vente, string $numero, User $auteur): Vente
@@ -482,7 +479,7 @@ class VenteService
         return DB::transaction(function () use ($vente, $numero, $auteur): Vente {
             $vente = Vente::whereKey($vente->id)->lockForUpdate()->firstOrFail();
             $boutique = Boutique::find($vente->boutique_id);
-            if (! ($vente->essai && (bool) $boutique?->mode_rodage) && ! ModeLibre::actif($boutique)) {
+            if (! ModeLibre::actif($boutique)) {
                 throw ValidationException::withMessages(['numero_facture' => [
                     'Pour choisir le numéro de vos factures, activez le mode libre (Ma boutique), sous votre responsabilité.',
                 ]]);

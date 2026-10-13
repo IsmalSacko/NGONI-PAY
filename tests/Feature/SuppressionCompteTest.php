@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Plateforme\Utilisateurs;
 use App\Models\Boutique;
 use App\Models\Produit;
 use App\Models\User;
@@ -11,15 +12,16 @@ use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\ConditionsUtilisation;
 use App\Services\SuppressionCompte;
-use Illuminate\Http\Request;
 use App\Services\VenteService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -202,7 +204,7 @@ class SuppressionCompteTest extends TestCase
 
     public function test_depuis_la_console_web_apercu_puis_confirmation(): void
     {
-        \Livewire\Livewire::actingAs($this->exploitant)->test(\App\Livewire\Plateforme\Utilisateurs::class)
+        Livewire::actingAs($this->exploitant)->test(Utilisateurs::class)
             ->call('preparerSuppression', $this->awa->id)
             ->assertSee('Pressing Awa')->assertSee('Fanta')
             ->set('confirmation', 'supprimer')->call('supprimer')->assertHasErrors('confirmation')

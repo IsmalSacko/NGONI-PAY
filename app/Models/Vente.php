@@ -37,10 +37,6 @@ class Vente extends Model
             // Numéro de facture figé à la création : renommer la boutique
             // ensuite ne change plus celui des factures déjà remises.
             $vente->attributes['numero_facture'] ??= self::prochainNumeroFacture($vente);
-            // Mode rodage : une vente d'essai, numérotée ESSAI-…, supprimable.
-            if ($vente->boutique_id !== null && ! isset($vente->attributes['essai'])) {
-                $vente->attributes['essai'] = (bool) Boutique::withoutGlobalScopes()->whereKey($vente->boutique_id)->value('mode_rodage');
-            }
         });
 
         // Le compteur de la boutique ne recule jamais (voir dernier_numero_vente) :

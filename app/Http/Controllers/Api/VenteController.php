@@ -207,7 +207,7 @@ class VenteController extends Controller
         return response()->json(['message' => "La facture porte maintenant le numéro {$vente->numeroFormate()}.", 'data' => ['numero_facture' => $vente->numeroFormate()]]);
     }
 
-    /** Vente d'essai (rodage), ou toute vente en mode libre : supprimée, et tracée au journal. */
+    /** En mode libre, une vente supprimée, et tracée au journal. */
     public function supprimer(Request $request, Vente $vente): JsonResponse
     {
         $this->ventes->supprimer($vente, $request->user());

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Abonnement;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
@@ -56,8 +57,8 @@ class NettoyageOrphelinsTest extends TestCase
         // Un compte effacé à la main a laissé son abonnement Pro (la ligne vide de la console).
         $disparu = (string) Str::uuid();
         DB::table('abonnements')->insert(['user_id' => $disparu, 'plan' => 'pro', 'est_actif' => true, 'est_manuel' => true, 'debut' => now(), 'fin' => now()->addMonth(), 'created_at' => now(), 'updated_at' => now()]);
-        $this->assertSame(1, \App\Models\Abonnement::whereDoesntHave('proprietaire')->count());
-        $this->assertSame(2, \App\Models\Abonnement::avecCompte()->count(), 'la console ne le montre plus');
+        $this->assertSame(1, Abonnement::whereDoesntHave('proprietaire')->count());
+        $this->assertSame(2, Abonnement::avecCompte()->count(), 'la console ne le montre plus');
 
         $nettoyage = app(NettoyageOrphelins::class);
         $this->assertSame(['abonnements' => 1], $nettoyage->restesDeComptes());

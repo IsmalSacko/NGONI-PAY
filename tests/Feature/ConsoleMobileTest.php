@@ -10,6 +10,7 @@ use App\Models\NotificationApp;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\GestionAnnonces;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -76,7 +77,7 @@ class ConsoleMobileTest extends TestCase
             ->assertJsonPath('data.0.id', $fassely->id);
         $this->console()->getJson('/api/plateforme/utilisateurs?recherche=Sacko multi Services')->assertOk()
             ->assertJsonFragment(['id' => $fassely->id]);
-        $this->assertSame([$fassely->id], app(\App\Services\GestionAnnonces::class)->rechercherComptes('MULTI serv')->pluck('id')->all());
+        $this->assertSame([$fassely->id], app(GestionAnnonces::class)->rechercherComptes('MULTI serv')->pluck('id')->all());
     }
 
     public function test_l_exploitant_est_prevenu_des_inscriptions_et_des_demandes(): void

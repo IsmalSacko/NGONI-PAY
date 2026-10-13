@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Support\Apres;
 use App\Support\Authorization\Permissions;
 use App\Support\Phone\PhoneNumber;
-use App\Support\Presence\Appareil;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
@@ -78,8 +77,6 @@ class BoutiqueRegistrationService
                 'devise' => $pays->currency(),
                 'telephone' => PhoneNumber::normalize($data['telephone'], $pays),
                 'email' => $data['email'] ?? null,
-                // Nouvelle boutique : en rodage, ses essais s'effacent au passage en mode réel.
-                'mode_rodage' => $this->rodageALInscription(),
             ]);
 
             // Le contexte tenant doit être posé avant toute écriture qui en
@@ -229,7 +226,6 @@ class BoutiqueRegistrationService
                         : $proprietaire->phone,
                     'email' => $data['email'] ?? $proprietaire->email,
                     'adresse' => $data['adresse'] ?? null,
-                    'mode_rodage' => $this->rodageALInscription(),
                 ]);
 
                 $this->tenant->setBoutique($boutique->id);
@@ -287,22 +283,6 @@ class BoutiqueRegistrationService
             DB::table(config('permission.table_names.role_has_permissions'))->insert($lignes);
             app(PermissionRegistrar::class)->forgetCachedPermissions();
         }
-    }
-
-    /** Première version de l'application qui montre le rodage et sait le quitter. */
-    public const VERSION_RODAGE = '4.12.0';
-
-    /**
-     * Nouvelle boutique en rodage (réglable) — seulement depuis une application
-     * qui le connaît : une plus ancienne numéroterait ESSAI-… sans bandeau ni
-     * bouton « Passer en mode réel ».
-     */
-    private function rodageALInscription(): bool
-    {
-        $version = Appareil::depuisRequete(request())->version;
-
-        return (bool) config('ecaisse.rodage_a_l_inscription')
-            && $version !== null && version_compare(explode('+', $version)[0], self::VERSION_RODAGE, '>=');
     }
 
     /**

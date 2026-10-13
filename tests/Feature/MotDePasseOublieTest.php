@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Auth\MotDePasseOublie;
 use App\Mail\CodeReinitialisationMail;
 use App\Models\PasswordResetCode;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Services\BoutiqueRegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class MotDePasseOublieTest extends TestCase
@@ -126,7 +128,7 @@ class MotDePasseOublieTest extends TestCase
         $this->assertEquals($inconnu, $sansEmail);
         $this->assertSame('+33605758494', $inconnu['support_whatsapp']);
         // Aucun code envoyé (l'inscription ci-dessus prévient seulement l'exploitant).
-        Mail::assertNotSent(\App\Mail\CodeReinitialisationMail::class);
+        Mail::assertNotSent(CodeReinitialisationMail::class);
     }
 
     public function test_les_demandes_en_rafale_sont_limitees(): void
@@ -140,18 +142,18 @@ class MotDePasseOublieTest extends TestCase
 
     public function test_le_site_propose_le_code_par_email_et_whatsapp(): void
     {
-        \Illuminate\Support\Facades\Mail::fake();
-        $user = \App\Models\User::factory()->create(['phone' => '+22376123456', 'email' => 'web@example.com']);
+        Mail::fake();
+        $user = User::factory()->create(['phone' => '+22376123456', 'email' => 'web@example.com']);
 
         $this->get('/connexion')->assertSee('Mot de passe oublié ?');
         $this->get('/mot-de-passe-oublie')->assertOk()->assertSee('WhatsApp');
 
         $code = null;
-        $composant = \Livewire\Livewire::test(\App\Livewire\Auth\MotDePasseOublie::class)
+        $composant = Livewire::test(MotDePasseOublie::class)
             ->set('pays', 'ML')->set('telephone', '76 12 34 56')
             ->call('demander')->assertSet('etape', 'code');
 
-        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\CodeReinitialisationMail::class, function ($mail) use (&$code) {
+        Mail::assertSent(CodeReinitialisationMail::class, function ($mail) use (&$code) {
             $code = $mail->code;
 
             return $mail->hasTo('web@example.com');
@@ -161,6 +163,6 @@ class MotDePasseOublieTest extends TestCase
             ->call('reinitialiser')->assertHasErrors('code')
             ->set('code', $code)->call('reinitialiser')->assertHasNoErrors()->assertSet('etape', 'termine');
 
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('nouveau123', $user->fresh()->password));
+        $this->assertTrue(Hash::check('nouveau123', $user->fresh()->password));
     }
 }

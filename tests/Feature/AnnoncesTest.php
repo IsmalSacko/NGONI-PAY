@@ -6,6 +6,8 @@ namespace Tests\Feature;
 
 use App\Livewire\Plateforme\Annonces;
 use App\Models\Annonce;
+use App\Models\Boutique;
+use App\Models\NotificationApp;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\DiffusionAnnonces;
@@ -67,22 +69,22 @@ class AnnoncesTest extends TestCase
         $this->withToken($jeton)->getJson('/api/notifications')->assertJsonPath('non_lues', 0);
 
         // Balayée : supprimée, et seulement la sienne.
-        $autre = \App\Models\NotificationApp::where('user_id', '!=', $this->moussa->id)->value('id');
+        $autre = NotificationApp::where('user_id', '!=', $this->moussa->id)->value('id');
         $this->withToken($jeton)->deleteJson("/api/notifications/{$autre}")->assertOk();
-        $this->assertNotNull(\App\Models\NotificationApp::find($autre), 'celle d’un autre compte reste');
+        $this->assertNotNull(NotificationApp::find($autre), 'celle d’un autre compte reste');
         $this->withToken($jeton)->deleteJson("/api/notifications/{$id}")->assertOk();
-        $this->assertNull(\App\Models\NotificationApp::find($id));
+        $this->assertNull(NotificationApp::find($id));
     }
 
     public function test_l_exploitant_qui_tient_une_boutique_recoit_les_annonces(): void
     {
         // Sans boutique : écarté (il n'utilise que la console).
-        $sansBoutique = app(\App\Services\DiffusionAnnonces::class)->destinataires(new \App\Models\Annonce(['audience' => 'tous']))->pluck('id');
+        $sansBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous']))->pluck('id');
         $this->assertNotContains($this->exploitant->id, $sansBoutique);
 
         // Avec une boutique : commerçant comme les autres.
-        $this->exploitant->forceFill(['boutique_id' => \App\Models\Boutique::value('id')])->save();
-        $avecBoutique = app(\App\Services\DiffusionAnnonces::class)->destinataires(new \App\Models\Annonce(['audience' => 'tous']))->pluck('id');
+        $this->exploitant->forceFill(['boutique_id' => Boutique::value('id')])->save();
+        $avecBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous']))->pluck('id');
         $this->assertContains($this->exploitant->id, $avecBoutique);
     }
 

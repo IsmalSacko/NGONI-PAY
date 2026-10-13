@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Mail\FraudeEssaiMail;
 use App\Models\Abonnement;
+use App\Models\NotificationApp;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /**
@@ -88,18 +91,18 @@ class EssaiParAppareilTest extends TestCase
     {
         $exploitant = User::factory()->create(['est_admin_plateforme' => true, 'is_active' => true]);
 
-        \Illuminate\Support\Facades\Mail::fake();
+        Mail::fake();
         $this->inscrire('76000041', self::TELEPHONE_A);
-        $this->assertSame(0, \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->count(), 'un premier compte est normal');
+        $this->assertSame(0, NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->count(), 'un premier compte est normal');
 
         $this->inscrire('76000042', self::TELEPHONE_A);
-        $alerte = \App\Models\NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->sole();
+        $alerte = NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->sole();
         $this->assertStringContainsString('+22376000042', $alerte->message);
         $this->assertStringContainsString('+22376000041', $alerte->message, 'le compte déjà vu sur ce téléphone');
         $this->assertSame('/console/comptes', $alerte->lien);
 
         // Et un e-mail, avec le téléphone, la personne et l'avertissement prêt à envoyer sur WhatsApp.
-        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\FraudeEssaiMail::class, function (\App\Mail\FraudeEssaiMail $mail) {
+        Mail::assertSent(FraudeEssaiMail::class, function (FraudeEssaiMail $mail) {
             $html = $mail->render();
 
             return $mail->hasTo(config('ecaisse.notification_email'))

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Plateforme\Tutoriels;
+use App\Models\NotificationApp;
 use App\Models\Tutoriel;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /** Aide et tutoriels : gérés depuis la console, listés dans l'application. */
@@ -86,16 +89,16 @@ class TutorielsTest extends TestCase
         $admin = User::where('est_admin_plateforme', true)->firstOrFail();
         $this->actingAs($admin)->get('/plateforme/tutoriels')->assertOk()->assertSee('Tutoriels');
 
-        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)
+        Livewire::actingAs($admin)->test(Tutoriels::class)
             ->call('nouveau')
             ->set('url', 'https://vimeo.com/1')->set('titre', 'Vente')->call('enregistrer')->assertHasErrors('url')
             ->set('url', 'https://youtu.be/dQw4w9WgXcQ')->call('enregistrer')->assertHasNoErrors()
             ->assertSee('Vente');
 
         $t = Tutoriel::sole();
-        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)->call('basculer', $t->id);
+        Livewire::actingAs($admin)->test(Tutoriels::class)->call('basculer', $t->id);
         $this->assertFalse($t->fresh()->actif);
-        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Plateforme\Tutoriels::class)->call('supprimer', $t->id);
+        Livewire::actingAs($admin)->test(Tutoriels::class)->call('supprimer', $t->id);
         $this->assertSame(0, Tutoriel::count());
     }
 
@@ -110,7 +113,7 @@ class TutorielsTest extends TestCase
         $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
             'titre' => 'Enregistrer une vente', 'categorie' => 'ventes', 'url' => 'https://youtu.be/dQw4w9WgXcQ',
         ])->assertCreated()->assertJsonPath('message', fn ($m) => str_contains($m, 'prévenus'));
-        $generale = \App\Models\NotificationApp::where('titre', '🎬 Nouvelle vidéo : Enregistrer une vente')->get();
+        $generale = NotificationApp::where('titre', '🎬 Nouvelle vidéo : Enregistrer une vente')->get();
         $this->assertCount(3, $generale);
         $this->assertSame('https://youtu.be/dQw4w9WgXcQ', $generale->first()->lien);
 
@@ -118,12 +121,12 @@ class TutorielsTest extends TestCase
         $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
             'titre' => 'Gérer les tables', 'categorie' => 'restaurant', 'url' => 'https://youtu.be/abcdefghijk',
         ])->assertCreated();
-        $this->assertSame([$restaurant['user']->id], \App\Models\NotificationApp::where('titre', '🎬 Nouvelle vidéo : Gérer les tables')->pluck('user_id')->all());
+        $this->assertSame([$restaurant['user']->id], NotificationApp::where('titre', '🎬 Nouvelle vidéo : Gérer les tables')->pluck('user_id')->all());
 
         // Case décochée : rien n'est envoyé.
         $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
             'titre' => 'Correction', 'categorie' => 'ventes', 'url' => 'https://youtu.be/abcdefghijk', 'prevenir' => false,
         ])->assertCreated();
-        $this->assertSame(0, \App\Models\NotificationApp::where('titre', 'like', '%Correction%')->count());
+        $this->assertSame(0, NotificationApp::where('titre', 'like', '%Correction%')->count());
     }
 }

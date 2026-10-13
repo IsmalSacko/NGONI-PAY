@@ -24,7 +24,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -250,66 +249,14 @@ class BoutiqueController extends Controller
         return response()->json($reinitialisation->apercuBoutique($boutique));
     }
 
-    /** Efface les données d'essai de la boutique : il faut taper REINITIALISER. */
     /**
-     * Mode rodage, activé par le propriétaire tant que la boutique n'a pas de
-     * vraie vente : ses ventes sont des essais (ESSAI-…), supprimables. On en
-     * sort par le passage en mode réel, qui efface tout.
+     * Le mode rodage n'existe plus : la réinitialisation (Ma boutique) remet
+     * une boutique à zéro. Une application d'avant qui le propose encore n'y
+     * change rien : la boutique reste en mode réel, sans message.
      */
-    public function activerRodage(Request $request): JsonResponse
+    public function rodageSupprime(): JsonResponse
     {
-        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
-        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut passer en mode rodage.');
-        if (Vente::where('essai', false)->exists()) {
-            throw ValidationException::withMessages(['rodage' => [
-                'Votre boutique a déjà de vraies ventes : elles ne peuvent pas devenir des essais. Pour repartir de zéro, utilisez « Repartir de zéro ».',
-            ]]);
-        }
-        $boutique->forceFill(['mode_rodage' => true])->save();
-
-        return response()->json(['data' => $boutique->fresh()]);
-    }
-
-    /**
-     * Fin du rodage : la boutique vend pour de vrai, les prochaines factures
-     * sont numérotées normalement. Rien n'est effacé : beaucoup vendent pour
-     * de vrai dès le rodage. Effacer ses essais (sauf les comptes, et le
-     * catalogue, les fournisseurs s'il le veut) est une option, à cocher.
-     * Une application d'avant le choix (sans « effacer ») efface, comme son
-     * écran l'annonce.
-     */
-    public function passerEnModeReel(Request $request, ReinitialisationBoutique $reinitialisation): JsonResponse
-    {
-        $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
-        abort_unless(ReinitialisationBoutique::autorise($request->user(), $boutique), 403, 'Seul le propriétaire de la boutique peut passer en mode réel.');
-        $effacer = $request->has('effacer') ? $request->boolean('effacer') : true;
-        $request->validate([
-            'effacer' => ['boolean'],
-            'confirmation' => [$effacer ? 'required' : 'nullable', 'in:MODE REEL'],
-            'garder_catalogue' => ['boolean'],
-            'garder_fournisseurs' => ['boolean'],
-        ], ['confirmation.in' => 'Tapez MODE REEL pour confirmer.', 'confirmation.required' => 'Tapez MODE REEL pour confirmer.']);
-        if (! $boutique->mode_rodage) {
-            throw ValidationException::withMessages(['rodage' => ['Votre boutique est déjà en mode réel.']]);
-        }
-
-        if (! $effacer) {
-            $boutique->forceFill(['mode_rodage' => false])->save();
-
-            return response()->json([
-                'message' => "{$boutique->nom} est en mode réel : vos ventes sont gardées, la prochaine facture sera {$boutique->fresh()->prochaine_facture}.",
-                'data' => $boutique->fresh(),
-            ]);
-        }
-
-        $reinitialisation->reinitialiser($boutique->id, $request->user(), $request->boolean('garder_catalogue', true), $request->boolean('garder_fournisseurs', true), numerosAZero: true);
-        $compteurs = array_filter($boutique->fresh()->compteurs_facture ?? [], fn ($serie) => ! str_starts_with((string) $serie, 'ESSAI|'), ARRAY_FILTER_USE_KEY);
-        $boutique->forceFill(['mode_rodage' => false, 'compteurs_facture' => $compteurs])->save();
-
-        return response()->json([
-            'message' => "{$boutique->nom} est en mode réel : vos essais sont effacés, la prochaine facture sera {$boutique->fresh()->prochaine_facture}.",
-            'data' => $boutique->fresh(),
-        ]);
+        return response()->json(['data' => Boutique::findOrFail(app(TenantContext::class)->boutiqueId())]);
     }
 
     /** Mode libre : le texte à accepter, et l'état de la boutique. */

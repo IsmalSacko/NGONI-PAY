@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Boutique;
+use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
@@ -90,7 +91,7 @@ class FonctionsDuPlanTest extends TestCase
         $this->actingAs($this->awa)->get('/tableau-de-bord')->assertOk();
 
         // L'exploitant les décoche dans la console.
-        \App\Models\Plan::where('code', 'basic')->update(['fonctionnalites' => json_encode([])]);
+        Plan::where('code', 'basic')->update(['fonctionnalites' => json_encode([])]);
         $credit()->assertForbidden()->assertJsonPath('message', 'La vente à crédit n’est pas incluse dans votre offre.');
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->awa)->get('/tableau-de-bord')->assertRedirect(route('connexion'));
