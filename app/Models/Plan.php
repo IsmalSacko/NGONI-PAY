@@ -98,6 +98,9 @@ class Plan extends Model
         'Caisse, tickets et reçus PDF',
         'Catalogue, stocks et clients',
         'Ventes hors ligne',
+        'Codes articles, vente à la bouteille et au casier',
+        'Facture distributeur : NIU, PSA, frais d’enlèvement',
+        'Import de votre facture (2 par mois en Basic, 5 en Pro)',
     ];
 
     protected $fillable = [
