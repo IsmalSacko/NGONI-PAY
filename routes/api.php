@@ -123,6 +123,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('moi', [ProfilController::class, 'update']);
     Route::put('moi/preferences', [ProfilController::class, 'preferences']);
     Route::put('moi/mot-de-passe', [ProfilController::class, 'motDePasse'])->middleware('throttle:10,1');
+    // Suppression du compte par son titulaire (exigée par l'App Store).
+    Route::get('moi/suppression', [ProfilController::class, 'apercuSuppression']);
+    Route::post('moi/supprimer', [ProfilController::class, 'supprimer'])->middleware('throttle:5,1');
 
     Route::post('appareils', [AppareilController::class, 'store']);
     Route::get('notifications', [NotificationController::class, 'index']);

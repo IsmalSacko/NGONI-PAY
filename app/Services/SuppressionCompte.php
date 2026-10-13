@@ -8,6 +8,7 @@ use App\Models\Boutique;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -68,9 +69,11 @@ class SuppressionCompte
     /**
      * @return array{boutiques: int, comptes: int, sauvegarde: string}
      */
-    public function supprimer(User $compte, User $exploitant): array
+    public function supprimer(User $compte, User $exploitant, bool $parLuiMeme = false): array
     {
-        if ($compte->id === $exploitant->id || $compte->est_admin_plateforme) {
+        // Le titulaire supprime lui-même son compte depuis l'application (règle
+        // 5.1.1 de l'App Store) ; l'exploitant, lui, ne se supprime pas ici.
+        if (($compte->id === $exploitant->id && ! $parLuiMeme) || $compte->est_admin_plateforme) {
             throw ValidationException::withMessages(['compte' => ['Compte protégé : un administrateur de la plateforme ne peut pas être supprimé ici.']]);
         }
 
@@ -117,7 +120,7 @@ class SuppressionCompte
         // Photos, logos et preuves de paiement, une fois la base à jour.
         Storage::disk('local')->delete($fichiers);
 
-        Log::warning('Compte supprimé par l’exploitant', [
+        Log::warning($parLuiMeme ? 'Compte supprimé par son titulaire' : 'Compte supprimé par l’exploitant', [
             'compte' => $compte->id, 'nom' => $compte->name, 'telephone' => $compte->phone,
             'boutiques' => $plan['boutiques'], 'comptes' => $plan['supprimes'], 'par' => $exploitant->id, 'sauvegarde' => $sauvegarde,
         ]);
@@ -202,7 +205,7 @@ class SuppressionCompte
             $donnees['tables'][$table] = $lignes(DB::table($table)->whereIn('user_id', $plan['supprimes']));
         }
         foreach (['lignes_vente' => 'vente_id', 'lignes_achat' => 'achat_id'] as $table => $cle) {
-            if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+            if (Schema::hasTable($table)) {
                 $parent = $cle === 'vente_id' ? 'ventes' : 'achats';
                 $donnees['tables'][$table] = $lignes(DB::table($table)->whereIn($cle, DB::table($parent)->whereIn('boutique_id', $plan['boutiques'])->select('id')));
             }

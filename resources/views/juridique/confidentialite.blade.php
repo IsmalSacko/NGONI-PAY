@@ -60,7 +60,7 @@
 <p>Vous pouvez aussi saisir l’autorité de protection des données : en France, la <a href="https://www.cnil.fr" rel="noopener">CNIL</a> ; ou celle de votre pays (au Mali, l’APDP).</p>
 
 <h2 id="suppression-compte">8. Supprimer votre compte Ngoni Caisse</h2>
-<p>Pour supprimer votre compte et ses données, envoyez-nous une demande depuis le numéro de téléphone de votre compte @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener">par WhatsApp</a>@endif ou par e-mail à <a href="mailto:contact@ismael-dev.com">contact@ismael-dev.com</a>, en indiquant ce numéro.</p>
+<p>Pour supprimer votre compte et ses données : dans l’application, ouvrez Mon compte puis « Supprimer mon compte » (mot de passe demandé). Vous pouvez aussi nous le demander depuis le numéro de téléphone de votre compte @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener">par WhatsApp</a>@endif ou par e-mail à <a href="mailto:contact@ismael-dev.com">contact@ismael-dev.com</a>, en indiquant ce numéro.</p>
 <p>Nous supprimons alors, sous 30 jours : votre compte, vos boutiques et leurs données (articles, ventes, clients, stocks, équipe), vos notifications et vos appareils enregistrés. Une sauvegarde technique de la suppression est conservée par l’Éditeur, pour pouvoir corriger une erreur ; elle n’est accessible qu’à lui. La preuve d’acceptation des conditions est gardée comme indiqué à l’article 5.</p>
 <p>La suppression est définitive : exportez ce que vous souhaitez garder avant de la demander.</p>
 
