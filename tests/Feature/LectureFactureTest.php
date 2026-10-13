@@ -71,16 +71,21 @@ class LectureFactureTest extends TestCase
         $this->envoyer()->assertStatus(429)->assertJsonPath('code', 'QUOTA_LECTURE_FACTURE')
             ->assertJsonPath('message', fn (string $m) => str_starts_with($m, 'Vous avez déjà importé votre facture ce mois-ci.'));
 
-        // Pro : deux par mois.
-        Abonnement::where('user_id', $this->admin->id)->update(['plan' => 'pro', 'fin' => now()->addYear()->toDateString()]);
+        // Basic : deux par mois.
+        Abonnement::where('user_id', $this->admin->id)->update(['plan' => 'basic', 'fin' => now()->addYear()->toDateString()]);
         $this->withToken($this->admin->createToken('t')->plainTextToken)->getJson('/api/boutique/lecture-facture')
             ->assertJsonPath('data.par_mois', 2)->assertJsonPath('data.restantes', 1);
         $this->envoyer()->assertOk();
         $this->envoyer()->assertStatus(429);
 
+        // Pro : cinq par mois.
+        Abonnement::where('user_id', $this->admin->id)->update(['plan' => 'pro']);
+        $this->withToken($this->admin->createToken('t')->plainTextToken)->getJson('/api/boutique/lecture-facture')
+            ->assertJsonPath('data.par_mois', 5)->assertJsonPath('data.restantes', 3);
+
         // Le mois suivant, le compteur repart.
         $this->travel(1)->months();
-        $this->envoyer()->assertOk()->assertJsonPath('quota.restantes', 1);
+        $this->envoyer()->assertOk()->assertJsonPath('quota.restantes', 4);
 
         // Offre terminée : plus d'import.
         Abonnement::where('user_id', $this->admin->id)->update(['fin' => now()->subDay()->toDateString()]);

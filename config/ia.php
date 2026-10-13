@@ -8,6 +8,6 @@ return [
     'lectures_facture_par_mois' => [
         'essai' => (int) env('IA_LECTURES_ESSAI', 1),
         'basic' => (int) env('IA_LECTURES_BASIC', 2),
-        'pro' => (int) env('IA_LECTURES_PRO', 2),
+        'pro' => (int) env('IA_LECTURES_PRO', 5),
     ],
 ];

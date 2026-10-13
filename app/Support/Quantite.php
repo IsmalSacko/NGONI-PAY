@@ -33,6 +33,8 @@ final class Quantite
         'boite' => 'boîte',
         'sachet' => 'sachet',
         'bouteille' => 'bouteille',
+        'casier' => 'casier',
+        'pack' => 'pack',
         'paquet' => 'paquet',
         'plaquette' => 'plaquette',
         // Unités de marché courantes.
@@ -70,6 +72,8 @@ final class Quantite
         'boite' => 'Boîte',
         'sachet' => 'Sachet',
         'bouteille' => 'Bouteille',
+        'casier' => 'Casier',
+        'pack' => 'Pack',
         'paquet' => 'Paquet',
         'plaquette' => 'Plaquette',
         'tas' => 'Tas',
