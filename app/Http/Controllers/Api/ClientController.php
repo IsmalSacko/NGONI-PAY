@@ -77,6 +77,10 @@ class ClientController extends Controller
             // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
             'revendeur' => ['nullable', 'boolean'],
             'plafond_credit' => ['nullable', 'integer', 'min:0'],
+            // Facture « distributeur » : code client, NIU, adresse.
+            'code_client' => ['nullable', 'string', 'max:30'],
+            'niu' => ['nullable', 'string', 'max:40'],
+            'adresse' => ['nullable', 'string', 'max:255'],
         ]);
 
         return response()->json(Client::create($data), 201);
@@ -92,6 +96,10 @@ class ClientController extends Controller
             // Revendeur : ses achats passent d'eux-mêmes au prix de gros.
             'revendeur' => ['nullable', 'boolean'],
             'plafond_credit' => ['nullable', 'integer', 'min:0'],
+            // Facture « distributeur » : code client, NIU, adresse.
+            'code_client' => ['nullable', 'string', 'max:30'],
+            'niu' => ['nullable', 'string', 'max:40'],
+            'adresse' => ['nullable', 'string', 'max:255'],
         ]);
 
         $client->update($data);

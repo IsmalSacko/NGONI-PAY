@@ -39,6 +39,10 @@ class ReglagesBoutique
             'identifiant_fiscal' => ['nullable', 'string', 'max:60'],
             'rccm' => ['nullable', 'string', 'max:60'],
             'message_ticket' => ['nullable', 'string', 'max:160'],
+            // Facture « distributeur » : BP, PSA (précompte sur achats), modèle.
+            'boite_postale' => ['nullable', 'string', 'max:60'],
+            'psa_taux' => ['nullable', 'numeric', 'min:0', 'max:20'],
+            'modele_facture' => ['nullable', Rule::in(['standard', 'distributeur'])],
             // Numéro de facture : PRÉFIXE-2026-0001-SUFFIXE (lettres et chiffres).
             'facture_prefixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
             'facture_suffixe' => ['nullable', 'string', 'max:10', 'regex:/^[A-Za-z0-9]+$/'],
@@ -83,6 +87,9 @@ class ReglagesBoutique
             'identifiant_fiscal' => array_key_exists('identifiant_fiscal', $donnees) ? ($data['identifiant_fiscal'] ?? null) : $boutique->identifiant_fiscal,
             'rccm' => array_key_exists('rccm', $donnees) ? ($data['rccm'] ?? null) : $boutique->rccm,
             'message_ticket' => array_key_exists('message_ticket', $donnees) ? ($data['message_ticket'] ?? null) : $boutique->message_ticket,
+            'boite_postale' => array_key_exists('boite_postale', $donnees) ? ($data['boite_postale'] ?? null) : $boutique->boite_postale,
+            'psa_taux' => array_key_exists('psa_taux', $donnees) ? ((float) ($data['psa_taux'] ?? 0) ?: null) : $boutique->psa_taux,
+            'modele_facture' => array_key_exists('modele_facture', $donnees) ? ($data['modele_facture'] ?? 'standard') : $boutique->modele_facture,
             'facture_prefixe' => array_key_exists('facture_prefixe', $donnees) ? (strtoupper((string) ($data['facture_prefixe'] ?? '')) ?: null) : $boutique->facture_prefixe,
             'facture_suffixe' => array_key_exists('facture_suffixe', $donnees) ? (strtoupper((string) ($data['facture_suffixe'] ?? '')) ?: null) : $boutique->facture_suffixe,
             'facture_annee' => array_key_exists('facture_annee', $donnees) ? (bool) ($data['facture_annee'] ?? true) : $boutique->facture_annee,

@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'tarifs', 'code', 'code_barre',
+    'categorie_produit_id', 'nom', 'format', 'dci', 'sur_ordonnance', 'unite', 'paliers', 'tarifs', 'code', 'code_barre', 'reference', 'est_frais',
     'prix_achat', 'prix_vente', 'prix_gros', 'seuil_gros', 'taux_tva', 'stock', 'seuil_alerte', 'actif',
 ])]
 class Produit extends Model
@@ -46,6 +46,7 @@ class Produit extends Model
         return [
             'taux_tva' => 'decimal:2',
             'actif' => 'boolean',
+            'est_frais' => 'boolean',
             'stock' => QuantiteCast::class,
             'seuil_alerte' => QuantiteCast::class,
             'seuil_gros' => QuantiteCast::class,
