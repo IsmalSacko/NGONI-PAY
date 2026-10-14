@@ -56,9 +56,41 @@ class PaiementMobile
     /** @return array{demande: DemandeAbonnement, redirect_url: string} */
     public function demarrer(Boutique $boutique, User $demandeur, string $plan, CycleFacturation $cycle, string $moyen): array
     {
-        if ($this->jeko->proposeA($boutique)) {
-            return $this->jeko->demarrer($boutique, $demandeur, $plan, $cycle, $moyen);
-        }
+        $paiement = $this->jeko->proposeA($boutique)
+            ? $this->jeko->demarrer($boutique, $demandeur, $plan, $cycle, $moyen)
+            : $this->demarrerHorsJeko($boutique, $demandeur, $plan, $cycle, $moyen);
+
+        // Prévenu dès l'ouverture de la page de paiement, et pas seulement au
+        // paiement confirmé : un commerçant qui renonce reste à rappeler.
+        $demande = $paiement['demande'];
+        app(AlertesExploitant::class)->envoyer(
+            'Paiement en ligne lancé',
+            ($demande->boutique?->nom ?? 'Une boutique').' · '.(Plan::parCode($demande->plan)?->nom ?? $demande->plan).' '.mb_strtolower($demande->cycle->libelle())
+                .' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.($demande->libellePaiementEnLigne() ?? 'paiement en ligne')
+                .' · en attente de l’opérateur',
+            '/console/demandes',
+        );
+
+        return $paiement;
+    }
+
+    /**
+     * Ce que le prestataire dit du paiement, sans rien changer à la demande :
+     * « payee », « refusee », ou null (en cours, abandonné ou illisible).
+     */
+    public function statutChezPrestataire(DemandeAbonnement $demande): ?string
+    {
+        return match (true) {
+            $demande->jeko_paiement_id !== null => $this->jeko->statut($demande),
+            $demande->pawapay_deposit_id !== null => $this->pawapay->statut($demande),
+            $demande->fedapay_transaction_id !== null => $this->fedapay->statut($demande),
+            default => null,
+        };
+    }
+
+    /** @return array{demande: DemandeAbonnement, redirect_url: string} */
+    private function demarrerHorsJeko(Boutique $boutique, User $demandeur, string $plan, CycleFacturation $cycle, string $moyen): array
+    {
 
         // pawaPay là où le compte est actif (pays du franc CFA), FedaPay ailleurs.
         [$prestataire, $colonne, $prefixe] = $this->pawapay->proposeA($boutique)

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plateforme;
 
+use App\Enums\StatutDemande;
 use App\Models\DemandeAbonnement;
 use App\Services\AbonnementService;
+use App\Services\PaiementMobile;
 use App\Services\RechercheDemandes;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -65,6 +67,44 @@ class Demandes extends Component
 
         $this->info = "Demande approuvée : {$demande->proprietaire?->name} est en {$abonnement->plan}"
             .($abonnement->fin ? ' jusqu’au '.$abonnement->fin->format('d/m/Y') : ' sans échéance').'.';
+    }
+
+    /**
+     * Ce que l'opérateur dit du paiement en ligne, à l'instant. En attente, la
+     * demande en tire la conséquence (payée, elle s'active) ; tranchée, elle
+     * ne change pas, et un paiement reçu après coup est signalé.
+     */
+    public function verifierPaiement(int $id, PaiementMobile $paiements): void
+    {
+        $this->reset(['info', 'alerte']);
+        $demande = DemandeAbonnement::findOrFail($id);
+        if (! $demande->paiementEnLigne()) {
+            return;
+        }
+
+        $moyen = $demande->libellePaiementEnLigne();
+        if ($demande->statut === StatutDemande::EnAttente) {
+            $demande = $paiements->verifier($demande);
+            if ($demande->statut === StatutDemande::Approuvee) {
+                $this->info = "Paiement reçu ({$moyen}) : l’abonnement est activé.";
+
+                return;
+            }
+        }
+
+        $statut = $paiements->statutChezPrestataire($demande);
+        if ($statut === 'payee' && $demande->statut !== StatutDemande::Approuvee) {
+            $this->alerte = "Payé chez l’opérateur ({$moyen}) alors que la demande est ".mb_strtolower($demande->statut->libelle()).' : '
+                .'l’abonnement ne s’est pas activé. Accordez-le depuis Abonnements.';
+
+            return;
+        }
+
+        $this->info = $moyen.' : '.match ($statut) {
+            'payee' => 'paiement reçu.',
+            'refusee' => 'paiement refusé ou annulé chez l’opérateur, rien n’a été prélevé.',
+            default => 'aucun paiement reçu (jamais validé chez l’opérateur, ou encore en cours).',
+        };
     }
 
     public function demanderRefus(int $id): void

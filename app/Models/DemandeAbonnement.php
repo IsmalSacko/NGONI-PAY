@@ -83,6 +83,26 @@ class DemandeAbonnement extends Model
         return $this->preuve_chemin !== null && Storage::disk('local')->exists($this->preuve_chemin);
     }
 
+    /**
+     * Temps écoulé entre la demande et sa décision : « 35 s », « 2 min »,
+     * « 3 h 05 ». Sur un paiement en ligne retiré, c'est le temps passé sur la
+     * page de paiement.
+     */
+    public function delaiDecision(): ?string
+    {
+        if ($this->decide_le === null || $this->created_at === null) {
+            return null;
+        }
+
+        $secondes = (int) $this->created_at->diffInSeconds($this->decide_le, true);
+
+        return match (true) {
+            $secondes < 60 => $secondes.' s',
+            $secondes < 3600 => intdiv($secondes, 60).' min',
+            default => intdiv($secondes, 3600).' h '.str_pad((string) intdiv($secondes % 3600, 60), 2, '0', STR_PAD_LEFT),
+        };
+    }
+
     /** Payée (ou en cours de paiement) en ligne : Jèko ou FedaPay. Elle s'approuve seule. */
     public function paiementEnLigne(): bool
     {

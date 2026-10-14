@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\StatutDemande;
+use App\Livewire\Plateforme\Demandes;
 use App\Mail\DemandeAbonnementMail;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
+use App\Models\NotificationApp;
 use App\Models\User;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\PaiementJeko;
@@ -16,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -215,6 +218,51 @@ class PaiementJekoTest extends TestCase
         $this->payer();
 
         $this->assertSame(StatutDemande::Annulee, $premiere->fresh()->statut);
+    }
+
+    public function test_l_exploitant_est_prevenu_du_lancement_puis_du_retrait_sans_paiement(): void
+    {
+        $exploitant = $this->exploitant();
+        $demande = $this->payer();
+
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $exploitant->id, 'titre' => 'Paiement en ligne lancé']);
+        $this->assertStringContainsString('Wave via Jèko', NotificationApp::where('user_id', $exploitant->id)->where('titre', 'Paiement en ligne lancé')->value('message'));
+
+        $this->travel(2)->minutes();
+        $this->api()->deleteJson("/api/abonnement/demandes/{$demande->id}")->assertOk();
+
+        $demande->refresh();
+        $this->assertSame(StatutDemande::Annulee, $demande->statut);
+        $this->assertSame('Retirée depuis l’application 2 min après la demande, sans paiement reçu.', $demande->note_decision);
+        $retrait = NotificationApp::where('user_id', $exploitant->id)->where('titre', 'Demande annulée')->value('message');
+        $this->assertStringContainsString('(Wave via Jèko) 2 min après l’avoir lancée, sans payer', $retrait);
+    }
+
+    public function test_la_console_demande_a_l_operateur_et_signale_un_paiement_arrive_apres_l_annulation(): void
+    {
+        $exploitant = $this->exploitant();
+        $demande = $this->payer();
+        $this->api()->deleteJson("/api/abonnement/demandes/{$demande->id}")->assertOk();
+
+        Livewire::actingAs($exploitant)->test(Demandes::class)->set('filtre', 'annulee')
+            ->assertSee('Demander à l’opérateur')
+            ->call('verifierPaiement', $demande->id)
+            ->assertSet('info', 'Wave via Jèko : aucun paiement reçu (jamais validé chez l’opérateur, ou encore en cours).');
+
+        // Payé par le lien resté ouvert : la demande annulée ne s'active pas, la console le dit.
+        $this->statutJeko = 'success';
+        Livewire::actingAs($exploitant)->test(Demandes::class)
+            ->call('verifierPaiement', $demande->id)
+            ->assertSet('alerte', 'Payé chez l’opérateur (Wave via Jèko) alors que la demande est annulée : l’abonnement ne s’est pas activé. Accordez-le depuis Abonnements.');
+        $this->assertSame(StatutDemande::Annulee, $demande->fresh()->statut);
+    }
+
+    private function exploitant(): User
+    {
+        $exploitant = User::create(['name' => 'Ismael', 'phone' => '+33605758494', 'password' => 'password123']);
+        $exploitant->forceFill(['est_admin_plateforme' => true])->save();
+
+        return $exploitant;
     }
 
     public function test_hors_cote_d_ivoire_le_paiement_mobile_n_est_pas_propose(): void

@@ -132,11 +132,8 @@ class PaiementJeko
             return $demande;
         }
 
-        try {
-            $paiement = $this->client()->get('/partner_api/payment_requests/'.$demande->jeko_paiement_id)->throw()->json();
-        } catch (\Throwable $e) {
-            Log::warning('Jèko : statut illisible', ['demande' => $demande->id, 'erreur' => mb_substr($e->getMessage(), 0, 300)]);
-
+        $paiement = $this->lire($demande);
+        if ($paiement === null) {
             return $demande;
         }
 
@@ -173,6 +170,31 @@ class PaiementJeko
 
             return $demande->fresh();
         });
+    }
+
+    /**
+     * Statut du paiement chez Jèko, sans rien changer à la demande : « payee »,
+     * « refusee », ou null (en cours, ou illisible).
+     */
+    public function statut(DemandeAbonnement $demande): ?string
+    {
+        return match ($this->lire($demande)['status'] ?? 'pending') {
+            'pending' => null,
+            'success' => 'payee',
+            default => 'refusee',
+        };
+    }
+
+    /** Le paiement tel que Jèko le connaît, ou null s'il est illisible. */
+    private function lire(DemandeAbonnement $demande): ?array
+    {
+        try {
+            return $this->client()->get('/partner_api/payment_requests/'.$demande->jeko_paiement_id)->throw()->json();
+        } catch (\Throwable $e) {
+            Log::warning('Jèko : statut illisible', ['demande' => $demande->id, 'erreur' => mb_substr($e->getMessage(), 0, 300)]);
+
+            return null;
+        }
     }
 
     /** Webhook : vrai seulement si la signature HMAC-SHA256 du corps brut est celle de Jèko. */

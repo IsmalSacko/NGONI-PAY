@@ -105,6 +105,12 @@
                             <x-telephone :numero="$demande->telephone_contact ?: $demande->proprietaire?->phone" />
                             · {{ $demande->created_at->diffForHumans() }}
                         </p>
+                        @php($appareil = $demande->demandeur ?? $demande->proprietaire)
+                        @if ($appareil?->vu_modele || $appareil?->vu_version)
+                            {{-- Le téléphone vu en dernier : celui de la demande, le plus souvent. --}}
+                            <p class="mt-1 text-xs text-muted">Téléphone : <span class="font-semibold text-ink">{{ collect([$appareil->vu_modele, $appareil->vu_plateforme, $appareil->vu_version ? 'appli '.$appareil->vu_version : null])->filter()->implode(' · ') }}</span>
+                                @if ($appareil->vu_le) · vu {{ $appareil->vu_le->diffForHumans() }} @endif</p>
+                        @endif
                         <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="text-muted">Abonnement actuel :</span> <x-statut-abonnement :abonnement="$demande->proprietaire?->abonnement" />
                             @if ($demande->paiementEnLigne())
@@ -146,7 +152,14 @@
                         @endif
                         @if ($tranchee)
                             <p class="mt-2 text-muted">{{ $demande->statut->libelle() }} {{ $demande->decide_le?->format('d/m/Y H:i') }}
+                                @if ($demande->delaiDecision()) ({{ $demande->delaiDecision() }} après la demande) @endif
                                 @if ($demande->note_decision) — {{ $demande->note_decision }} @endif</p>
+                        @endif
+                        @if ($demande->paiementEnLigne())
+                            <button wire:click="verifierPaiement({{ $demande->id }})" wire:loading.attr="disabled" wire:target="verifierPaiement({{ $demande->id }})"
+                                    class="mt-2 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-accent-soft text-accent font-bold hover:bg-accent hover:text-white disabled:opacity-60">
+                                <x-plateforme.picto nom="recherche" class="w-4 h-4" />Demander à l’opérateur
+                            </button>
                         @endif
                     </div>
                 </div>

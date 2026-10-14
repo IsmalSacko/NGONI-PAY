@@ -216,11 +216,20 @@ class AbonnementService
     public function annuler(DemandeAbonnement $demande): void
     {
         $this->exigerEnAttente($demande);
-        $demande->update(['statut' => StatutDemande::Annulee, 'decide_le' => now()]);
+        $demande->statut = StatutDemande::Annulee;
+        $demande->decide_le = now();
+        // Sans cette note, rien ne distinguait dans la console un retrait du
+        // commerçant d'une annulation faute de paiement. Le contrôleur a relu
+        // le paiement en ligne juste avant : rien n'était reçu.
+        $enLigne = $demande->libellePaiementEnLigne();
+        $demande->note_decision = 'Retirée depuis l’application '.$demande->delaiDecision().' après la demande'
+            .($enLigne !== null ? ', sans paiement reçu' : '').'.';
+        $demande->save();
 
         app(AlertesExploitant::class)->envoyer(
             'Demande annulée',
-            ($demande->boutique?->nom ?? 'Une boutique').' a annulé sa demande '.ucfirst($demande->plan).'.',
+            ($demande->boutique?->nom ?? 'Une boutique').' a retiré sa demande '.ucfirst($demande->plan)
+                .($enLigne !== null ? ' ('.$enLigne.') '.$demande->delaiDecision().' après l’avoir lancée, sans payer.' : '.'),
             '/console/demandes',
         );
     }
