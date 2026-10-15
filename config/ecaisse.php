@@ -29,4 +29,7 @@ return [
 
     'notification_email' => env('ECAISSE_NOTIFICATION_EMAIL', 'ismalsacko@yahoo.fr'),
 
+
+    // Jeton de vérification de Google Search Console (balise HTML), posé sur la vitrine.
+    'google_site_verification' => env('GOOGLE_SITE_VERIFICATION'),
 ];

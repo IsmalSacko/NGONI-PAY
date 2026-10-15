@@ -4,6 +4,10 @@
 @unless ($indexer)
     <meta name="robots" content="noindex, nofollow">
 @endunless
+{{-- Search Console : la balise de vérification de Google, sur les pages publiques. --}}
+@if ($indexer && config('ecaisse.google_site_verification'))
+    <meta name="google-site-verification" content="{{ config('ecaisse.google_site_verification') }}">
+@endif
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
