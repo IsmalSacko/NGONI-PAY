@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutDemande;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\PageMetierController;
 use App\Http\Controllers\Plateforme\EnvoiInstallateurController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\VitrineController;
@@ -126,6 +127,9 @@ Route::get('paiement-abonnement', function (Request $request) {
 })->middleware('throttle:30,1')->name('paiement-abonnement');
 
 Route::get('sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+// Pages par métier et par pays (« caisse pour pharmacie au Sénégal ») : voir App\Support\PagesMetier.
+Route::get('caisse/{metier}/{pays?}', PageMetierController::class)
+    ->where('metier', '[a-z-]+')->where('pays', '[a-z-]+')->name('page-metier');
 Route::get('robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 // Logo et photos d'articles, sans session (tickets, application).

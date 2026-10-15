@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
+use App\Support\PagesMetier;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 
@@ -37,6 +38,14 @@ class SeoController extends Controller
             'changefreq' => $p[2],
         ]);
 
+        // Les pages par métier et par pays, toutes, sans rien à tenir à jour.
+        $pages = $pages->concat(collect(PagesMetier::toutes())->map(fn (array $page) => [
+            'loc' => route('page-metier', array_filter([$page['metier'], $page['pays']])),
+            'lastmod' => $this->dateVue('page-metier'),
+            'priority' => $page['pays'] === null ? '0.8' : '0.6',
+            'changefreq' => 'monthly',
+        ]));
+
         return response()
             ->view('seo.sitemap', ['pages' => $pages])
             ->header('Content-Type', 'application/xml; charset=utf-8');
@@ -59,7 +68,7 @@ class SeoController extends Controller
 
     private function dateVue(string $route): string
     {
-        $vue = ['telecharger' => 'telecharger', 'confidentialite' => 'juridique/confidentialite', 'conditions' => 'juridique/conditions', 'mentions-legales' => 'juridique/mentions'][$route] ?? 'vitrine';
+        $vue = ['telecharger' => 'telecharger', 'confidentialite' => 'juridique/confidentialite', 'conditions' => 'juridique/conditions', 'mentions-legales' => 'juridique/mentions', 'page-metier' => 'page-metier'][$route] ?? 'vitrine';
         $fichier = resource_path("views/{$vue}.blade.php");
 
         return date('Y-m-d', is_file($fichier) ? filemtime($fichier) : time());

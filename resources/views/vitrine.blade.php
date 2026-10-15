@@ -220,8 +220,9 @@
     <section class="border-y border-border bg-white">
         <div class="max-w-6xl mx-auto px-4 md:px-6 py-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-semibold text-muted">
             <span class="text-ink">Pensé pour :</span>
-            @foreach (['Boutiques de quartier', 'Pharmacies', 'Supérettes', 'Pressings', 'Quincailleries', 'Salons', 'Restaurants'] as $metier)
-                <span>{{ $metier }}</span>
+            {{-- Chaque métier mène à sa page (voir App\Support\PagesMetier). --}}
+            @foreach (['Boutiques de quartier' => 'boutique', 'Pharmacies' => 'pharmacie', 'Supérettes' => 'boutique', 'Pressings' => 'pressing', 'Restaurants' => 'restaurant', 'Grossistes et distributeurs' => 'distributeur'] as $metier => $page)
+                <a href="{{ route('page-metier', [$page]) }}" class="hover:text-ink underline-offset-4 hover:underline">{{ $metier }}</a>
             @endforeach
         </div>
     </section>
@@ -455,6 +456,19 @@
 @endif
 
 <footer class="border-t border-border">
+    {{-- Les pages par métier et par pays, reliées depuis l'accueil : c'est ainsi que Google les trouve. --}}
+    <div class="max-w-6xl mx-auto px-4 md:px-6 pt-10 grid sm:grid-cols-2 lg:grid-cols-5 gap-6 text-sm">
+        @foreach (\App\Support\PagesMetier::METIERS as $code => $m)
+            <div>
+                <a href="{{ route('page-metier', [$code]) }}" class="font-bold hover:text-accent">{{ $m['nom'] }}</a>
+                <ul class="mt-2 space-y-1 text-muted">
+                    @foreach (\App\Support\PagesMetier::PAYS as $pays => $p)
+                        <li><a href="{{ route('page-metier', [$code, $pays]) }}" class="hover:text-ink">{{ $m['nom'] }} {{ $p['dans'] }}</a></li>
+                    @endforeach
+                </ul>
+            </div>
+        @endforeach
+    </div>
     <div class="max-w-6xl mx-auto px-4 md:px-6 py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between text-sm text-muted">
         <x-logo taille="w-9 h-9" :nom="true" couleur-nom="text-accent" />
         <nav class="flex flex-wrap gap-x-6 gap-y-2">
