@@ -287,6 +287,8 @@ class AbonnementService
         });
 
         $this->prevenirActivation($abonnement, $demande->demande_par, $demande->recu_numero);
+        // Payé en ligne ou validé à la main : la vente dans la boutique de l'exploitant.
+        app(VenteAbonnement::class)->apresValidation($demande);
 
         return $abonnement;
     }

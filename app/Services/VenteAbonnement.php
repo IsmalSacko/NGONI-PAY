@@ -18,11 +18,13 @@ use Ramsey\Uuid\Uuid;
 use Throwable;
 
 /**
- * Un abonnement payé en ligne (Jèko, FedaPay, pawaPay) devient une vente dans
- * la boutique de l'exploitant (config `ecaisse.boutique_ventes_abonnements`),
- * comme s'il l'avait encaissé à sa caisse : même numéro de ticket, même
- * séance, le commerçant en client avec son téléphone, son e-mail et sa
- * boutique. Jusqu'ici, l'exploitant la retrouvait et la saisissait à la main.
+ * Un abonnement payé — en ligne (Jèko, FedaPay, pawaPay) ou validé à la main
+ * dans la console — devient une vente dans la boutique de l'exploitant
+ * (config `ecaisse.boutique_ventes_abonnements`), comme s'il l'avait encaissé
+ * à sa caisse : même numéro de ticket, même séance, le commerçant en client
+ * avec son téléphone, son e-mail et sa boutique. Jusqu'ici, l'exploitant la
+ * retrouvait et la saisissait à la main. Un abonnement accordé sans paiement
+ * (« accorder », « prolonger ») n'a pas de montant : pas de vente.
  *
  * Après la validation de l'abonnement et hors de sa transaction : une vente
  * qui échoue ne doit jamais défaire l'abonnement payé — l'exploitant est
@@ -30,7 +32,7 @@ use Throwable;
  * l'enregistrement idempotent : un appel du prestataire rejoué ne double pas
  * la vente.
  */
-class VenteAbonnementEnLigne
+class VenteAbonnement
 {
     public function __construct(
         private readonly TenantContext $tenant,
@@ -47,7 +49,7 @@ class VenteAbonnementEnLigne
                 report($e);
                 app(AlertesExploitant::class)->envoyer(
                     'Vente d’abonnement non enregistrée',
-                    ($demande->boutique?->nom ?? 'Une boutique').' : l’abonnement payé en ligne est actif, mais sa vente n’a pas pu être enregistrée. À saisir à la main.',
+                    ($demande->boutique?->nom ?? 'Une boutique').' : l’abonnement est actif, mais sa vente n’a pas pu être enregistrée. À saisir à la main.',
                     '/console/demandes',
                 );
             }
@@ -57,7 +59,7 @@ class VenteAbonnementEnLigne
     public function enregistrer(DemandeAbonnement $demande): ?Vente
     {
         $boutiqueId = config('ecaisse.boutique_ventes_abonnements');
-        if (blank($boutiqueId)) {
+        if (blank($boutiqueId) || (int) $demande->montant <= 0) {
             return null;
         }
         $boutique = Boutique::find($boutiqueId);

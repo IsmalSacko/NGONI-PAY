@@ -6,8 +6,10 @@ namespace Tests\Feature;
 
 use App\Enums\CycleFacturation;
 use App\Models\Boutique;
+use App\Models\Client;
 use App\Models\NotificationApp;
 use App\Models\User;
+use App\Models\Vente;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\GestionAnnonces;
@@ -96,6 +98,22 @@ class ConsoleMobileTest extends TestCase
 
         // Les commerçants ne reçoivent pas ces alertes.
         $this->assertSame(0, NotificationApp::where('user_id', $this->awa->id)->where('type', 'console')->count());
+    }
+
+    public function test_une_demande_validee_a_la_main_devient_une_vente_chez_l_exploitant(): void
+    {
+        config(['ecaisse.boutique_ventes_abonnements' => $this->exploitant->boutique_id]);
+        $demande = app(AbonnementService::class)->soumettre($this->boutiqueAwa, $this->awa, 'basic', CycleFacturation::Mensuel);
+        $demande->update(['moyen' => 'wave']);
+
+        $this->console()->postJson("/api/plateforme/demandes/{$demande->id}/approuver")->assertOk();
+
+        $vente = Vente::withoutGlobalScopes()->where('boutique_id', $this->exploitant->boutique_id)->with('lignes')->sole();
+        $this->assertSame((int) $demande->montant, (int) $vente->total);
+        $this->assertSame('wave', $vente->moyen_paiement->value);
+        $this->assertSame('Plan Basic · 1 mois', $vente->lignes->sole()->nom_produit);
+        $client = Client::withoutGlobalScopes()->findOrFail($vente->client_id);
+        $this->assertSame(['Awa', $this->awa->phone], [$client->nom, $client->telephone]);
     }
 
     public function test_approuver_et_refuser_une_demande_depuis_l_application(): void
