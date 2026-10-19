@@ -195,7 +195,7 @@ class CommandesFournisseur
         // (même code-barres, sinon même nom), la conversion tirée de mes paliers.
         $miens = Produit::query()->get(['id', 'nom', 'unite', 'code_barre', 'paliers', 'prix_vente']);
         $parId = $miens->keyBy('id');
-        $parCode = $miens->filter(fn ($m) => filled($m->code_barre))->keyBy('code_barre');
+        $parCode = $miens->filter(fn ($m) => filled($m->code_barre))->keyBy(fn ($m) => Produit::cleCodeBarre($m->code_barre));
         $parNom = $miens->keyBy(fn ($m) => mb_strtolower(trim($m->nom)));
 
         $suitStock = $grossiste->suitLeStock();
@@ -204,7 +204,7 @@ class CommandesFournisseur
             $c = $correspondances[$p->id] ?? null;
             $mien = $c === null ? null : ($parId[$c->produit_revendeur_id] ?? null);
             if ($mien === null) {
-                $mien = (filled($p->code_barre) ? ($parCode[$p->code_barre] ?? null) : null) ?? ($parNom[mb_strtolower(trim($p->nom))] ?? null);
+                $mien = (filled($p->code_barre) ? ($parCode[Produit::cleCodeBarre($p->code_barre)] ?? null) : null) ?? ($parNom[mb_strtolower(trim($p->nom))] ?? null);
                 $c = $mien === null ? null : (object) ['contenance' => self::contenanceProposee($mien, $p, $enGros && $p->prix_gros !== null ? (int) $p->prix_gros : (int) $p->prix_vente)];
             }
 
@@ -696,7 +696,7 @@ class CommandesFournisseur
     {
         $chez = Produit::withoutGlobalScopes()->where('boutique_id', $grossiste->id)->where('actif', true);
 
-        return (filled($produit->code_barre) ? (clone $chez)->where('code_barre', $produit->code_barre)->first() : null)
+        return (filled($produit->code_barre) ? (clone $chez)->whereIn('code_barre', Produit::variantesCodeBarre($produit->code_barre))->first() : null)
             ?? (clone $chez)->whereRaw('LOWER(nom) = ?', [mb_strtolower($produit->nom)])->first();
     }
 

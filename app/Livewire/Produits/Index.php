@@ -198,7 +198,14 @@ class Index extends Component
             'nom' => ['required', 'string', 'max:255'],
             'format' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:4'],
-            'code_barre' => ['nullable', 'string', 'max:255', Rule::unique('produits', 'code_barre')->where('boutique_id', $this->boutiqueActiveId())->ignore($this->produitId)],
+            // Déjà pris, y compris écrit avec un 0 devant (UPC-A / EAN-13).
+            'code_barre' => ['nullable', 'string', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec): void {
+                $existant = Produit::withoutGlobalScopes()->where('boutique_id', $this->boutiqueActiveId())->whereIn('code_barre', Produit::variantesCodeBarre((string) $valeur))
+                    ->when($this->produitId, fn ($q) => $q->whereKeyNot($this->produitId))->first(['nom', 'format']);
+                if ($existant) {
+                    $echec('Ce code-barres est déjà celui de « '.trim($existant->nom.($existant->format ? ' – '.$existant->format : '')).' ».');
+                }
+            }],
             // Saisi dans la devise (« 2,50 » en euros), stocké en unités mineures.
             'prix_vente' => ['required', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],
             'prix_achat' => ['nullable', 'string', 'regex:/^\s*\d[\d\s]*([.,]\d{1,3})?\s*$/'],

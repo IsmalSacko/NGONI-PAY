@@ -310,7 +310,7 @@ class ProduitController extends Controller
             'frais_enlevement' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
             // Déjà pris : on dit par quel article, pour que le commerçant le retrouve.
             'code_barre' => ['nullable', 'string', 'max:255', function (string $attribut, mixed $valeur, \Closure $echec) use ($boutiqueId, $produit): void {
-                $existant = Produit::withoutGlobalScopes()->where('boutique_id', $boutiqueId)->where('code_barre', $valeur)
+                $existant = Produit::withoutGlobalScopes()->where('boutique_id', $boutiqueId)->whereIn('code_barre', Produit::variantesCodeBarre((string) $valeur))
                     ->when($produit, fn ($q) => $q->whereKeyNot($produit->id))->first(['nom', 'format']);
                 if ($existant) {
                     $echec('Ce code-barres est déjà celui de « '.trim($existant->nom.($existant->format ? ' – '.$existant->format : '')).' ».');

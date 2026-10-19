@@ -134,6 +134,31 @@ class Produit extends Model
         }
     }
 
+    /**
+     * Un même article, deux écritures : un code UPC-A (12 chiffres, produits
+     * importés d'Amérique) est aussi un EAN-13 qui commence par 0, et le
+     * scanner rend l'un ou l'autre selon le téléphone. On les compare sur la
+     * forme à 12 chiffres.
+     */
+    public static function cleCodeBarre(string $code): string
+    {
+        $code = trim($code);
+
+        return preg_match('/^0\d{12}$/', $code) ? substr($code, 1) : $code;
+    }
+
+    /**
+     * Les écritures de ce code-barres à chercher ensemble en base.
+     *
+     * @return list<string>
+     */
+    public static function variantesCodeBarre(string $code): array
+    {
+        $cle = self::cleCodeBarre($code);
+
+        return preg_match('/^\d{12}$/', $cle) ? [$cle, '0'.$cle] : [$cle];
+    }
+
     public function estEnRupture(): bool
     {
         return $this->stock <= 0;

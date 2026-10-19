@@ -165,6 +165,22 @@ class ProduitApiTest extends TestCase
             ->assertJsonPath('errors.code_barre.0', 'Ce code-barres est déjà celui de « Riz ».');
     }
 
+    public function test_un_code_upc_a_et_son_ecriture_ean_13_sont_le_meme_code_barres(): void
+    {
+        Produit::create(['nom' => 'Afric thé', 'prix_vente' => 1400, 'code_barre' => '824644977098']);
+        $jeton = $this->jeton($this->admin);
+
+        $this->withToken($jeton)
+            ->postJson('/api/produits', ['nom' => 'Autre thé', 'prix_vente' => 100, 'code_barre' => '0824644977098'])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.code_barre.0', 'Ce code-barres est déjà celui de « Afric thé ».');
+
+        // Un EAN-13 qui ne commence pas par 0 reste un autre code.
+        $this->withToken($jeton)
+            ->postJson('/api/produits', ['nom' => 'Thé vert', 'prix_vente' => 100, 'code_barre' => '1824644977098'])
+            ->assertCreated();
+    }
+
     public function test_supprimer_un_produit_libere_son_code_barres(): void
     {
         $produit = Produit::create(['nom' => 'Riz', 'prix_vente' => 4750, 'code_barre' => '6130000200021']);
