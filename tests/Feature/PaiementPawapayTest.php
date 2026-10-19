@@ -172,10 +172,11 @@ class PaiementPawapayTest extends TestCase
         $ventes = Vente::withoutGlobalScopes()->where('boutique_id', $caisse->id)->with('lignes')->get();
         $this->assertCount(1, $ventes);
         $vente = $ventes->first();
-        $this->assertSame($demande->montant + $demande->frais_mobile, (int) $vente->total);
+        // Le prix de l'abonnement : les frais du paiement mobile ne sont pas sur la facture.
+        $this->assertGreaterThan(0, $demande->frais_mobile);
+        $this->assertSame((int) $demande->montant, (int) $vente->total);
         $this->assertSame($exploitant->id, $vente->user_id);
-        $this->assertStringStartsWith('Plan Pro · 1 mois — Free Money via pawaPay', $vente->lignes->first()->nom_produit);
-        $this->assertSame('Frais de paiement mobile', $vente->lignes->last()->nom_produit);
+        $this->assertSame('Plan Pro · 1 mois — Free Money via pawaPay', $vente->lignes->sole()->nom_produit);
 
         $client = Client::withoutGlobalScopes()->findOrFail($vente->client_id);
         $this->assertSame($caisse->id, $client->boutique_id);

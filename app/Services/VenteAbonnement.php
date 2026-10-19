@@ -128,8 +128,9 @@ class VenteAbonnement
     }
 
     /**
-     * « Plan Pro · 1 mois », au montant payé, et les frais du paiement mobile
-     * à part quand le commerçant les a payés : le total est ce qu'il a versé.
+     * « Plan Pro · 1 mois », au prix de l'abonnement. Les frais du paiement
+     * mobile vont au prestataire, pas à l'exploitant : ils ne sont pas sur sa
+     * facture.
      *
      * @return list<array{libelle: string, prix_unitaire: int, quantite: int}>
      */
@@ -140,12 +141,7 @@ class VenteAbonnement
         $moyen = $demande->libellePaiementEnLigne();
         $libelle = 'Plan '.$plan.($duree ? ' · '.$duree : '').($moyen ? ' — '.$moyen : '');
 
-        $lignes = [['libelle' => mb_substr($libelle, 0, 120), 'prix_unitaire' => (int) $demande->montant, 'quantite' => 1]];
-        if ((int) $demande->frais_mobile > 0) {
-            $lignes[] = ['libelle' => 'Frais de paiement mobile', 'prix_unitaire' => (int) $demande->frais_mobile, 'quantite' => 1];
-        }
-
-        return $lignes;
+        return [['libelle' => mb_substr($libelle, 0, 120), 'prix_unitaire' => (int) $demande->montant, 'quantite' => 1]];
     }
 
     /** Le moyen de la caisse le plus proche ; les autres (MTN, Free…) sont nommés sur la ligne. */
