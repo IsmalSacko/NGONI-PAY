@@ -30,6 +30,13 @@ return [
     'notification_email' => env('ECAISSE_NOTIFICATION_EMAIL', 'ismalsacko@yahoo.fr'),
 
 
+    /*
+     * Boutique de l'exploitant (son identifiant) où chaque abonnement payé en
+     * ligne s'enregistre de lui-même comme une vente : le montant, le
+     * commerçant en client, le ticket. Vide : rien n'est enregistré.
+     */
+    'boutique_ventes_abonnements' => env('ECAISSE_BOUTIQUE_VENTES_ABONNEMENTS'),
+
     // Jeton de vérification de Google Search Console (balise HTML), posé sur la vitrine.
     'google_site_verification' => env('GOOGLE_SITE_VERIFICATION'),
 ];

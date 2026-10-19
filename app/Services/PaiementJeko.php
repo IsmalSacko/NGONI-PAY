@@ -158,6 +158,7 @@ class PaiementJeko
             $demande->update(['jeko_transaction_id' => $transaction ?: null]);
             $moyen = config('jeko.moyens')[$paiement['paymentMethod'] ?? ''] ?? 'Mobile Money';
             $abonnement = $this->abonnements->approuver($demande, null, "Payé par {$moyen} via Jèko".($transaction ? " ({$transaction})" : ''));
+            app(VenteAbonnementEnLigne::class)->apresValidation($demande);
 
             $plan = Plan::parCode($demande->plan)?->nom ?? $demande->plan;
             app(AlertesExploitant::class)->envoyer(

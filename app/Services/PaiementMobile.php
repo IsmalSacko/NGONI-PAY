@@ -159,6 +159,7 @@ class PaiementMobile
             $moyen = $demande->libellePaiementEnLigne() ?? 'paiement en ligne';
             $abonnement = $this->abonnements->approuver($demande, null, "Payé par {$moyen} (".($demande->pawapay_deposit_id ?? $demande->fedapay_transaction_id).')');
             $this->prevenirExploitant($demande, $moyen, $abonnement->fin?->format('d/m/Y'));
+            app(VenteAbonnementEnLigne::class)->apresValidation($demande);
 
             return $demande->fresh();
         });

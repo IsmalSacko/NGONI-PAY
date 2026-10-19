@@ -6,8 +6,10 @@ namespace Tests\Feature;
 
 use App\Enums\StatutDemande;
 use App\Models\Boutique;
+use App\Models\Client;
 use App\Models\DemandeAbonnement;
 use App\Models\User;
+use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\PaiementJeko;
 use App\Services\PawapayPays;
@@ -149,6 +151,37 @@ class PaiementPawapayTest extends TestCase
         $this->assertSame(StatutDemande::Approuvee, $demande->statut);
         $this->assertStringContainsString('Free Money via pawaPay', (string) $demande->note_decision);
         $this->assertSame('pro', $this->awa->abonnement()->first()->plan);
+    }
+
+    public function test_l_abonnement_paye_en_ligne_devient_une_vente_chez_l_exploitant(): void
+    {
+        ['user' => $exploitant, 'boutique' => $caisse] = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'NGONI CAISSE', 'pays' => 'ML', 'telephone' => '74988201',
+            'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Ismaël',
+        ]);
+        $exploitant->forceFill(['est_admin_plateforme' => true])->save();
+        config(['ecaisse.boutique_ventes_abonnements' => $caisse->id]);
+        app(TenantContext::class)->forget();
+
+        $demande = $this->payer();
+        $this->complete($demande);
+        $this->postJson('/api/webhooks/pawapay', ['depositId' => $demande->pawapay_deposit_id, 'status' => 'COMPLETED'])->assertOk();
+        $this->postJson('/api/webhooks/pawapay', ['depositId' => $demande->pawapay_deposit_id, 'status' => 'COMPLETED'])->assertOk(); // rejoué
+        $demande->refresh();
+
+        $ventes = Vente::withoutGlobalScopes()->where('boutique_id', $caisse->id)->with('lignes')->get();
+        $this->assertCount(1, $ventes);
+        $vente = $ventes->first();
+        $this->assertSame($demande->montant + $demande->frais_mobile, (int) $vente->total);
+        $this->assertSame($exploitant->id, $vente->user_id);
+        $this->assertStringStartsWith('Plan Pro · 1 mois — Free Money via pawaPay', $vente->lignes->first()->nom_produit);
+        $this->assertSame('Frais de paiement mobile', $vente->lignes->last()->nom_produit);
+
+        $client = Client::withoutGlobalScopes()->findOrFail($vente->client_id);
+        $this->assertSame($caisse->id, $client->boutique_id);
+        $this->assertSame('Awa', $client->nom);
+        $this->assertSame($this->awa->phone, $client->telephone);
+        $this->assertSame('Boutique Boutique Awa · SN', $client->adresse);
     }
 
     public function test_un_appel_invente_ou_un_mauvais_montant_n_activent_rien(): void
