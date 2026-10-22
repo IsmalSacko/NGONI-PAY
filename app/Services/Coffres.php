@@ -17,6 +17,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -167,6 +169,51 @@ class Coffres
         }
 
         return $crees;
+    }
+
+    /**
+     * Créer un coffre ([$coffre] null), ou changer son nom et sa règle : à tout
+     * moment. Une règle changée vaut à partir de la journée en cours. Même
+     * chemin pour l'application et le back-office.
+     *
+     * @param  array<string, mixed>  $donnees  nom, mode, montant_fixe, pourcentage
+     */
+    public function regler(?Coffre $coffre, array $donnees): Coffre
+    {
+        $data = Validator::make($donnees, [
+            'nom' => ['required', 'string', 'max:40'],
+            'mode' => ['required', Rule::in(Coffre::MODES)],
+            'montant_fixe' => ['nullable', 'required_if:mode,'.Coffre::FIXE, 'integer', 'min:1', 'max:100000000000'],
+            'pourcentage' => ['nullable', 'required_if:mode,'.Coffre::POURCENTAGE, 'numeric', 'min:0.5', 'max:100'],
+        ], [], ['nom' => 'nom', 'montant_fixe' => 'somme par jour', 'pourcentage' => 'part des ventes'])->validate();
+
+        // Seule la valeur de la règle choisie est gardée.
+        $regle = [
+            'mode' => $data['mode'],
+            'montant_fixe' => $data['mode'] === Coffre::FIXE ? (int) $data['montant_fixe'] : null,
+            'pourcentage' => $data['mode'] === Coffre::POURCENTAGE ? round((float) $data['pourcentage'], 2) : null,
+        ];
+        $aujourdhui = $this->journee->courante()->toDateString();
+        if ($coffre === null) {
+            return Coffre::create([...$regle, 'nom' => trim($data['nom']), 'regle_depuis' => $aujourdhui]);
+        }
+        $change = $regle['mode'] !== $coffre->mode || $regle['montant_fixe'] !== $coffre->montant_fixe
+            || (float) $regle['pourcentage'] !== (float) $coffre->pourcentage;
+        $coffre->update([...$regle, 'nom' => trim($data['nom']), 'regle_depuis' => $change ? $aujourdhui : $coffre->regle_depuis]);
+
+        return $coffre->fresh();
+    }
+
+    /** Un coffre vide seulement : l'argent mis de côté ne disparaît pas d'un geste. */
+    public function supprimer(Coffre $coffre): void
+    {
+        if ($this->solde($coffre) !== 0) {
+            throw ValidationException::withMessages(['coffre' => ['Retirez d’abord l’argent du coffre, puis supprimez-le.']]);
+        }
+        DB::transaction(function () use ($coffre): void {
+            $coffre->mouvements()->delete();
+            $coffre->delete();
+        });
     }
 
     /** Mettre de côté à la main, aujourd'hui (journée de vente en cours). */

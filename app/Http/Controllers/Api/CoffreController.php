@@ -11,9 +11,6 @@ use App\Services\Coffres;
 use App\Services\Journee;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Les coffres de la boutique (fonction Pro) : mettre de côté une partie de la
@@ -38,38 +35,20 @@ class CoffreController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $coffre = Coffre::create([...$this->regle($request), 'nom' => $this->nom($request),
-            'regle_depuis' => $this->journee->courante()->toDateString()]);
-
-        return response()->json(['data' => $this->vue($coffre, 0)], 201);
+        return response()->json(['data' => $this->vue($this->coffres->regler(null, $request->all()), 0)], 201);
     }
 
     /** Le nom, ou la façon de le remplir : modifiable à tout moment. */
     public function update(Request $request, Coffre $coffre): JsonResponse
     {
-        $regle = $this->regle($request);
-        $change = $regle['mode'] !== $coffre->mode || $regle['montant_fixe'] !== $coffre->montant_fixe
-            || (float) $regle['pourcentage'] !== (float) $coffre->pourcentage;
-        $coffre->update([
-            ...$regle,
-            'nom' => $this->nom($request),
-            // Une règle changée vaut à partir de la journée en cours.
-            'regle_depuis' => $change ? $this->journee->courante()->toDateString() : $coffre->regle_depuis,
-        ]);
+        $coffre = $this->coffres->regler($coffre, $request->all());
 
-        return response()->json(['data' => $this->vue($coffre->fresh(), $this->coffres->solde($coffre))]);
+        return response()->json(['data' => $this->vue($coffre, $this->coffres->solde($coffre))]);
     }
 
-    /** Un coffre vide seulement : l'argent mis de côté ne disparaît pas d'un geste. */
     public function destroy(Coffre $coffre): JsonResponse
     {
-        if ($this->coffres->solde($coffre) !== 0) {
-            throw ValidationException::withMessages(['coffre' => ['Retirez d’abord l’argent du coffre, puis supprimez-le.']]);
-        }
-        DB::transaction(function () use ($coffre): void {
-            $coffre->mouvements()->delete();
-            $coffre->delete();
-        });
+        $this->coffres->supprimer($coffre);
 
         return response()->json(['ok' => true]);
     }
@@ -106,28 +85,6 @@ class CoffreController extends Controller
     public function aujourdhui(): JsonResponse
     {
         return response()->json(['data' => $this->coffres->prevision($this->journee->courante())]);
-    }
-
-    /** @return array{mode: string, montant_fixe: int|null, pourcentage: float|null} */
-    private function regle(Request $request): array
-    {
-        $data = $request->validate([
-            'mode' => ['required', Rule::in(Coffre::MODES)],
-            'montant_fixe' => ['nullable', 'required_if:mode,'.Coffre::FIXE, 'integer', 'min:1', 'max:100000000000'],
-            'pourcentage' => ['nullable', 'required_if:mode,'.Coffre::POURCENTAGE, 'numeric', 'min:0.5', 'max:100'],
-        ], [], ['montant_fixe' => 'somme par jour', 'pourcentage' => 'part des ventes']);
-
-        // Seule la valeur de la règle choisie est gardée.
-        return [
-            'mode' => $data['mode'],
-            'montant_fixe' => $data['mode'] === Coffre::FIXE ? (int) $data['montant_fixe'] : null,
-            'pourcentage' => $data['mode'] === Coffre::POURCENTAGE ? round((float) $data['pourcentage'], 2) : null,
-        ];
-    }
-
-    private function nom(Request $request): string
-    {
-        return trim((string) $request->validate(['nom' => ['required', 'string', 'max:40']], [], ['nom' => 'nom'])['nom']);
     }
 
     private function montant(Request $request): int
