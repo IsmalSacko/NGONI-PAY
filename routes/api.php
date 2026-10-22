@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\ClotureController;
+use App\Http\Controllers\Api\CoffreController;
 use App\Http\Controllers\Api\CommandeFournisseurController;
 use App\Http\Controllers\Api\CommandePressingController;
 use App\Http\Controllers\Api\CommandeRestaurantController;
@@ -290,6 +291,16 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('depenses', [DepenseController::class, 'store'])->middleware(['permission:ventes.create', 'abonnement', 'fonctionnalite:depenses']);
     Route::delete('depenses/{depense}', [DepenseController::class, 'destroy'])->middleware(['permission:ventes.delete', 'fonctionnalite:depenses']);
     Route::get('bilan', [DepenseController::class, 'bilan'])->middleware(['permission:rapports.view', 'fonctionnalite:depenses']);
+    // Coffres (offre Pro) : mettre de côté une partie de la recette, à la main ou chaque soir.
+    // Réservés à qui voit le chiffre d'affaires ; le rappel de la fermeture de caisse, à qui encaisse.
+    Route::get('coffres', [CoffreController::class, 'index'])->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
+    Route::get('coffres/aujourdhui', [CoffreController::class, 'aujourdhui'])->middleware(['permission:ventes.create', 'fonctionnalite:coffre']);
+    Route::post('coffres', [CoffreController::class, 'store'])->middleware(['permission:dashboard.view', 'abonnement', 'fonctionnalite:coffre']);
+    Route::put('coffres/{coffre}', [CoffreController::class, 'update'])->middleware(['permission:dashboard.view', 'abonnement', 'fonctionnalite:coffre']);
+    Route::delete('coffres/{coffre}', [CoffreController::class, 'destroy'])->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
+    Route::get('coffres/{coffre}/mouvements', [CoffreController::class, 'mouvements'])->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
+    Route::post('coffres/{coffre}/ajouter', [CoffreController::class, 'ajouter'])->middleware(['permission:dashboard.view', 'abonnement', 'fonctionnalite:coffre']);
+    Route::post('coffres/{coffre}/retirer', [CoffreController::class, 'retirer'])->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
     Route::get('pressing/fournitures', [GestionPressingController::class, 'fournitures'])->middleware('permission:produits.view');
     Route::post('pressing/fournitures', [GestionPressingController::class, 'creerFourniture'])->middleware(['permission:produits.create', 'abonnement']);
     Route::put('pressing/fournitures/{fourniture}', [GestionPressingController::class, 'modifierFourniture'])->middleware('permission:produits.update');

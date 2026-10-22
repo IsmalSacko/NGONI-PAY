@@ -128,6 +128,9 @@ class Rapports
                 'depenses' => (int) Depense::whereDate('jour', '>=', $debut)->whereDate('jour', '<=', $fin)->sum('montant'),
                 'a_recevoir' => $encoreDu,
             ],
+            // Coffres : ce qui est parti de la recette (pas une dépense : le
+            // chiffre et le bénéfice ne bougent pas, seul le disponible baisse).
+            'epargne' => app(Coffres::class)->resume($du, $au),
         ];
     }
 

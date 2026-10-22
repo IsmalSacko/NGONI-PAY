@@ -70,6 +70,9 @@ class Plan extends Model
     /** Mode libre : supprimer, corriger et renuméroter ses ventes et factures, même passées. */
     public const MODE_LIBRE = 'mode_libre';
 
+    /** Coffre : mettre de côté une partie de la recette, à la main ou chaque soir. */
+    public const COFFRE = 'coffre';
+
     /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
@@ -91,6 +94,7 @@ class Plan extends Model
         self::RESTAURANT_AVANCE => 'Restaurant : cuisine, réservations, livraison, recettes',
         self::MODE_LIBRE => 'Mode libre : supprimer, corriger, renuméroter ses factures',
         self::CONTROLE_STOCK => 'Contrôle du stock : inventaire et pertes',
+        self::COFFRE => 'Coffre : mettre de côté chaque jour',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */

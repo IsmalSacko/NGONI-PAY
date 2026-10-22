@@ -2,6 +2,7 @@
 
 use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
+use App\Services\Coffres;
 use App\Services\CommandesRestaurant;
 use App\Services\DiffusionAnnonces;
 use App\Services\NettoyageOrphelins;
@@ -83,6 +84,17 @@ Artisan::command('ecaisse:bilan-du-soir', function () {
 Schedule::command('ecaisse:bilan-du-soir')->hourly()->withoutOverlapping();
 
 // Bilan du mois précédent, le 1er à 8 h : PDF par e-mail et notification.
+Artisan::command('ecaisse:coffres', function () {
+    $n = app(Coffres::class)->passageDuSoir(now());
+    if ($n > 0) {
+        $this->info("Versement du soir dans les coffres : {$n} boutique(s).");
+    }
+})->purpose('Met de côté dans les coffres la part de la journée (23 h, heure du pays)');
+
+// Chaque heure : chaque boutique est servie à 23 h, heure de son pays ; la
+// veille est rattrapée si la tâche n'a pas tourné, jamais deux fois.
+Schedule::command('ecaisse:coffres')->hourly()->withoutOverlapping();
+
 Artisan::command('ecaisse:bilan-mensuel', function () {
     $n = app(BilanMensuel::class)->envoyer(today());
     if ($n > 0) {
