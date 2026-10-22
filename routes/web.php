@@ -184,6 +184,7 @@ Route::middleware(['auth', 'conditions', 'tenant', 'backoffice'])->group(functio
     Route::get('boutiques', Index::class)->name('boutiques.index');
     Route::get('achats', App\Livewire\Achats\Index::class)->name('achats.index')->middleware(['permission:achats.view', 'fonctionnalite:achats_fournisseurs']);
     Route::get('commandes-fournisseurs', App\Livewire\CommandesFournisseur\Index::class)->name('commandes-fournisseurs.index')->middleware('permission:achats.view');
+    Route::get('coffre', App\Livewire\Coffres\Index::class)->name('coffres.index')->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
     Route::get('rapports', App\Livewire\Rapports\Index::class)->name('rapports.index')->middleware('permission:rapports.view');
     Route::get('statistiques', App\Livewire\Statistiques\Index::class)->name('statistiques.index')->middleware('permission:rapports.view');
     Route::get('rapports/imprimer', [ExportController::class, 'imprimer'])->name('rapports.imprimer')->middleware('permission:rapports.view');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Coffres\Index as CoffresIndex;
 use App\Models\Boutique;
 use App\Models\Coffre;
 use App\Models\MouvementCoffre;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -169,5 +171,31 @@ class CoffresTest extends TestCase
         app(TenantContext::class)->forget();
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
         $this->withToken($autre->createToken('t')->plainTextToken)->postJson("/api/coffres/{$id}/retirer", ['montant' => 1])->assertNotFound();
+    }
+
+    public function test_le_back_office_cree_un_coffre_ajoute_et_cache_les_montants(): void
+    {
+        $this->actingAs($this->awa);
+        $page = Livewire::test(CoffresIndex::class)
+            ->call('nouveau')->set('nom', 'Réserve')->set('mode', Coffre::POURCENTAGE)->set('pourcentage', '12,5')
+            ->call('enregistrer')->assertHasNoErrors()->assertSet('edite', null);
+        $coffre = Coffre::where('nom', 'Réserve')->firstOrFail();
+        $this->assertSame(12.5, $coffre->pourcentage);
+
+        $page->call('ouvrirMouvement', $coffre->id, true)->set('montant', '5000')->call('enregistrerMouvement')->assertHasNoErrors()
+            // Caché tant que l'œil est fermé ; la règle, elle, se lit.
+            ->assertSee('12,5 % des ventes encaissées')->assertDontSee('5 000')
+            ->set('visible', true)->assertSee('5 000');
+        $this->assertSame(5000, app(Coffres::class)->solde($coffre));
+
+        // Jamais plus que le solde.
+        $page->call('ouvrirMouvement', $coffre->id, false)->set('montant', '9000')->call('enregistrerMouvement')->assertHasErrors('montant');
+    }
+
+    public function test_sans_l_offre_pro_le_back_office_refuse_le_coffre(): void
+    {
+        app(AbonnementService::class)->accorder($this->awa, 'basic', now()->addMonth(), $this->awa);
+        $this->actingAs($this->awa)->get('/coffre')->assertForbidden();
+        Livewire::test(CoffresIndex::class)->call('nouveau')->assertForbidden();
     }
 }
