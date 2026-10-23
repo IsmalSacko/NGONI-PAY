@@ -44,7 +44,7 @@
     </div>
 
     <x-charte.carte-heros icone="balance" titre="Écart du mois" :valeur="$ecart($ecartTotal)">
-        <span>{{ $fermees->count() }} séance{{ $fermees->count() > 1 ? 's' : '' }} fermée{{ $fermees->count() > 1 ? 's' : '' }}{{ $manques > 0 ? ' · '.$manques.' avec un manque' : '' }}</span>
+        <span>{{ $fermees->count() }} séance{{ $fermees->count() > 1 ? 's' : '' }} fermée{{ $fermees->count() > 1 ? 's' : '' }}{{ $manques > 0 ? ' · '.$manques.' avec un manque' : '' }}{{ $nonComptees > 0 ? ' · '.$nonComptees.' non comptée'.($nonComptees > 1 ? 's' : '').' (oubli)' : '' }}</span>
     </x-charte.carte-heros>
 
     <x-charte.carte class="p-5 flex flex-col gap-3">
@@ -66,7 +66,7 @@
                                 <td class="py-2 pr-3 text-right tabular-nums">{{ $m($s->fond_initial) }}</td>
                                 <td class="py-2 pr-3 text-right tabular-nums">{{ $s->fond_final === null ? '—' : $m($s->fond_final) }}</td>
                                 <td class="py-2 pr-3 text-right tabular-nums font-bold {{ (int) $s->ecart < 0 ? 'text-danger-fg' : ((int) $s->ecart > 0 ? 'text-warn-fg' : 'text-succes-fonce') }}">{{ $ecart($s->ecart === null ? null : (int) $s->ecart) }}</td>
-                                <td class="py-2 text-muted">{{ $s->notes }}</td>
+                                <td class="py-2 {{ $s->fermee_auto ? 'text-warn-fg font-semibold' : 'text-muted' }}">{{ $s->notes }}</td>
                             </tr>
                         @endforeach
                     </tbody>

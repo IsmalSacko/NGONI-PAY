@@ -172,6 +172,8 @@ class Index extends Component
             'fermees' => $fermees,
             'ecartTotal' => (int) $fermees->sum('ecart'),
             'manques' => $fermees->where('ecart', '<', 0)->count(),
+            // Fermées par Ngoni à 4 h, faute de l'avoir été au comptoir.
+            'nonComptees' => $fermees->where('fermee_auto', true)->count(),
             'peutFermer' => $this->peutFermer(),
             'peutOuvrir' => $this->peutOuvrir($sessions),
             'titreMois' => ucfirst($du->locale('fr')->translatedFormat('F Y')),

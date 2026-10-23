@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'fond_initial', 'fond_final', 'ecart', 'statut', 'ouverte_le', 'fermee_le', 'notes'])]
+#[Fillable(['user_id', 'fond_initial', 'fond_final', 'ecart', 'statut', 'ouverte_le', 'fermee_le', 'fermee_auto', 'rappel_le', 'notes'])]
 class SessionCaisse extends Model
 {
     /** @use HasFactory<SessionCaisseFactory> */
@@ -26,6 +26,8 @@ class SessionCaisse extends Model
         return [
             'ouverte_le' => 'datetime',
             'fermee_le' => 'datetime',
+            'fermee_auto' => 'boolean',
+            'rappel_le' => 'datetime',
         ];
     }
 

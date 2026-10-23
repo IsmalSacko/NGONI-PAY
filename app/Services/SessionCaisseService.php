@@ -10,7 +10,13 @@ use App\Models\EncaissementPressing;
 use App\Models\EncaissementRestaurant;
 use App\Models\ReglementCredit;
 use App\Models\SessionCaisse;
+use App\Models\Boutique;
 use App\Models\User;
+use App\Models\Vente;
+use App\Support\Fuseau;
+use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -111,5 +117,121 @@ class SessionCaisseService
     public function courante(User $caissier): ?SessionCaisse
     {
         return SessionCaisse::where('user_id', $caissier->id)->where('statut', 'ouverte')->first();
+    }
+
+    /** Heure locale (pays de la boutique) du rappel « caisse encore ouverte ». */
+    public const HEURE_RAPPEL = 23;
+
+    /** Heure locale de la fermeture automatique : après les ventes de la nuit (bars, restaurants). */
+    public const HEURE_FERMETURE = 4;
+
+    /**
+     * Créneau de la fermeture, de 4 h à 8 h : rattrape un passage manqué
+     * (serveur arrêté à 4 h) sans jamais couper une caisse en pleine journée.
+     */
+    public const FIN_CRENEAU_FERMETURE = 8;
+
+    /** Mention d'une séance fermée par Ngoni, faute de l'avoir été au comptoir. */
+    public const NOTE_AUTO = 'Fermée automatiquement — non comptée';
+
+    /**
+     * Fermeture d'une caisse oubliée : sans comptage, donc sans fond compté ni
+     * écart (en inventer un cacherait un manque). Datée de la dernière
+     * opération de la séance, pas de l'heure du passage de Ngoni : la caisse a
+     * servi ce soir-là, pas à 4 h du matin.
+     */
+    public function fermerAutomatiquement(SessionCaisse $session): SessionCaisse
+    {
+        $session->update([
+            'statut' => 'fermee',
+            'fond_final' => null,
+            'ecart' => null,
+            'fermee_le' => $this->derniereOperation($session),
+            'fermee_auto' => true,
+            'notes' => self::NOTE_AUTO,
+        ]);
+
+        return $session->fresh();
+    }
+
+    /** Le moment de la dernière opération de la séance (son ouverture, sans opération). */
+    public function derniereOperation(SessionCaisse $session): Carbon
+    {
+        return collect([
+            $session->ouverte_le,
+            Vente::withoutBoutiqueScope()->where('session_caisse_id', $session->id)->max('created_at'),
+            ReglementCredit::withoutBoutiqueScope()->where('session_caisse_id', $session->id)->max('created_at'),
+            Depense::withoutBoutiqueScope()->where('session_caisse_id', $session->id)->max('created_at'),
+            EncaissementPressing::withoutBoutiqueScope()->where('session_caisse_id', $session->id)->max('created_at'),
+            EncaissementRestaurant::withoutBoutiqueScope()->where('session_caisse_id', $session->id)->max('created_at'),
+        ])->filter()->map(fn ($d) => Carbon::parse($d))->max();
+    }
+
+    /**
+     * Tâche horaire, à l'heure du pays de chaque boutique : à 23 h, rappel au
+     * caissier et au propriétaire d'une caisse encore ouverte qui a servi dans
+     * la journée (une fois par soir) ; entre 4 h et 8 h, fermeture automatique
+     * des caisses ouvertes avant 4 h qui ont servi dans les 24 heures (le
+     * créneau rattrape un passage manqué, jamais en pleine journée). Une
+     * boutique endormie n'est ni rappelée ni fermée.
+     *
+     * @return array{rappels: int, fermees: int}
+     */
+    public function passageHoraire(CarbonInterface $instant): array
+    {
+        $ouvertes = SessionCaisse::withoutBoutiqueScope()->where('statut', 'ouverte')->get()->groupBy('boutique_id');
+        $tenant = app(TenantContext::class);
+        $precedente = $tenant->boutiqueId();
+        $bilan = ['rappels' => 0, 'fermees' => 0];
+
+        foreach (Boutique::whereIn('id', $ouvertes->keys())->get() as $boutique) {
+            $local = Carbon::instance($instant->toDateTime())->setTimezone(Fuseau::pourPays($boutique->pays));
+            $limite = $local->copy()->startOfDay()->setTime(self::HEURE_FERMETURE, 0);
+            $tenant->setBoutique($boutique->id);
+            try {
+                foreach ($ouvertes[$boutique->id] as $session) {
+                    if ($local->hour >= self::HEURE_FERMETURE && $local->hour < self::FIN_CRENEAU_FERMETURE
+                        && $session->ouverte_le->lt($limite)
+                        // Seulement une caisse qui a servi la veille : celle d'une
+                        // boutique endormie reste comme elle est.
+                        && $this->derniereOperation($session)->gte($limite->copy()->subDay())) {
+                        $this->fermerAutomatiquement($session);
+                        $bilan['fermees']++;
+                    } elseif ($local->hour >= self::HEURE_RAPPEL
+                        && ($session->rappel_le === null || $session->rappel_le->lt($local->copy()->startOfDay()))
+                        // Seulement une caisse qui a servi aujourd'hui : une boutique
+                        // endormie ne reçoit pas un rappel chaque soir.
+                        && $this->derniereOperation($session)->gte($local->copy()->startOfDay())) {
+                        $this->rappeler($boutique, $session);
+                        $session->update(['rappel_le' => $instant]);
+                        $bilan['rappels']++;
+                    }
+                }
+            } finally {
+                $precedente === null ? $tenant->forget() : $tenant->setBoutique($precedente);
+            }
+        }
+
+        return $bilan;
+    }
+
+    /** « Votre caisse est encore ouverte » : au caissier, et au propriétaire s'il est un autre. */
+    private function rappeler(Boutique $boutique, SessionCaisse $session): void
+    {
+        $destinataires = User::whereIn('id', array_filter([$session->user_id, $boutique->proprietaire_id]))
+            ->where('is_active', true)->get();
+        foreach ($destinataires as $u) {
+            $soi = $u->id === $session->user_id;
+            app(NotifierCompte::class)->envoyer(
+                $u,
+                'Caisse encore ouverte',
+                $soi
+                    ? 'Votre caisse est encore ouverte : comptez le tiroir et fermez-la. Sinon, Ngoni la fermera à 4 h sans comptage.'
+                    : 'La caisse de '.($session->caissier?->name ?? 'un caissier').' est encore ouverte. Sans fermeture, Ngoni la fermera à 4 h sans comptage.',
+                '/caisse',
+                'caisse',
+                email: false,
+            );
+        }
     }
 }

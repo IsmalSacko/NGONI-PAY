@@ -96,6 +96,15 @@ Artisan::command('ecaisse:coffres', function () {
 // veille est rattrapée si la tâche n'a pas tourné, jamais deux fois.
 Schedule::command('ecaisse:coffres')->hourly()->withoutOverlapping();
 
+// Caisse oubliée : rappel à 23 h, fermeture sans comptage à 4 h (heure du pays de chaque boutique).
+Artisan::command('ecaisse:caisses-oubliees', function () {
+    $b = app(\App\Services\SessionCaisseService::class)->passageHoraire(now());
+    if ($b['rappels'] + $b['fermees'] > 0) {
+        $this->info("Caisses oubliées : {$b['rappels']} rappel(s), {$b['fermees']} fermeture(s) automatique(s).");
+    }
+})->purpose('Rappelle à 23 h les caisses encore ouvertes, les ferme sans comptage à 4 h (heure du pays)');
+Schedule::command('ecaisse:caisses-oubliees')->hourly()->withoutOverlapping();
+
 Artisan::command('ecaisse:bilan-mensuel', function () {
     $n = app(BilanMensuel::class)->envoyer(today());
     if ($n > 0) {
