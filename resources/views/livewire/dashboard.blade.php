@@ -13,6 +13,51 @@
         @endif
     </x-charte.carte-heros>
 
+    {{-- Objectif du mois et série de jours de vente, comme la carte Élan du Pilotage. --}}
+    @if ($elan)
+        @php($o = $elan['objectif'])
+        @php($serie = $elan['serie'])
+        <x-charte.carte class="p-5 flex flex-col gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <x-charte.en-tete-section icone="flag" titre="Objectif du mois"
+                    :sous-titre="$serie['jours'] > 0 ? $serie['jours'].' jour'.($serie['jours'] > 1 ? 's' : '').' de vente d’affilée'.($serie['aujourdhui'] ? '' : ' : une vente aujourd’hui garde la série') : 'Une vente aujourd’hui lance la série.'" />
+                @can('boutique.update')
+                    <button wire:click="ouvrirObjectif" class="h-10 px-4 rounded-xl {{ $o['montant'] ? 'bg-white border border-border-strong text-accent' : 'bg-accent text-white' }} font-bold text-sm">
+                        {{ $o['montant'] ? 'Modifier l’objectif' : 'Fixer un objectif du mois' }}
+                    </button>
+                @endcan
+            </div>
+            @if ($o['montant'])
+                @php($pct = min(100, (int) $o['pourcentage']))
+                <div class="flex items-baseline justify-between gap-2">
+                    <span class="font-display font-extrabold text-2xl text-ink tabular-nums">{{ $m($o['realise']) }} <span class="text-base text-muted font-semibold">/ {{ $m($o['montant']) }} {{ $boutique->devise }}</span></span>
+                    <span class="font-extrabold {{ $o['pourcentage'] >= 100 ? 'text-succes-fonce' : 'text-accent' }}">{{ $o['pourcentage'] }} %</span>
+                </div>
+                <div class="h-3 rounded-full bg-accent-soft overflow-hidden" role="progressbar" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="h-full rounded-full {{ $o['pourcentage'] >= 100 ? 'bg-succes' : 'bg-jaune' }}" style="width: {{ $pct }}%"></div>
+                </div>
+                <p class="text-xs text-muted">{{ $o['pourcentage'] >= 100 ? 'Objectif atteint, bravo !' : 'Encore '.$m($o['montant'] - $o['realise']).' '.$boutique->devise.' pour l’atteindre.' }}</p>
+            @endif
+        </x-charte.carte>
+    @endif
+
+    @if ($objectifOuvert)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('objectifOuvert', false)">
+            <form wire:submit="enregistrerObjectif" class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-sm flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl text-accent">Objectif du mois</h2>
+                <label class="text-sm font-semibold">Chiffre d’affaires visé ce mois-ci ({{ $boutique->devise }})
+                    <input wire:model="objectif" type="text" inputmode="decimal" placeholder="ex. 1 500 000" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
+                </label>
+                @error('objectif') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                <p class="text-xs text-muted">Laissez vide pour retirer l’objectif.</p>
+                <div class="flex gap-3 mt-2">
+                    <button type="button" wire:click="$set('objectifOuvert', false)" class="flex-1 h-11 rounded-xl bg-white border border-border-strong font-bold">Annuler</button>
+                    <button type="submit" class="flex-1 h-11 rounded-xl bg-accent text-white font-bold">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         @foreach ([['Tickets', $tickets, 'receipt_long'], ['Panier moyen', $m($panierMoyen).' '.$boutique->devise, 'shopping_basket'], ['TVA collectée', $m($tva).' '.$boutique->devise, 'percent']] as [$libelle, $valeur, $icone])
             <x-charte.carte class="p-4 flex flex-col gap-2">

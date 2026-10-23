@@ -10,9 +10,14 @@ use App\Models\Boutique;
 use App\Models\LigneVente;
 use App\Models\Produit;
 use App\Models\Vente;
+use App\Models\Plan;
+use App\Services\AbonnementService;
+use App\Services\Elan;
 use App\Services\Journee;
 use App\Services\Rapports;
 use App\Support\Fuseau;
+use App\Support\Money\Montant;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -27,6 +32,11 @@ class Dashboard extends Component
         'ventes.index' => 'ventes.view', 'clients.index' => 'clients.view', 'utilisateurs.index' => 'utilisateurs.view',
     ];
 
+    /** Fenêtre « Objectif du mois » ouverte. */
+    public bool $objectifOuvert = false;
+
+    public string $objectif = '';
+
     public function mount()
     {
         // Le chiffre d'affaires est un droit du membre (Permissions::DROITS) :
@@ -40,6 +50,38 @@ class Dashboard extends Component
             }
         }
         abort(403);
+    }
+
+    /** L'objectif du mois, comme au Pilotage : réglé par l'admin, offre qui le comprend. */
+    private function autoriserObjectif(): Boutique
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $boutique = Boutique::findOrFail($this->boutiqueActiveId());
+        app(AbonnementService::class)->permet($boutique, Plan::OBJECTIF_MOIS) || abort(403);
+
+        return $boutique;
+    }
+
+    public function ouvrirObjectif(): void
+    {
+        $boutique = $this->autoriserObjectif();
+        $this->resetValidation();
+        $this->objectif = $boutique->objectif_mensuel === null ? '' : Montant::saisie((int) $boutique->objectif_mensuel);
+        $this->objectifOuvert = true;
+    }
+
+    public function enregistrerObjectif(): void
+    {
+        $boutique = $this->autoriserObjectif();
+        // Vide : plus d'objectif.
+        $montant = trim($this->objectif) === '' ? null : Montant::parse($this->objectif);
+        if (trim($this->objectif) !== '' && ($montant === null || $montant < 1)) {
+            $this->addError('objectif', 'Indiquez un montant, ou laissez vide pour retirer l’objectif.');
+
+            return;
+        }
+        $boutique->forceFill(['objectif_mensuel' => $montant])->save();
+        $this->objectifOuvert = false;
     }
 
     public function render()
@@ -90,8 +132,12 @@ class Dashboard extends Component
             ->limit(6)
             ->get();
 
+        $objectifInclus = $boutique !== null && app(AbonnementService::class)->permet($boutique, Plan::OBJECTIF_MOIS);
+
         return view('livewire.dashboard', [
             'boutique' => $boutique,
+            // Ce qui donne envie d'ouvrir la caisse : l'objectif du mois et la série de jours de vente.
+            'elan' => $objectifInclus ? app(Elan::class)->pour($boutique) : null,
             'total' => $total,
             'tickets' => $tickets,
             'tva' => $tva,
