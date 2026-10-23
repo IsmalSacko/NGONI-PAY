@@ -253,6 +253,64 @@
                         <label class="block text-sm font-semibold mb-1">Message en bas du ticket</label>
                         <input wire:model="reglages.message_ticket" type="text" maxlength="160" placeholder="Merci de votre visite ! Les articles vendus ne sont ni repris ni échangés." class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">
                     </div>
+                    {{-- La facture, comme l'écran Ma boutique de l'application. --}}
+                    <fieldset class="rounded-xl border border-[--color-border-strong] p-3 flex flex-col gap-3">
+                        <legend class="px-1 text-sm font-extrabold">Modèle de facture</legend>
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach (['standard' => 'Standard', 'distributeur' => 'Distributeur'] as $code => $lib)
+                                <label class="h-10 rounded-lg border flex items-center justify-center font-bold cursor-pointer {{ ($reglages['modele_facture'] ?? 'standard') === $code ? 'bg-accent text-white border-accent' : 'border-[--color-border-strong]' }}">
+                                    <input type="radio" wire:model.live="reglages.modele_facture" value="{{ $code }}" class="sr-only">{{ $lib }}
+                                </label>
+                            @endforeach
+                        </div>
+                        @if (($reglages['modele_facture'] ?? 'standard') === 'distributeur')
+                            <p class="text-xs text-[--color-muted]">Pour les grossistes et distributeurs : code des articles et des clients, identifiant fiscal du client, PSA et frais par article.</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="block text-sm font-semibold">Boîte postale <span class="font-normal text-[--color-muted]">(facultatif)</span>
+                                    <input wire:model="reglages.boite_postale" type="text" maxlength="60" placeholder="BP 1234 Douala" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                                </label>
+                                <label class="block text-sm font-semibold">PSA / précompte en % <span class="font-normal text-[--color-muted]">(facultatif)</span>
+                                    <input wire:model="reglages.psa_taux" type="text" inputmode="decimal" placeholder="Ex. 2,5" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                                </label>
+                            </div>
+                            @error('reglages.psa_taux') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                            <p class="text-xs text-[--color-muted] -mt-2">Le PSA est compris dans vos prix, comme la TVA. Vide : pas de précompte.</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="block text-sm font-semibold">Titre du bloc des articles
+                                    <input wire:model="reglages.libelle_marchandises" type="text" maxlength="40" placeholder="Marchandises" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                                </label>
+                                <label class="block text-sm font-semibold">Nom des frais par article
+                                    <input wire:model="reglages.libelle_frais" type="text" maxlength="40" placeholder="Frais d’enlèvement" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                                </label>
+                            </div>
+                        @endif
+                    </fieldset>
+                    <fieldset class="rounded-xl border border-[--color-border-strong] p-3 flex flex-col gap-3">
+                        <legend class="px-1 text-sm font-extrabold">Numéro des factures</legend>
+                        @if ($prochaineFacture !== '')
+                            <p class="text-sm">Prochaine facture : <span class="font-extrabold tabular-nums">{{ $prochaineFacture }}</span></p>
+                        @endif
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="block text-sm font-semibold">Préfixe
+                                <input wire:model="reglages.facture_prefixe" type="text" maxlength="10" placeholder="auto (initiales)" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal uppercase">
+                            </label>
+                            <label class="block text-sm font-semibold">Suffixe
+                                <input wire:model="reglages.facture_suffixe" type="text" maxlength="10" placeholder="aucun" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal uppercase">
+                            </label>
+                        </div>
+                        @error('reglages.facture_prefixe') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                        @error('reglages.facture_suffixe') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                        <label class="flex items-start gap-2 text-sm">
+                            <input type="checkbox" wire:model.live="reglages.facture_annee" class="mt-1">
+                            <span><span class="font-semibold">Mettre l’année dans le numéro</span><br>
+                                <span class="text-[--color-muted]">{{ ($reglages['facture_annee'] ?? true) ? 'Le numéro repart à 1 chaque 1er janvier.' : 'Le numéro continue d’année en année.' }}</span></span>
+                        </label>
+                        <label class="block text-sm font-semibold">Prochain numéro <span class="font-normal text-[--color-muted]">(facultatif)</span>
+                            <input wire:model="reglages.facture_prochain_numero" type="text" inputmode="numeric" placeholder="ex. 457, pour suivre votre carnet" class="mt-1 w-full h-10 px-3 rounded-lg border border-[--color-border-strong] font-normal">
+                        </label>
+                        @error('reglages.facture_prochain_numero') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                        <p class="text-xs text-[--color-muted]">Un numéro déjà donné à un client ne resert jamais. Pour repartir à 1, changez de préfixe : une nouvelle série commence.</p>
+                    </fieldset>
                     <div>
                         <label class="block text-sm font-semibold mb-1">E-mail</label>
                         <input wire:model="reglages.email" type="email" class="w-full h-11 px-3 rounded-lg border border-[--color-border-strong]">

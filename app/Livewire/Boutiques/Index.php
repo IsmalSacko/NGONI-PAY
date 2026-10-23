@@ -13,6 +13,7 @@ use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
 use App\Services\Images;
+use App\Services\NumerotationFactures;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
 use App\Support\Money\Currencies;
@@ -163,7 +164,13 @@ class Index extends Component
 
     /** @var array{nom: string, pays: string, devise: string, telephone: string, email: string, adresse: string} */
     public array $reglages = ['nom' => '', 'pays' => '', 'devise' => '', 'telephone' => '', 'email' => '', 'adresse' => '', 'convertir' => true, 'taux' => '',
-        'identifiant_fiscal' => '', 'rccm' => '', 'message_ticket' => ''];
+        'identifiant_fiscal' => '', 'rccm' => '', 'message_ticket' => '',
+        // La facture, comme l'écran Ma boutique de l'application.
+        'modele_facture' => 'standard', 'boite_postale' => '', 'psa_taux' => '', 'libelle_marchandises' => '', 'libelle_frais' => '',
+        'facture_prefixe' => '', 'facture_suffixe' => '', 'facture_annee' => true, 'facture_prochain_numero' => ''];
+
+    /** « NC-2026-0458 » : le numéro que portera la prochaine vente. */
+    public string $prochaineFacture = '';
 
     /** Devise avant modification : le taux se lit « 1 nouvelle = x ancienne ». */
     public string $deviseInitiale = '';
@@ -187,7 +194,13 @@ class Index extends Component
             'telephone' => (string) $b->telephone, 'email' => (string) $b->email, 'adresse' => (string) $b->adresse,
             'convertir' => true, 'taux' => '',
             'identifiant_fiscal' => (string) $b->identifiant_fiscal, 'rccm' => (string) $b->rccm, 'message_ticket' => (string) $b->message_ticket,
+            'modele_facture' => $b->modele_facture ?: 'standard', 'boite_postale' => (string) $b->boite_postale,
+            'psa_taux' => $b->psa_taux === null ? '' : str_replace('.', ',', (string) (0 + (float) $b->psa_taux)),
+            'libelle_marchandises' => (string) $b->libelle_marchandises, 'libelle_frais' => (string) $b->libelle_frais,
+            'facture_prefixe' => (string) $b->facture_prefixe, 'facture_suffixe' => (string) $b->facture_suffixe,
+            'facture_annee' => (bool) ($b->facture_annee ?? true), 'facture_prochain_numero' => '',
         ];
+        $this->prochaineFacture = app(NumerotationFactures::class)->apercu($b);
         $this->deviseInitiale = (string) $b->devise;
         $this->reglagesOuverts = true;
     }
@@ -200,6 +213,7 @@ class Index extends Component
         try {
             $donnees = array_map(fn ($v) => $v === '' ? null : $v, $this->reglages);
             $donnees['taux'] = $donnees['taux'] === null ? null : str_replace(',', '.', (string) $donnees['taux']);
+            $donnees['psa_taux'] = $donnees['psa_taux'] === null ? null : str_replace(',', '.', (string) $donnees['psa_taux']);
             $b = $service->mettreAJour($b, $donnees);
         } catch (ValidationException $e) {
             foreach ($e->errors() as $champ => $messages) {
