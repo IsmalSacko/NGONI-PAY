@@ -7,10 +7,13 @@ namespace Tests\Feature;
 use App\Livewire\Boutiques\Index as BoutiquesIndex;
 use App\Models\Boutique;
 use App\Models\User;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\NumerotationFactures;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use Spatie\Permission\PermissionRegistrar;
@@ -72,5 +75,30 @@ class FactureBackofficeTest extends TestCase
         Livewire::test(BoutiquesIndex::class)->call('ouvrirReglages')
             ->set('reglages.facture_prefixe', 'NC-2')
             ->call('enregistrerReglages')->assertHasErrors('reglages.facture_prefixe');
+    }
+
+    public function test_ma_facture_lue_preremplit_les_reglages_sans_rien_enregistrer(): void
+    {
+        app(AbonnementService::class)->accorder($this->awa, 'pro', now()->addMonth(), $this->awa);
+        config(['ia.lectures_facture_par_mois' => ['pro' => 2]]);
+        // Le service d'IA répond comme Gemini : un JSON dans le texte de la réponse.
+        config(['services.gemini.key' => 'cle-de-test', 'services.gemini.model' => 'modele-test', 'services.gemini.fallback_model' => 'modele-test']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+            'modele' => 'distributeur', 'adresse' => 'Akwa, Douala', 'boite_postale' => 'BP 77 Douala', 'psa_taux' => 2.5,
+            'tva_taux' => 19.25, 'libelle_frais' => 'Frais d’enlèvement', 'mentions' => ['NIU M0123', 'BP 77'],
+        ])]]]]]])]);
+        $this->actingAs($this->awa);
+
+        $page = Livewire::test(BoutiquesIndex::class)->call('ouvrirReglages')
+            ->assertSee('Importer ma facture')->assertSee('2 imports restants')
+            ->set('facture', UploadedFile::fake()->create('facture.pdf', 120, 'application/pdf'))
+            ->assertHasNoErrors()
+            ->assertSet('reglages.modele_facture', 'distributeur')->assertSet('reglages.adresse', 'Akwa, Douala')
+            ->assertSet('reglages.psa_taux', '2,5')->assertSee('NIU M0123')->assertSee('1 import restant');
+        // Rien n'est enregistré avant « Enregistrer ».
+        $this->assertNotSame('distributeur', $this->boutique->fresh()->modele_facture);
+
+        $page->call('enregistrerReglages')->assertHasNoErrors();
+        $this->assertSame('BP 77 Douala', $this->boutique->fresh()->boite_postale);
     }
 }

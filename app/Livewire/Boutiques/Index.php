@@ -13,6 +13,8 @@ use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
 use App\Services\Images;
+use App\Services\Ia\LectureFacture;
+use App\Services\Ia\QuotaLectureFacture;
 use App\Services\NumerotationFactures;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
@@ -172,6 +174,61 @@ class Index extends Component
     /** « NC-2026-0458 » : le numéro que portera la prochaine vente. */
     public string $prochaineFacture = '';
 
+    /** « Ma facture » : la facture du commerçant, lue pour préremplir les réglages. */
+    public $facture = null;
+
+    /** Ce que la lecture a trouvé (mentions, TVA), à vérifier avant d'enregistrer. */
+    public array $factureLue = [];
+
+    /** Imports du mois : par_mois, restantes, renouvellement. */
+    public array $quotaFacture = [];
+
+    /**
+     * La facture envoyée est lue tout de suite (comme dans l'application) :
+     * les champs trouvés remplacent ceux du formulaire, le modèle le plus
+     * proche est choisi. Rien n'est enregistré sans « Enregistrer ».
+     */
+    public function updatedFacture(LectureFacture $lecture, QuotaLectureFacture $quota): void
+    {
+        Auth::user()->can('boutique.update') || abort(403);
+        $this->resetValidation('facture');
+        $this->validate(['facture' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,heic,pdf', 'max:8192']], [], ['facture' => 'facture']);
+        $b = Boutique::findOrFail($this->boutiqueActiveId());
+
+        if ($quota->restantes($b) <= 0) {
+            $etat = $quota->etat($b);
+            $this->addError('facture', $etat['par_mois'] === 0
+                ? 'L’import de facture n’est pas compris dans votre offre actuelle.'
+                : 'Vous avez déjà importé '.($etat['par_mois'] === 1 ? 'votre facture' : "vos {$etat['par_mois']} factures").' ce mois-ci. '
+                    .'Vous pourrez recommencer le '.\Illuminate\Support\Carbon::parse($etat['renouvellement'])->translatedFormat('j F').'.');
+            $this->reset('facture');
+
+            return;
+        }
+        try {
+            $lue = $lecture->lire($this->facture);
+        } catch (\RuntimeException $e) {
+            $this->addError('facture', $e->getMessage());
+            $this->reset('facture');
+
+            return;
+        }
+        $quota->compter($b, (string) Auth::id());
+
+        foreach (['adresse', 'telephone', 'email', 'boite_postale', 'identifiant_fiscal', 'rccm', 'message_ticket', 'libelle_marchandises', 'libelle_frais'] as $champ) {
+            if (filled($lue[$champ] ?? null)) {
+                $this->reglages[$champ] = trim((string) $lue[$champ]);
+            }
+        }
+        if (($lue['psa_taux'] ?? null) !== null) {
+            $this->reglages['psa_taux'] = str_replace('.', ',', (string) (0 + (float) $lue['psa_taux']));
+        }
+        $this->reglages['modele_facture'] = $lue['modele'] ?? 'standard';
+        $this->factureLue = ['mentions' => $lue['mentions'] ?? [], 'tva_taux' => $lue['tva_taux'] ?? null, 'modele' => $this->reglages['modele_facture']];
+        $this->quotaFacture = $quota->etat($b);
+        $this->reset('facture');
+    }
+
     /** Devise avant modification : le taux se lit « 1 nouvelle = x ancienne ». */
     public string $deviseInitiale = '';
 
@@ -201,6 +258,8 @@ class Index extends Component
             'facture_annee' => (bool) ($b->facture_annee ?? true), 'facture_prochain_numero' => '',
         ];
         $this->prochaineFacture = app(NumerotationFactures::class)->apercu($b);
+        $this->factureLue = [];
+        $this->quotaFacture = app(QuotaLectureFacture::class)->etat($b);
         $this->deviseInitiale = (string) $b->devise;
         $this->reglagesOuverts = true;
     }

@@ -263,6 +263,27 @@
                                 </label>
                             @endforeach
                         </div>
+                        {{-- « Ma facture » : la facture déjà utilisée, lue pour préremplir. --}}
+                        @if (($quotaFacture['par_mois'] ?? 0) > 0)
+                            <div class="rounded-lg bg-[--color-accent-soft] p-3 flex flex-col gap-2">
+                                <span class="text-sm font-semibold">D’après ma facture</span>
+                                <span class="text-xs text-[--color-muted]">Envoyez une photo ou un PDF de la facture que vous utilisez déjà. Ngoni la lit, remplit vos mentions (adresse, boîte postale, identifiant fiscal, RCCM, taux…) et choisit le modèle le plus proche. Vous vérifiez avant d’enregistrer.</span>
+                                <label class="inline-flex items-center gap-2 self-start h-10 px-4 rounded-lg bg-white border border-[--color-border-strong] font-bold text-sm cursor-pointer">
+                                    <x-charte.icone nom="upload_file" :taille="18" /><span wire:loading.remove wire:target="facture">Importer ma facture</span><span wire:loading wire:target="facture">Lecture de la facture…</span>
+                                    <input type="file" wire:model="facture" accept="image/*,application/pdf" class="sr-only">
+                                </label>
+                                <span class="text-xs text-[--color-muted]">{{ ($quotaFacture['restantes'] ?? 0) > 0 ? ($quotaFacture['restantes'].' import'.($quotaFacture['restantes'] > 1 ? 's' : '').' restant'.($quotaFacture['restantes'] > 1 ? 's' : '').' ce mois-ci.') : 'Plus d’import ce mois-ci.' }}</span>
+                                @error('facture') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                                @if ($factureLue)
+                                    <div class="rounded-lg bg-white p-3 text-sm">
+                                        <p class="font-extrabold">Lu sur votre facture : modèle {{ ($factureLue['modele'] ?? '') === 'distributeur' ? 'Distributeur' : 'Standard' }}</p>
+                                        @if (! empty($factureLue['mentions']))<p class="text-[--color-muted]">{{ implode(' · ', $factureLue['mentions']) }}</p>@endif
+                                        @if (($factureLue['tva_taux'] ?? null) !== null)<p class="text-[--color-muted]">TVA {{ str_replace('.', ',', (string) (0 + (float) $factureLue['tva_taux'])) }} % : elle se règle sur chaque article.</p>@endif
+                                        <p class="text-xs text-[--color-muted] mt-1">Vérifiez les champs ci-dessous, puis Enregistrer.</p>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
                         @if (($reglages['modele_facture'] ?? 'standard') === 'distributeur')
                             <p class="text-xs text-[--color-muted]">Pour les grossistes et distributeurs : code des articles et des clients, identifiant fiscal du client, PSA et frais par article.</p>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
