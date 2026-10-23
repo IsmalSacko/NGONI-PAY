@@ -433,7 +433,7 @@ class PlateformeController extends Controller
             'cibles.*' => ['string'],
         ]);
 
-        return response()->json(['destinataires' => $annonces->destinatairesPrevus($data['audience'], $data['cibles'] ?? [])]);
+        return response()->json(['destinataires' => $annonces->destinatairesPrevus($data['audience'], $data['cibles'] ?? [], $request->input('type'))]);
     }
 
     /** Comptes à choisir pour une annonce ciblée. */

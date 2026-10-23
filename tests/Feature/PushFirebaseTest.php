@@ -25,6 +25,9 @@ class PushFirebaseTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Les annonces vont aux comptes vus dans l'application depuis 14 jours :
+        // ceux de ces tests le sont.
+        User::creating(fn (User $u) => $u->vu_le ??= now());
         Cache::flush();
 
         // Fausse clé de compte de service, signée avec une vraie clé RSA.

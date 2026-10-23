@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Annonce;
+use App\Models\User;
 use App\Models\NotificationApp;
 use App\Services\BoutiqueRegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +27,9 @@ class AnnonceMiseAJourAutoTest extends TestCase
                 'email' => $email, 'password' => 'password123', 'nom_utilisateur' => $nom,
             ]);
         }
+
+        // Les annonces vont aux comptes vus dans l'application depuis 14 jours.
+        User::query()->update(['vu_le' => now()]);
 
         // Comme en production : la 3.0.1 a déjà été annoncée depuis la console.
         Annonce::create(['type' => 'mise_a_jour', 'titre' => 'Nouvelle version', 'message' => '…', 'version' => '3.0.1', 'audience' => 'tous', 'statut' => 'envoyee']);

@@ -64,8 +64,8 @@ class Tutoriels extends Component
 
         if ($this->edite === null) {
             $tutoriel = Tutoriel::create($data + ['ordre' => (int) Tutoriel::max('ordre') + 1]);
-            $annonce = $this->prevenir ? app(AnnonceTutoriel::class)->annoncer($tutoriel, Auth::user()) : null;
-            $this->info = "« {$data['titre']} » ajouté".($annonce ? ' : les commerçants sont prévenus par notification.' : ' : visible dans l’aide.');
+            $enAttente = $this->prevenir && app(AnnonceTutoriel::class)->mettreEnAttente($tutoriel);
+            $this->info = "« {$data['titre']} » ajouté".($enAttente ? ' : les commerçants seront prévenus lundi, dans le résumé des vidéos de la semaine.' : ' : visible dans l’aide.');
         } else {
             Tutoriel::findOrFail($this->edite)->update($data);
             $this->info = "« {$data['titre']} » enregistré.";

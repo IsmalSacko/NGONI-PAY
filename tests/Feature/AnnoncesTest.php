@@ -40,6 +40,8 @@ class AnnoncesTest extends TestCase
         $this->moussa = $inscrire('Moussa', '76008202', null);
         $this->moussa->abonnement()->update(['fin' => now()->subDay()->toDateString()]);
         $this->exploitant = User::factory()->create(['est_admin_plateforme' => true]);
+        // Les annonces vont aux comptes vus dans l'application depuis 14 jours.
+        User::query()->update(['vu_le' => now()]);
     }
 
     public function test_une_mise_a_jour_notifie_tout_le_monde_sans_e_mail(): void
@@ -79,12 +81,12 @@ class AnnoncesTest extends TestCase
     public function test_l_exploitant_qui_tient_une_boutique_recoit_les_annonces(): void
     {
         // Sans boutique : écarté (il n'utilise que la console).
-        $sansBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous']))->pluck('id');
+        $sansBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous', 'type' => 'mise_a_jour']))->pluck('id');
         $this->assertNotContains($this->exploitant->id, $sansBoutique);
 
         // Avec une boutique : commerçant comme les autres.
         $this->exploitant->forceFill(['boutique_id' => Boutique::value('id')])->save();
-        $avecBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous']))->pluck('id');
+        $avecBoutique = app(DiffusionAnnonces::class)->destinataires(new Annonce(['audience' => 'tous', 'type' => 'mise_a_jour']))->pluck('id');
         $this->assertContains($this->exploitant->id, $avecBoutique);
     }
 
@@ -137,5 +139,58 @@ class AnnoncesTest extends TestCase
     {
         $this->actingAs($this->awa)->get('/plateforme/annonces')->assertForbidden();
         $this->actingAs($this->exploitant)->get('/plateforme/annonces')->assertOk()->assertSee('Annonces');
+    }
+
+    public function test_les_messages_vont_aux_commercants_actifs_et_les_mises_a_jour_a_chaque_telephone(): void
+    {
+        $diffusion = app(DiffusionAnnonces::class);
+        $caissier = User::create(['boutique_id' => $this->awa->boutique_id, 'name' => 'Ali', 'phone' => '+22370000071', 'password' => 'password123']);
+        $caissier->forceFill(['vu_le' => now()])->save();
+        $endormi = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Boutique Endormie', 'pays' => 'ML', 'telephone' => '76008209', 'email' => null, 'password' => 'password123', 'nom_utilisateur' => 'Sidi',
+        ])['user'];
+        $endormi->forceFill(['vu_le' => now()->subDays(20)])->save();
+
+        $message = $diffusion->destinataires(new Annonce(['audience' => 'tous', 'type' => 'message']))->pluck('id');
+        $this->assertContains($this->awa->id, $message);
+        // Pas le caissier, pas celui qui n'ouvre plus l'application.
+        $this->assertNotContains($caissier->id, $message);
+        $this->assertNotContains($endormi->id, $message);
+
+        // Une mise à jour : chaque téléphone actif, caissier compris.
+        $miseAJour = $diffusion->destinataires(new Annonce(['audience' => 'tous', 'type' => 'mise_a_jour']))->pluck('id');
+        $this->assertContains($caissier->id, $miseAJour);
+        $this->assertNotContains($endormi->id, $miseAJour);
+
+        // La relance des expirés vise justement ceux qui ne viennent plus.
+        $endormi->abonnement()->update(['fin' => now()->subDay()->toDateString()]);
+        $this->assertContains($endormi->id, $diffusion->destinataires(new Annonce(['audience' => 'expires', 'type' => 'message']))->pluck('id'));
+    }
+
+    public function test_une_seule_annonce_par_jour_la_suivante_attend_le_lendemain(): void
+    {
+        $diffusion = app(DiffusionAnnonces::class);
+        $premiere = Annonce::create(['type' => 'message', 'titre' => 'Première', 'message' => '…', 'audience' => 'tous', 'statut' => 'programmee', 'programmee_le' => now()]);
+        $seconde = Annonce::create(['type' => 'message', 'titre' => 'Seconde', 'message' => '…', 'audience' => 'tous', 'statut' => 'programmee', 'programmee_le' => now()]);
+
+        $diffusion->diffuser($premiere);
+        $diffusion->diffuser($seconde);
+        $this->assertSame(0, NotificationApp::where('annonce_id', $seconde->id)->count());
+        $seconde->refresh();
+        $this->assertSame('en_cours', $seconde->statut);
+        $this->assertNotNull($seconde->reprise_le);
+        // Pas de nouvel essai chaque minute.
+        $this->assertSame(0, $diffusion->diffuserLesEcheances());
+
+        // Le lendemain, elle part et se termine.
+        $this->travel(21)->hours();
+        $diffusion->diffuserLesEcheances();
+        $this->assertSame(NotificationApp::where('annonce_id', $premiere->id)->count(), NotificationApp::where('annonce_id', $seconde->id)->count());
+        $this->assertSame('envoyee', $seconde->fresh()->statut);
+
+        // Une mise à jour, elle, ne attend jamais.
+        $maj = Annonce::create(['type' => 'mise_a_jour', 'titre' => 'Version', 'message' => '…', 'version' => '9.0.0', 'audience' => 'tous', 'statut' => 'programmee', 'programmee_le' => now()]);
+        $diffusion->diffuser($maj);
+        $this->assertGreaterThan(0, NotificationApp::where('annonce_id', $maj->id)->count());
     }
 }

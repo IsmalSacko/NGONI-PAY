@@ -32,6 +32,9 @@ class ConsoleMobileTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Les annonces vont aux comptes vus dans l'application depuis 14 jours :
+        // ceux de ces tests le sont.
+        User::creating(fn (User $u) => $u->vu_le ??= now());
         Mail::fake();
 
         // L'exploitant tient aussi sa boutique, comme en production.

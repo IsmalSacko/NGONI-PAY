@@ -101,7 +101,7 @@ class Annonces extends Component
     {
         return view('livewire.plateforme.annonces', [
             'annonces' => Annonce::latest('id')->limit(50)->get(),
-            'apercu' => $this->formulaire ? $annonces->destinatairesPrevus($this->audience, $this->cibles) : null,
+            'apercu' => $this->formulaire ? $annonces->destinatairesPrevus($this->audience, $this->cibles, $this->type) : null,
             'comptes' => $this->formulaire && $this->audience === 'selection' ? $annonces->rechercherComptes($this->recherche) : collect(),
             'choisis' => User::whereIn('id', $this->cibles)->get(['id', 'name', 'phone']),
         ]);

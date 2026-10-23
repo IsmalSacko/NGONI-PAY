@@ -24,7 +24,7 @@ class Annonce extends Model
 
     protected $fillable = [
         'type', 'titre', 'message', 'version', 'lien', 'audience', 'par_email', 'statut',
-        'programmee_le', 'recurrence', 'derniere_diffusion', 'nb_notifies', 'nb_emails', 'nb_echecs', 'cree_par',
+        'programmee_le', 'recurrence', 'derniere_diffusion', 'reprise_le', 'nb_notifies', 'nb_emails', 'nb_echecs', 'cree_par',
     ];
 
     protected function casts(): array
@@ -32,6 +32,7 @@ class Annonce extends Model
         return [
             'par_email' => 'boolean',
             'programmee_le' => 'datetime',
+            'reprise_le' => 'datetime',
             'derniere_diffusion' => 'datetime',
         ];
     }

@@ -22,11 +22,11 @@ class Tutoriel extends Model
         'autre' => 'Autre',
     ];
 
-    protected $fillable = ['titre', 'sous_titre', 'categorie', 'url', 'ordre', 'actif'];
+    protected $fillable = ['titre', 'sous_titre', 'categorie', 'url', 'ordre', 'actif', 'a_annoncer', 'annonce_le'];
 
     protected function casts(): array
     {
-        return ['actif' => 'boolean', 'ordre' => 'integer'];
+        return ['actif' => 'boolean', 'ordre' => 'integer', 'a_annoncer' => 'boolean', 'annonce_le' => 'datetime'];
     }
 
     /**

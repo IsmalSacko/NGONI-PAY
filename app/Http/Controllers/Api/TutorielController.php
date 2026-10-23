@@ -38,11 +38,11 @@ class TutorielController extends Controller
     {
         $tutoriel = Tutoriel::create($this->valider($request) + ['ordre' => (int) Tutoriel::max('ordre') + 1]);
 
-        // « Prévenir les commerçants » : coché par défaut.
-        $annonce = $request->boolean('prevenir', true) ? $annonces->annoncer($tutoriel, $request->user()) : null;
+        // « Prévenir les commerçants » : coché par défaut ; le résumé part le lundi.
+        $enAttente = $request->boolean('prevenir', true) && $annonces->mettreEnAttente($tutoriel);
 
         return response()->json([
-            'message' => "« {$tutoriel->titre} » ajouté".($annonce ? ' : les commerçants sont prévenus.' : '.'),
+            'message' => "« {$tutoriel->titre} » ajouté".($enAttente ? ' : les commerçants seront prévenus lundi (résumé des vidéos de la semaine).' : '.'),
             'data' => $tutoriel->versApplication(),
         ], 201);
     }

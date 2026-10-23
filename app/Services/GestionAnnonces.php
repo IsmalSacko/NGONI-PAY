@@ -63,7 +63,8 @@ class GestionAnnonces
             'titre' => ['required', 'string', 'max:120'],
             'message' => ['required', 'string', 'max:2000'],
             'version' => ['nullable', 'string', 'max:20'],
-            'lien' => ['nullable', 'url', 'max:255'],
+            // Une adresse web, ou un écran de l'application (« /aide »).
+            'lien' => ['nullable', 'string', 'max:255', 'regex:#^(https?://\S+|/[a-z0-9/_-]*)$#i'],
             'audience' => ['required', Rule::in(array_keys(Annonce::AUDIENCES))],
             'quand' => ['required', Rule::in(['maintenant', 'programmer'])],
             'programmee_le' => ['nullable', 'required_if:quand,programmer', 'date', 'after:now'],
@@ -122,11 +123,12 @@ class GestionAnnonces
     }
 
     /** Combien de comptes l'annonce toucherait. @param  list<string>  $cibles */
-    public function destinatairesPrevus(string $audience, array $cibles = []): int
+    public function destinatairesPrevus(string $audience, array $cibles = [], ?string $type = null): int
     {
+        // Le type compte : une mise à jour va aussi aux caissiers, un message aux seuls commerçants.
         return $audience === 'selection'
             ? User::whereIn('id', $cibles)->count()
-            : $this->diffusion->destinataires(new Annonce(['audience' => $audience]))->count();
+            : $this->diffusion->destinataires(new Annonce(['audience' => $audience, 'type' => $type ?? 'message']))->count();
     }
 
     /** Comptes de commerçants à choisir, par nom ou téléphone (2 caractères au moins). @return Collection<int, User> */

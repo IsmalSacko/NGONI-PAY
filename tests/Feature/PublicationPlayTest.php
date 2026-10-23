@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Models\Annonce;
 use App\Models\NotificationApp;
 use App\Services\BoutiqueRegistrationService;
@@ -18,6 +19,9 @@ class PublicationPlayTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Les annonces vont aux comptes vus dans l'application depuis 14 jours :
+        // ceux de ces tests le sont.
+        User::creating(fn (User $u) => $u->vu_le ??= now());
         Mail::fake();
         config(['mobile.jeton_publication' => 'secret-ci', 'mobile.latest_version' => '3.0.1', 'mobile.delai_annonce_heures' => 3]);
         app(BoutiqueRegistrationService::class)->register([

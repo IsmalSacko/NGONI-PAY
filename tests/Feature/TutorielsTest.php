@@ -102,31 +102,44 @@ class TutorielsTest extends TestCase
         $this->assertSame(0, Tutoriel::count());
     }
 
-    public function test_une_nouvelle_video_previent_les_commercants_concernes(): void
+    public function test_les_nouvelles_videos_partent_dans_un_seul_resume_le_lundi(): void
     {
         $restaurant = app(BoutiqueRegistrationService::class)->register([
             'nom' => 'Maquis Chez Awa', 'pays' => 'ML', 'telephone' => '76008202', 'password' => 'password123', 'nom_utilisateur' => 'Fanta',
         ]);
         $restaurant['boutique']->forceFill(['activite' => 'restaurant'])->save();
+        // Les annonces vont aux commerçants vus dans l'application depuis 14 jours.
+        User::query()->update(['vu_le' => now()]);
 
-        // Une vidéo générale : tout le monde, et le toucher ouvre YouTube.
+        // Publier ne notifie plus personne : les vidéos attendent le résumé.
+        foreach ([['Enregistrer une vente', 'ventes', 'aaaaaaaaaaa'], ['Ajouter un article', 'stock', 'bbbbbbbbbbb'], ['Gérer les tables', 'restaurant', 'ccccccccccc']] as [$titre, $categorie, $id]) {
+            $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
+                'titre' => $titre, 'categorie' => $categorie, 'url' => "https://youtu.be/{$id}",
+            ])->assertCreated()->assertJsonPath('message', fn ($m) => str_contains($m, 'lundi'));
+        }
         $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
-            'titre' => 'Enregistrer une vente', 'categorie' => 'ventes', 'url' => 'https://youtu.be/dQw4w9WgXcQ',
-        ])->assertCreated()->assertJsonPath('message', fn ($m) => str_contains($m, 'prévenus'));
-        $generale = NotificationApp::where('titre', '🎬 Nouvelle vidéo : Enregistrer une vente')->get();
-        $this->assertCount(3, $generale);
-        $this->assertSame('https://youtu.be/dQw4w9WgXcQ', $generale->first()->lien);
-
-        // Une vidéo du module restaurant : les restaurants seulement.
-        $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
-            'titre' => 'Gérer les tables', 'categorie' => 'restaurant', 'url' => 'https://youtu.be/abcdefghijk',
+            'titre' => 'Correction', 'categorie' => 'ventes', 'url' => 'https://youtu.be/ddddddddddd', 'prevenir' => false,
         ])->assertCreated();
-        $this->assertSame([$restaurant['user']->id], NotificationApp::where('titre', '🎬 Nouvelle vidéo : Gérer les tables')->pluck('user_id')->all());
+        // (Seules les alertes d'inscription de l'exploitant existent à ce stade.)
+        $this->assertSame(0, NotificationApp::whereNotNull('annonce_id')->count());
 
-        // Case décochée : rien n'est envoyé.
-        $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
-            'titre' => 'Correction', 'categorie' => 'ventes', 'url' => 'https://youtu.be/abcdefghijk', 'prevenir' => false,
-        ])->assertCreated();
-        $this->assertSame(0, NotificationApp::where('titre', 'like', '%Correction%')->count());
+        // Le lundi : une seule annonce par commerçant. Les autres reçoivent les deux
+        // vidéos générales ; le restaurant, ces deux-là et la sienne ensemble.
+        $this->artisan('ecaisse:resume-videos')->assertSuccessful();
+        $generale = NotificationApp::where('titre', '🎬 2 nouvelles vidéos d’aide')->get();
+        $this->assertGreaterThan(0, $generale->count());
+        $this->assertNotContains($restaurant['user']->id, $generale->pluck('user_id'));
+        $this->assertSame('/aide', $generale->first()->lien);
+        $this->assertStringContainsString('Enregistrer une vente · Ajouter un article', $generale->first()->message);
+        $resto = NotificationApp::where('user_id', $restaurant['user']->id)->whereNotNull('annonce_id')->get();
+        $this->assertCount(1, $resto);
+        $this->assertSame('🎬 3 nouvelles vidéos d’aide', $resto->first()->titre);
+        $this->assertStringContainsString('Gérer les tables', $resto->first()->message);
+        $this->assertSame(0, NotificationApp::where('message', 'like', '%Correction%')->count());
+
+        // La semaine suivante, rien de nouveau : rien ne part.
+        $avant = NotificationApp::whereNotNull('annonce_id')->count();
+        $this->artisan('ecaisse:resume-videos')->assertSuccessful();
+        $this->assertSame($avant, NotificationApp::whereNotNull('annonce_id')->count());
     }
 }

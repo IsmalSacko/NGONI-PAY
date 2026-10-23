@@ -96,6 +96,20 @@ Artisan::command('ecaisse:coffres', function () {
 // veille est rattrapée si la tâche n'a pas tourné, jamais deux fois.
 Schedule::command('ecaisse:coffres')->hourly()->withoutOverlapping();
 
+// Les nouvelles vidéos d'aide : un seul résumé par semaine, le lundi à 10 h
+// (Bamako), au lieu d'une notification à chaque publication.
+Artisan::command('ecaisse:resume-videos', function () {
+    $auteur = \App\Models\User::where('est_admin_plateforme', true)->orderBy('created_at')->first();
+    if ($auteur === null) {
+        return;
+    }
+    $n = count(app(\App\Services\AnnonceTutoriel::class)->resumeDeLaSemaine($auteur));
+    if ($n > 0) {
+        $this->info("Résumé des vidéos : {$n} annonce(s).");
+    }
+})->purpose('Annonce en un seul message les vidéos d’aide de la semaine');
+Schedule::command('ecaisse:resume-videos')->weeklyOn(1, '10:00')->withoutOverlapping();
+
 // Caisse oubliée : rappel à 23 h, fermeture sans comptage à 4 h (heure du pays de chaque boutique).
 Artisan::command('ecaisse:caisses-oubliees', function () {
     $b = app(\App\Services\SessionCaisseService::class)->passageHoraire(now());
