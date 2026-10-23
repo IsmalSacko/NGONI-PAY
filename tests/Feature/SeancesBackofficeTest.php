@@ -65,4 +65,18 @@ class SeancesBackofficeTest extends TestCase
         $this->actingAs($caissier);
         Livewire::test(SeancesIndex::class)->assertForbidden();
     }
+
+    public function test_ouvrir_sa_caisse_depuis_le_back_office_avec_le_fond_de_la_derniere_fermeture(): void
+    {
+        $sessions = app(SessionCaisseService::class);
+        $sessions->fermer($sessions->ouvrir($this->awa, 5000), 20000);
+        $this->actingAs($this->awa);
+
+        Livewire::test(SeancesIndex::class)->assertSee('Ouvrir ma caisse')
+            ->call('ouvrirOuverture')->assertSet('fond', '20000')
+            ->call('ouvrir')->assertHasNoErrors()->assertSee('Caisse ouverte')
+            // Une caisse déjà ouverte : le bouton disparaît.
+            ->assertDontSee('Ouvrir ma caisse');
+        $this->assertSame(20000, (int) $sessions->courante($this->awa)->fond_initial);
+    }
 }

@@ -2,15 +2,22 @@
 @php($ecart = fn ($e) => $e === null ? '—' : ($e === 0 ? 'Aucun' : ($e > 0 ? '+' : '−').$m(abs($e))))
 <div class="flex flex-col gap-5">
     {{-- Même habit que l'écran Caisse de l'application. --}}
-    <div class="flex flex-col gap-1">
-        <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Séances de caisse</h1>
-        <span class="text-muted text-sm">Le fond de départ, ce que le tiroir devrait contenir, ce qui a été compté, et l’écart.</span>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="flex flex-col gap-1">
+            <h1 class="font-display font-extrabold text-2xl md:text-3xl text-accent">Séances de caisse</h1>
+            <span class="text-muted text-sm">Le fond de départ, ce que le tiroir devrait contenir, ce qui a été compté, et l’écart.</span>
+        </div>
+        @if ($peutOuvrir)
+            <button wire:click="ouvrirOuverture" class="inline-flex items-center gap-2 h-12 px-5 rounded-xl bg-accent text-white font-bold shadow-carte">
+                <x-charte.icone nom="lock_open" />Ouvrir ma caisse
+            </button>
+        @endif
     </div>
 
     @if ($info)<p class="rounded-2xl bg-succes-doux text-succes-fonce px-4 py-3 text-sm font-bold">{{ $info }}</p>@endif
 
     <x-charte.carte class="p-5 flex flex-col gap-3">
-        <x-charte.en-tete-section icone="point_of_sale" titre="Caisses ouvertes" sous-titre="Elles s’ouvrent et se ferment au comptoir, dans l’application." />
+        <x-charte.en-tete-section icone="point_of_sale" titre="Caisses ouvertes" sous-titre="Chacun ouvre sa caisse, ici ou dans l’application, et la ferme en comptant son tiroir." />
         <div>
             @forelse ($ouvertes as $o)
                 <div class="flex flex-wrap items-center gap-3 py-3 border-b border-separateur last:border-b-0" wire:key="o-{{ $o['s']->id }}">
@@ -67,6 +74,23 @@
             @endif
         </div>
     </x-charte.carte>
+
+    @if ($ouverture)
+        <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('ouverture', false)">
+            <form wire:submit="ouvrir" class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-sm flex flex-col gap-3">
+                <h2 class="font-display font-extrabold text-xl text-accent">Ouvrir ma caisse</h2>
+                <p class="text-sm text-muted">Comptez l’argent déjà dans le tiroir : c’est le fond de départ. Le montant laissé à la dernière fermeture est proposé.</p>
+                <label class="text-sm font-semibold">Fond de caisse
+                    <input wire:model="fond" type="text" inputmode="decimal" placeholder="0" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
+                </label>
+                @error('fond') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
+                <div class="flex gap-3 mt-2">
+                    <button type="button" wire:click="$set('ouverture', false)" class="flex-1 h-11 rounded-xl bg-white border border-border-strong font-bold">Annuler</button>
+                    <button type="submit" class="flex-1 h-11 rounded-xl bg-accent text-white font-bold">Ouvrir</button>
+                </div>
+            </form>
+        </div>
+    @endif
 
     @if ($aFermer)
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('aFermer', null)">

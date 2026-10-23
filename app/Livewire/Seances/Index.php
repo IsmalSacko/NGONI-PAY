@@ -40,6 +40,11 @@ class Index extends Component
 
     public ?string $info = null;
 
+    /** Fenêtre « Ouvrir ma caisse ». */
+    public bool $ouverture = false;
+
+    public string $fond = '';
+
     public function mount(): void
     {
         $this->mois = now()->format('Y-m');
@@ -61,6 +66,49 @@ class Index extends Component
         if ($this->debut()->addMonth()->lte(now())) {
             $this->mois = $this->debut()->addMonth()->format('Y-m');
         }
+    }
+
+    /** Ouvrir sa propre caisse, comme au comptoir : offre qui la comprend, abonnement en cours. */
+    private function peutOuvrir(SessionCaisseService $sessions): bool
+    {
+        return Auth::user()->can('sessions_caisse.create')
+            && app(AbonnementService::class)->permet(Boutique::find($this->boutiqueActiveId()), Plan::SEANCES_CAISSE)
+            && $sessions->courante(Auth::user()) === null;
+    }
+
+    public function ouvrirOuverture(SessionCaisseService $sessions): void
+    {
+        $this->autoriser();
+        $this->peutOuvrir($sessions) || abort(403);
+        $this->resetValidation();
+        // Le fond laissé dans le tiroir à la dernière fermeture, comme dans l'application.
+        $derniere = $sessions->derniereFermeture();
+        $this->fond = $derniere?->fond_final === null ? '' : Montant::saisie((int) $derniere->fond_final);
+        $this->ouverture = true;
+    }
+
+    public function ouvrir(SessionCaisseService $sessions): void
+    {
+        $this->autoriser();
+        $this->peutOuvrir($sessions) || abort(403);
+        if (! $this->abonnementActif()) {
+            return;
+        }
+        $montant = Montant::parse($this->fond);
+        if ($montant === null || $montant < 0) {
+            $this->addError('fond', 'Indiquez l’argent présent dans le tiroir (0 s’il est vide).');
+
+            return;
+        }
+        try {
+            $sessions->ouvrir(Auth::user(), $montant);
+        } catch (ValidationException $e) {
+            $this->addError('fond', collect($e->errors())->flatten()->first());
+
+            return;
+        }
+        $this->ouverture = false;
+        $this->info = 'Caisse ouverte avec un fond de '.Montant::format($montant).'.';
     }
 
     public function ouvrirFermeture(string $id, SessionCaisseService $sessions): void
@@ -125,6 +173,7 @@ class Index extends Component
             'ecartTotal' => (int) $fermees->sum('ecart'),
             'manques' => $fermees->where('ecart', '<', 0)->count(),
             'peutFermer' => $this->peutFermer(),
+            'peutOuvrir' => $this->peutOuvrir($sessions),
             'titreMois' => ucfirst($du->locale('fr')->translatedFormat('F Y')),
             'dernierMois' => $du->copy()->addMonth()->isFuture(),
         ]);
