@@ -80,11 +80,11 @@ class TableauPlateformeTest extends TestCase
         $requete();
         $premiere = $this->awa->fresh()->vu_le;
 
-        $this->travel(30)->seconds();
+        $this->travel(10)->seconds();
         $requete();
-        $this->assertTrue($this->awa->fresh()->vu_le->equalTo($premiere), 'moins d’une minute après : rien de réécrit');
+        $this->assertTrue($this->awa->fresh()->vu_le->equalTo($premiere), 'moins de 20 s après : rien de réécrit');
 
-        $this->travel(31)->seconds();
+        $this->travel(11)->seconds();
         $requete();
         $this->assertTrue($this->awa->fresh()->vu_le->gt($premiere));
         $this->assertTrue($this->awa->fresh()->updated_at->equalTo($modifieLe), 'être vu n’est pas modifier');
@@ -132,10 +132,10 @@ class TableauPlateformeTest extends TestCase
 
     public function test_en_ligne_puis_il_y_a(): void
     {
-        $this->assertSame('En ligne maintenant', Presences::depuis(now(), now()->addSeconds(30)));
-        // Sans signal de présence, on ne sait que quand l'application a été vue.
+        $this->assertSame('En ligne maintenant', Presences::depuis(now()->subSeconds(80)));
+        // Partie depuis plus de 90 s : on ne la dit plus en ligne.
+        $this->assertSame('En ligne il y a 1 min', Presences::depuis(now()->subSeconds(100)));
         $this->assertSame('En ligne il y a 2 min', Presences::depuis(now()->subMinutes(2)));
-        $this->assertSame('En ligne il y a moins d’1 min', Presences::depuis(now()->subSeconds(20), now()->subSeconds(5)));
         $this->assertSame('En ligne il y a 12 min', Presences::depuis(now()->subMinutes(12)));
         $this->assertSame('En ligne il y a 1 h 05', Presences::depuis(now()->subMinutes(65)));
         $this->assertSame('En ligne il y a 3 j', Presences::depuis(now()->subDays(3)));
@@ -145,7 +145,6 @@ class TableauPlateformeTest extends TestCase
     public function test_les_derniers_vus_sans_les_comptes_de_l_exploitant(): void
     {
         $this->vu($this->awa, now()->subMinute(), 'android');
-        $this->enLigne($this->awa);
         $this->vu($this->exploitant, now(), 'web');
         $fanta = $this->commercant('Fanta', '76008202', now()->subHours(2), 'ios');
 
@@ -227,7 +226,6 @@ class TableauPlateformeTest extends TestCase
     public function test_le_tableau_montre_boutiques_encaissements_et_presences(): void
     {
         $this->vu($this->awa, now()->subMinute(), 'android', 'Samsung SM-A155F');
-        $this->enLigne($this->awa);
         $this->vente($this->pressing, 12_500);
 
         $this->actingAs($this->exploitant)->get('/plateforme')->assertOk()
@@ -253,7 +251,6 @@ class TableauPlateformeTest extends TestCase
     public function test_l_application_lit_la_meme_activite_que_la_console_web(): void
     {
         $this->vu($this->awa, now()->subMinute(), 'android', 'Samsung SM-A155F');
-        $this->enLigne($this->awa);
         $this->vente($this->pressing, 12_500);
         $lagos = Boutique::create(['nom' => 'Lagos Market', 'pays' => 'NG', 'devise' => 'NGN']);
         $this->vente($lagos, 250_000);
@@ -261,9 +258,8 @@ class TableauPlateformeTest extends TestCase
         $json = $this->withToken($this->exploitant->createToken('app')->plainTextToken)
             ->getJson('/api/plateforme/activite?periode=7j')->assertOk()->json();
 
-        $this->assertSame(3, $json['en_ligne_minutes']);
+        $this->assertSame(2, $json['en_ligne_minutes']);
         $this->assertSame(1, $json['en_ligne']['nombre']);
-        $this->assertTrue($json['en_ligne']['recents'][0]['en_ligne']);
         $this->assertSame(['Awa', 'Pressing Awa', 'Android', 'Samsung SM-A155F'], [
             $json['en_ligne']['recents'][0]['nom'], $json['en_ligne']['recents'][0]['boutique'],
             $json['en_ligne']['recents'][0]['plateforme_libelle'], $json['en_ligne']['recents'][0]['modele'],
@@ -294,12 +290,6 @@ class TableauPlateformeTest extends TestCase
     private function vu(User $user, \DateTimeInterface $le, string $plateforme, ?string $modele = null): void
     {
         DB::table('users')->where('id', $user->id)->update(['vu_le' => $le, 'vu_plateforme' => $plateforme, 'vu_modele' => $modele]);
-    }
-
-    /** L'application de l'utilisateur vient d'envoyer son signal de présence. */
-    private function enLigne(User $user): void
-    {
-        DB::table('users')->where('id', $user->id)->update(['presence_jusqua' => now()->addSeconds(Presences::PRESENCE_SECONDES)]);
     }
 
     private function commercant(string $nom, string $telephone, \DateTimeInterface $vuLe, string $plateforme): User

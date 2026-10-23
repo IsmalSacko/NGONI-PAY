@@ -5,9 +5,6 @@
             <span class="relative inline-flex w-2 h-2"><span class="absolute inset-0 rounded-full bg-succes opacity-60 motion-safe:animate-ping"></span><span class="relative w-2 h-2 rounded-full bg-succes"></span></span>{{ $enLigne }} en ligne
         </span>
     </div>
-    @if ($actifsSansSignal > 0)
-        <p class="mt-1 text-xs text-muted">+ {{ $actifsSansSignal }} actif{{ $actifsSansSignal > 1 ? 's' : '' }} ces 3 dernières minutes, avec une version de l’application qui ne signale pas sa présence.</p>
-    @endif
 
     <ul class="mt-3 divide-y divide-separateur">
         @forelse ($recents as $r)
@@ -19,7 +16,7 @@
                 <div class="min-w-0 grow">
                     <p class="font-bold text-sm truncate">{{ $r->boutique ?? 'Sans boutique' }}</p>
                     <p class="text-xs text-muted truncate">{{ $r->nom }}</p>
-                    <p class="mt-1 text-xs {{ $r->en_ligne ? 'text-succes font-bold' : 'text-muted' }}">{{ \App\Services\Plateforme\Presences::depuis($r->vu_le, $r->presence_jusqua) }}</p>
+                    <p class="mt-1 text-xs {{ $r->en_ligne ? 'text-succes font-bold' : 'text-muted' }}">{{ \App\Services\Plateforme\Presences::depuis($r->vu_le) }}</p>
                 </div>
                 <div class="text-right text-xs text-muted shrink-0 max-w-[45%]">
                     <p class="font-bold text-ink">{{ \App\Support\Presence\Appareil::PLATEFORMES[$r->plateforme] ?? 'Appareil inconnu' }}</p>

@@ -18,14 +18,18 @@ use Symfony\Component\HttpFoundation\Response;
  * « En ligne », « il y a 12 min », l'appareil, la boutique.
  *
  * Lu après la requête : l'authentification et la boutique active sont alors
- * connues. Une écriture par minute et par utilisateur au plus — l'application
- * interroge le serveur chaque minute, écrire à chaque requête ne dirait rien
- * de plus. L'écriture ne touche pas updated_at : être vu n'est pas modifier.
+ * connues. Une écriture toutes les 20 s et par utilisateur au plus —
+ * l'application interroge le serveur chaque minute, écrire à chaque requête ne
+ * dirait rien de plus. L'écriture ne touche pas updated_at : être vu n'est pas modifier.
  */
 class NoterPresence
 {
-    /** En deçà, la présence déjà notée suffit. */
-    public const INTERVALLE_SECONDES = 60;
+    /**
+     * En deçà, la présence déjà notée suffit. Sous la minute de l'application :
+     * à 60 s, un passage arrivé une seconde trop tôt n'était pas noté, et le
+     * commerçant semblait parti deux minutes (voir Presences::EN_LIGNE_SECONDES).
+     */
+    public const INTERVALLE_SECONDES = 20;
 
     public function __construct(private readonly TenantContext $tenant) {}
 

@@ -19,7 +19,6 @@ class EnLigne extends Component
     {
         return view('livewire.plateforme.en-ligne', [
             'enLigne' => $presences->nombreEnLigne(),
-            'actifsSansSignal' => $presences->nombreActifsSansSignal(),
             'recents' => $presences->recents($this->combien),
         ]);
     }

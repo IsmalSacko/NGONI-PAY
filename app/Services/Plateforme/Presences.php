@@ -22,16 +22,17 @@ class Presences
 {
     /**
      * L'application interroge le serveur chaque minute tant qu'elle est
-     * ouverte : trois minutes de silence, c'est qu'elle ne l'est plus.
+     * ouverte, et s'arrête dès qu'on la quitte : 90 s de silence, c'est
+     * qu'elle ne l'est plus. NoterPresence note chaque passage (au plus une
+     * fois toutes les 20 s) pour que la minute suivante ne tombe jamais à côté.
      */
-    public const EN_LIGNE_MINUTES = 3;
+    public const EN_LIGNE_SECONDES = 90;
 
     /**
-     * Une application à jour se signale toutes les 15 s, et annonce son départ
-     * (arrière-plan, déconnexion). Sans signal depuis 40 s — téléphone éteint,
-     * réseau coupé —, elle n'est plus tenue pour ouverte.
+     * Pour les consoles d'application qui comptent encore en minutes
+     * (GET /api/plateforme/activite) : l'arrondi supérieur de EN_LIGNE_SECONDES.
      */
-    public const PRESENCE_SECONDES = 40;
+    public const EN_LIGNE_MINUTES = 2;
 
     /**
      * Les derniers vus, du plus récent au plus ancien.
@@ -44,35 +45,21 @@ class Presences
             ->whereNotNull('users.vu_le')
             ->orderByDesc('users.vu_le')
             ->limit($combien)
-            ->get(['users.name', 'users.vu_le', 'users.presence_jusqua', 'users.vu_plateforme', 'users.vu_modele', 'b.nom as boutique', 'b.pays'])
+            ->get(['users.name', 'users.vu_le', 'users.vu_plateforme', 'users.vu_modele', 'b.nom as boutique', 'b.pays'])
             ->map(fn (User $u) => (object) [
                 'nom' => $u->name,
                 'boutique' => $u->boutique,
                 'pays' => $u->pays,
                 'vu_le' => $u->vu_le,
-                'presence_jusqua' => $u->presence_jusqua,
-                'en_ligne' => self::estEnLigne($u->presence_jusqua),
+                'en_ligne' => self::estEnLigne($u->vu_le),
                 'plateforme' => $u->vu_plateforme,
                 'modele' => $u->vu_modele,
             ]);
     }
 
-    /** Applications ouvertes en ce moment : seules celles qui se signalent comptent. */
     public function nombreEnLigne(): int
     {
-        return $this->commercants()->where('users.presence_jusqua', '>', now())->count();
-    }
-
-    /**
-     * Vus ces trois dernières minutes avec une application d'avant le signal
-     * de présence : actifs, sans qu'on puisse dire s'ils le sont encore.
-     */
-    public function nombreActifsSansSignal(): int
-    {
-        return $this->commercants()
-            ->whereNull('users.presence_jusqua')
-            ->where('users.vu_le', '>=', now()->subMinutes(self::EN_LIGNE_MINUTES))
-            ->count();
+        return $this->commercants()->where('users.vu_le', '>=', now()->subSeconds(self::EN_LIGNE_SECONDES))->count();
     }
 
     /** Utilisateurs vus depuis le début de la période. */
@@ -117,30 +104,25 @@ class Presences
             ->sortDesc();
     }
 
-    /**
-     * Ouverte en ce moment : son dernier signal n'a pas expiré, et elle n'a
-     * pas annoncé son départ. Une application sans signal n'est jamais « en
-     * ligne » : on ne sait que quand elle a été vue.
-     */
-    public static function estEnLigne(?CarbonInterface $presenceJusqua): bool
+    public static function estEnLigne(?CarbonInterface $vuLe): bool
     {
-        return $presenceJusqua !== null && $presenceJusqua->isFuture();
+        return $vuLe !== null && $vuLe->gte(now()->subSeconds(self::EN_LIGNE_SECONDES));
     }
 
     /** « En ligne maintenant », « il y a 12 min », « il y a 1 h 12 », « il y a 3 j », puis la date. */
-    public static function depuis(?CarbonInterface $vuLe, ?CarbonInterface $presenceJusqua = null): string
+    public static function depuis(?CarbonInterface $vuLe): string
     {
         if ($vuLe === null) {
             return 'Jamais vu';
         }
-        if (self::estEnLigne($presenceJusqua)) {
+        if (self::estEnLigne($vuLe)) {
             return 'En ligne maintenant';
         }
 
         $minutes = (int) $vuLe->diffInMinutes(now());
 
         return match (true) {
-            $minutes < 1 => 'En ligne il y a moins d’1 min',
+            $minutes < 2 => 'En ligne il y a 1 min',
             $minutes < 60 => "En ligne il y a {$minutes} min",
             $minutes < 24 * 60 => sprintf('En ligne il y a %d h %02d', intdiv($minutes, 60), $minutes % 60),
             $minutes < 30 * 24 * 60 => 'En ligne il y a '.intdiv($minutes, 24 * 60).' j',
