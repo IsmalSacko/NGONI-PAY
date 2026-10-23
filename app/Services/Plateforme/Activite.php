@@ -13,8 +13,9 @@ use App\Support\Presence\Appareil;
  * console de l'application (GET /api/plateforme/activite) — mêmes calculs
  * que la console web (Livewire Plateforme\Tableau).
  *
- * « En ligne » et « il y a 12 min » se calculent chez le lecteur à partir de
- * `vu_le` : un écran laissé ouvert reste juste, sans attendre le serveur.
+ * « il y a 12 min » se calcule chez le lecteur à partir de `vu_le`. « En
+ * ligne » vient du serveur (`en_ligne`, `en_ligne_jusqua`) : seul lui sait si
+ * l'application a annoncé son départ.
  */
 class Activite
 {
@@ -47,12 +48,15 @@ class Activite
             ],
             'en_ligne' => [
                 'nombre' => $this->presences->nombreEnLigne(),
+                'actifs_sans_signal' => $this->presences->nombreActifsSansSignal(),
                 'recents' => $this->presences->recents($recents)->map(fn ($r) => [
                     'nom' => $r->nom,
                     'boutique' => $r->boutique,
                     'pays' => $r->pays,
                     'pays_libelle' => $r->pays ? Encaissements::libellePays($r->pays) : null,
                     'vu_le' => $r->vu_le?->toIso8601String(),
+                    'en_ligne' => $r->en_ligne,
+                    'en_ligne_jusqua' => $r->en_ligne ? $r->presence_jusqua?->toIso8601String() : null,
                     'plateforme' => $r->plateforme,
                     'plateforme_libelle' => Appareil::PLATEFORMES[$r->plateforme] ?? null,
                     'modele' => $r->modele,

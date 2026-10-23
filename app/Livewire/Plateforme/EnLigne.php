@@ -9,8 +9,7 @@ use Livewire\Component;
 
 /**
  * Les derniers utilisateurs vus. Composant à part : il se rafraîchit seul
- * chaque minute (le rythme auquel l'application se signale), sans recalculer
- * les encaissements du reste de la page.
+ * toutes les 5 s, sans recalculer les encaissements du reste de la page.
  */
 class EnLigne extends Component
 {
@@ -20,6 +19,7 @@ class EnLigne extends Component
     {
         return view('livewire.plateforme.en-ligne', [
             'enLigne' => $presences->nombreEnLigne(),
+            'actifsSansSignal' => $presences->nombreActifsSansSignal(),
             'recents' => $presences->recents($this->combien),
         ]);
     }
