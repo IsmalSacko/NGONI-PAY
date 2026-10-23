@@ -19,6 +19,7 @@
             ['route' => 'ventes.index', 'label' => 'Ventes', 'permission' => 'ventes.view'],
             ['route' => 'statistiques.index', 'label' => 'Statistiques', 'permission' => 'rapports.view'],
             ['route' => 'rapports.index', 'label' => 'Rapports', 'permission' => 'rapports.view'],
+            ['route' => 'depenses.index', 'label' => 'Dépenses', 'permission' => 'rapports.view', 'fonctionnalite' => \App\Models\Plan::DEPENSES],
             ['route' => 'coffres.index', 'label' => 'Coffre', 'permission' => 'dashboard.view', 'fonctionnalite' => \App\Models\Plan::COFFRE],
             ['route' => 'clients.index', 'label' => 'Clients', 'permission' => 'clients.view'],
             ['route' => 'utilisateurs.index', 'label' => 'Équipe', 'permission' => 'utilisateurs.view'],
