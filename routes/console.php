@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\NotificationApp;
 use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
 use App\Services\Coffres;
@@ -145,3 +146,21 @@ Artisan::command('ecaisse:purger-reinitialisations', function () {
 })->purpose('Efface les sauvegardes de remise à zéro de plus de 30 jours');
 
 Schedule::command('ecaisse:purger-reinitialisations')->dailyAt('03:30')->withoutOverlapping();
+
+// Notifications de la cloche : gardées 7 jours, lues ou non. Une annonce crée
+// une ligne par compte : en octobre, 65 000 lignes pour 3 000 ventes, la moitié
+// de la base — et neuf sur dix jamais lues, sur des boutiques qui ne s'ouvrent
+// plus. Par lots, pour ne pas tenir la table verrouillée d'un seul coup.
+Artisan::command('ecaisse:purger-notifications', function () {
+    $limite = now()->subDays(7);
+    $total = 0;
+    do {
+        $n = NotificationApp::where('created_at', '<', $limite)->limit(5000)->delete();
+        $total += $n;
+    } while ($n > 0);
+    if ($total > 0) {
+        $this->info("{$total} notification(s) de plus de 7 jours effacée(s).");
+    }
+})->purpose('Efface les notifications de plus de 7 jours');
+
+Schedule::command('ecaisse:purger-notifications')->dailyAt('03:45')->withoutOverlapping();
