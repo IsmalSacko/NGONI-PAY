@@ -32,6 +32,13 @@ class Plan extends Model
     /** Réceptions de marchandise, fournisseurs et ce qu'on leur doit. */
     public const ACHATS_FOURNISSEURS = 'achats_fournisseurs';
 
+    /**
+     * Ce qui reste consultable après l'échéance, si l'offre le comprenait : le
+     * back-office et les achats (fournisseurs, historique, liste à commander).
+     * Consulter seulement : enregistrer demande toujours un abonnement en cours.
+     */
+    public const CONSULTABLES_APRES_ECHEANCE = [self::BACKOFFICE_WEB, self::ACHATS_FOURNISSEURS];
+
     /** Programme de fidélité : points et remise automatique. */
     public const FIDELITE = 'fidelite';
 

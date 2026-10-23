@@ -79,7 +79,7 @@ class AbonnementController extends Controller
         // La formule et les fonctions accordées à la main par l'exploitant.
         $fonctions = $abonnement?->fonctionnalites() ?? [];
         if (! ($abonnement?->estEnCours() ?? false)) {
-            $fonctions = array_values(array_intersect($fonctions, [Plan::BACKOFFICE_WEB, Plan::ACHATS_FOURNISSEURS]));
+            $fonctions = array_values(array_intersect($fonctions, Plan::CONSULTABLES_APRES_ECHEANCE));
         }
 
         $enAttente = $boutique->proprietaire_id === null ? null

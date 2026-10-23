@@ -26,11 +26,25 @@ class ExigeFonctionnalite
 
     public function handle(Request $request, Closure $next, string $fonctionnalite): Response
     {
-        if ($this->abonnements->permet(Boutique::find($this->tenant->boutiqueId()), $fonctionnalite)) {
+        $boutique = Boutique::find($this->tenant->boutiqueId());
+        if ($this->abonnements->permet($boutique, $fonctionnalite)) {
+            return $next($request);
+        }
+        // Après l'échéance, les achats se consultent encore si l'offre les
+        // comprenait : l'état d'abonnement les annonce ouverts à l'application.
+        // Les refuser ici la faisait tourner sur un sablier (« Achats »,
+        // « Commander ») : elle redemandait sans fin ce qu'on lui refusait.
+        if ($request->isMethodSafe() && in_array($fonctionnalite, Plan::CONSULTABLES_APRES_ECHEANCE, true)
+            && $this->abonnements->planInclut($boutique, $fonctionnalite)) {
             return $next($request);
         }
 
-        $message = (Plan::FONCTIONNALITES[$fonctionnalite] ?? 'Cette fonction').' : non incluse dans votre offre. Passez à une offre supérieure.';
+        // Essai ou abonnement échu : la fonction n'est pas hors de l'offre, c'est
+        // l'offre qui est terminée — le dire, plutôt que « passez à une offre supérieure ».
+        $termine = ! ($this->abonnements->pourBoutique($boutique)?->estEnCours() ?? false);
+        $message = (Plan::FONCTIONNALITES[$fonctionnalite] ?? 'Cette fonction').($termine
+            ? ' : votre essai ou abonnement est terminé, cette fonction n’est plus disponible.'
+            : ' : non incluse dans votre offre. Passez à une offre supérieure.');
 
         return $request->expectsJson()
             ? response()->json(['message' => $message, 'code' => 'FONCTIONNALITE_NON_INCLUSE', 'fonctionnalite' => $fonctionnalite], 403)

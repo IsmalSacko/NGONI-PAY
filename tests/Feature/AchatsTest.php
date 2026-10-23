@@ -12,6 +12,7 @@ use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\User;
 use App\Services\AchatService;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -302,5 +303,29 @@ class AchatsTest extends TestCase
         $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 12000);
         $this->api($this->admin)->postJson("/api/produits/{$this->riz->id}/ajuster-stock", ['stock' => 14])->assertOk();
         $this->api($this->admin)->getJson('/api/stocks/pertes')->assertJsonPath('total', 0);
+    }
+
+    public function test_apres_l_echeance_les_achats_se_consultent_sans_s_enregistrer(): void
+    {
+        // L'état d'abonnement annonce les achats ouverts après l'échéance (historique
+        // consultable) : les lectures doivent suivre, sinon l'application redemande
+        // sans fin ce qu'on lui refuse (sablier sur « Achats » et « Commander »).
+        app(AbonnementService::class)->accorder($this->admin, 'pro', now()->addMonth(), $this->admin);
+        $this->admin->abonnement()->update(['fin' => now()->subDays(3)->toDateString()]);
+
+        $this->api($this->admin)->getJson('/api/abonnement')->assertOk()
+            ->assertJsonPath('data.est_en_cours', false)
+            ->assertJsonPath('data.fonctionnalites', fn ($f) => in_array('achats_fournisseurs', $f, true));
+        $this->api($this->admin)->getJson('/api/achats')->assertOk();
+        $this->api($this->admin)->getJson('/api/fournisseurs')->assertOk();
+        $this->api($this->admin)->getJson('/api/stocks/a-commander')->assertOk();
+
+        // Enregistrer demande toujours un abonnement en cours.
+        app(TenantContext::class)->setBoutique($this->boutique->id);
+        $f = Fournisseur::create(['nom' => 'Grossiste Diallo']);
+        $this->api($this->admin)->postJson("/api/fournisseurs/{$f->id}/paiements", ['montant' => 1000])->assertForbidden();
+        $this->api($this->admin)->deleteJson("/api/fournisseurs/{$f->id}")->assertForbidden()
+            ->assertJsonPath('code', 'FONCTIONNALITE_NON_INCLUSE')
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'abonnement est terminé'));
     }
 }
