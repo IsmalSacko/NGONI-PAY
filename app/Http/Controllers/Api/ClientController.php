@@ -11,6 +11,7 @@ use App\Models\ReglementCredit;
 use App\Models\Vente;
 use App\Services\Fidelite;
 use App\Services\ReglementsCredit;
+use App\Support\Money\Montant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -125,6 +126,27 @@ class ClientController extends Controller
             'reglements' => $client->reglements()->with(['caissier:id,name', 'client'])->orderByDesc('numero')->latest()->get()
                 ->map(fn (ReglementCredit $r) => $r->recu()),
         ]);
+    }
+
+    /**
+     * Rendre au client tout ou partie de ce qu'on lui garde : un versement en
+     * sens inverse. Son avoir baisse, l'argent sort du tiroir de la séance, et
+     * un reçu « Rendu » est édité.
+     */
+    public function restitution(Request $request, Client $client): JsonResponse
+    {
+        $avoir = $client->avoir();
+        $data = $request->validate([
+            'montant' => ['required', 'integer', 'min:1', 'max:'.max(1, $avoir)],
+            'moyen_paiement' => ['required', Rule::in(array_values(array_filter(
+                array_map(fn (MoyenPaiement $m) => $m->value, MoyenPaiement::cases()),
+                fn (string $m) => $m !== MoyenPaiement::CreditClient->value,
+            )))],
+        ], ['montant.max' => $avoir > 0 ? 'Vous ne lui gardez que '.Montant::format($avoir).'.' : 'Vous ne lui gardez rien.'], ['montant' => 'montant']);
+
+        $reglement = app(ReglementsCredit::class)->enregistrer($client, $request->user(), -(int) $data['montant'], $data['moyen_paiement'], 'Rendu au client');
+
+        return response()->json(['solde_du' => $client->soldeDu(), 'avoir' => $client->avoir(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
     }
 
     /**

@@ -247,6 +247,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('clients/{client}', [ClientController::class, 'update'])->middleware(['permission:clients.update', 'abonnement']);
     Route::get('clients/{client}/credit', [ClientController::class, 'credit'])->middleware('permission:clients.view');
     Route::post('clients/{client}/reglements', [ClientController::class, 'reglement'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    // Rendre l'argent gardé (avoir) : comme un versement, en sens inverse.
+    Route::post('clients/{client}/restitution', [ClientController::class, 'restitution'])->middleware(['permission:ventes.create']);
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->middleware(['permission:clients.delete', 'abonnement']);
 
     Route::get('equipe', [EquipeController::class, 'index'])->middleware('permission:utilisateurs.view');

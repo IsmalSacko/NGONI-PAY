@@ -153,6 +153,21 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(500, $fatou->fresh()->avoir());
     }
 
+    public function test_rendre_l_argent_garde_sort_du_tiroir(): void
+    {
+        $fatou = Client::create(['nom' => 'Fatou']);
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 4000, 'moyen_paiement' => 'especes'])->assertCreated();
+
+        // Jamais plus que ce qu'on lui garde.
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/restitution", ['montant' => 5000, 'moyen_paiement' => 'especes'])
+            ->assertUnprocessable()->assertJsonValidationErrors('montant');
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/restitution", ['montant' => 1500, 'moyen_paiement' => 'especes'])
+            ->assertCreated()->assertJsonPath('avoir', 2500)->assertJsonPath('recu.montant', -1500)
+            ->assertJsonPath('recu.solde_avant', -4000)->assertJsonPath('recu.solde_apres', -2500);
+        $this->assertSame(2500, $fatou->fresh()->avoir());
+        $this->assertSame(0, $fatou->fresh()->soldeDu());
+    }
+
     public function test_la_monnaie_gardee_devient_un_avoir_deduit_des_achats_a_credit(): void
     {
         $fatou = Client::create(['nom' => 'Fatou']);
