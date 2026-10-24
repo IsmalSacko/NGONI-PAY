@@ -168,6 +168,21 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(0, $fatou->fresh()->soldeDu());
     }
 
+    public function test_payer_avec_son_avoir_a_la_caisse(): void
+    {
+        $fatou = Client::create(['nom' => 'Fatou', 'plafond_credit' => 1000]);
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 4000, 'moyen_paiement' => 'especes'])->assertCreated();
+
+        // Achat de 10 000 : l'avoir (4 000) couvre une part, elle paie le reste (6 000).
+        // Son plafond de crédit (1 000) ne bloque pas : rien n'est dû au bout du compte.
+        $vente = $this->vendre($this->caissier, ['moyen_paiement' => 'especes', 'montant_paye' => 6000, 'client_id' => $fatou->id])
+            ->assertCreated()->assertJsonPath('reste_du', 4000)->assertJsonPath('avoir_utilise', 4000);
+        $this->assertSame(0, $fatou->fresh()->solde());
+
+        // « Vendu à crédit » ne compte pas ce que l'avoir a payé.
+        $this->api($this->admin)->getJson('/api/rapports?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertJsonPath('credit.accorde', 0);
+    }
+
     public function test_la_monnaie_gardee_devient_un_avoir_deduit_des_achats_a_credit(): void
     {
         $fatou = Client::create(['nom' => 'Fatou']);

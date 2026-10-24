@@ -106,7 +106,8 @@ class Rapports
             'credit' => [
                 // Vendu à crédit : la part des ventes de la période non payée sur
                 // le moment. Fixe : il explique ventes = payé + vendu à crédit.
-                'accorde' => $accorde = (int) $valides()->sum('reste_du'),
+                // La part payée par l'avoir du client n'est pas une dette.
+                'accorde' => $accorde = (int) $valides()->sum(DB::raw('reste_du - avoir_utilise')),
                 // Reste à encaisser : ce que ces clients doivent encore
                 // aujourd'hui — leur crédit de la période, plafonné à leur dette
                 // actuelle. Baisse à chaque remboursement.

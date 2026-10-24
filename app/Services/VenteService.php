@@ -259,9 +259,12 @@ class VenteService
                 ? 0
                 : min($total, (int) ($data['montant_paye'] ?? $total));
             $reste = $total - $paye;
+            // Ce que la boutique gardait au client (avoir) paie d'abord ce reste.
+            $avoirUtilise = 0;
             if ($reste > 0) {
                 $this->autoriserCredit($data, $caissier);
                 $this->respecterPlafond($data, $reste);
+                $avoirUtilise = min($reste, (int) (Client::find($data['client_id'] ?? null)?->avoir() ?? 0));
             }
 
             $montantRecu = $moyenPaiement === MoyenPaiement::Especes ? (int) ($data['montant_recu'] ?? $paye) : null;
@@ -309,6 +312,7 @@ class VenteService
                 // Restaurant : paiement mixte (espèces + Orange Money…), jamais fourni par la caisse.
                 'paiements' => $data['paiements'] ?? null,
                 'reste_du' => $reste,
+                'avoir_utilise' => $avoirUtilise,
                 'moyen_paiement' => $moyenPaiement,
                 'montant_recu' => $montantRecu,
                 'monnaie_rendue' => $montantRecu !== null ? $montantRecu - $paye : null,
@@ -546,8 +550,10 @@ class VenteService
         if ($client?->plafond_credit === null || ! empty($data['vendue_hors_ligne'])) {
             return;
         }
-        $doit = $client->soldeDu();
-        if ($doit + $reste > $client->plafond_credit) {
+        // Dans les deux sens : ce qu'on lui garde (avoir) couvre d'abord ce reste.
+        $solde = $client->solde();
+        $doit = max(0, $solde);
+        if ($solde + $reste > $client->plafond_credit) {
             $format = fn (int $f) => number_format($f, 0, ',', ' ').' F';
             throw ValidationException::withMessages(['client_id' => [
                 "Plafond de crédit atteint : {$client->nom} doit déjà {$format($doit)}, son plafond est de {$format((int) $client->plafond_credit)}. Faites-le payer davantage.",

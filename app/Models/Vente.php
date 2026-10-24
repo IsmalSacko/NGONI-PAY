@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 
 #[Fillable([
     'user_id', 'client_id', 'session_caisse_id', 'reference_locale', 'numero', 'sous_total', 'remise',
-    'tva', 'total', 'montant_paye', 'acompte_deduit', 'commande_restaurant_id', 'paiements', 'reste_du', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
+    'tva', 'total', 'montant_paye', 'acompte_deduit', 'commande_restaurant_id', 'paiements', 'reste_du', 'avoir_utilise', 'moyen_paiement', 'montant_recu', 'monnaie_rendue', 'statut',
     'vendue_hors_ligne', 'synchronisee_le', 'annulee_le', 'annulee_par', 'motif_annulation',
     'jour_affaire', 'numero_jour', 'remise_fidelite', 'numero_facture', 'ordonnance', 'tarif', 'express',
 ])]
@@ -57,6 +57,7 @@ class Vente extends Model
     protected function casts(): array
     {
         return [
+            'avoir_utilise' => 'integer',
             'moyen_paiement' => MoyenPaiement::class,
             'essai' => 'boolean',
             'vendue_hors_ligne' => 'boolean',
