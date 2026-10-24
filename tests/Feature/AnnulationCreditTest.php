@@ -223,6 +223,9 @@ class AnnulationCreditTest extends TestCase
         $this->api($this->caissier)->getJson('/api/clients')->assertJsonPath('data.0.solde_du', 0)->assertJsonPath('data.0.avoir', 5000);
         $this->api($this->caissier)->getJson('/api/clients/resume')->assertJsonPath('avoirs', 1)->assertJsonPath('avoirs_total', 5000)
             ->assertJsonPath('debiteurs', 0);
+        // Le filtre « Vous leur gardez » la montre, « Ils vous doivent » non.
+        $this->api($this->caissier)->getJson('/api/clients?avoirs=1')->assertJsonCount(1, 'data')->assertJsonPath('data.0.avoir', 5000);
+        $this->api($this->caissier)->getJson('/api/clients?debiteurs=1')->assertJsonCount(0, 'data');
 
         // Sans dette, un versement est aussi accepté : une avance.
         $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 1000, 'moyen_paiement' => 'especes'])->assertCreated();

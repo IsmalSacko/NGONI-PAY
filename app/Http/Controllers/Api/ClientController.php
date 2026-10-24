@@ -55,12 +55,17 @@ class ClientController extends Controller
             });
         }
 
+        // Restes dus moins remboursements : positif, il doit ; négatif, la
+        // boutique lui garde de l'argent (avoir).
+        $dette = '(COALESCE((SELECT SUM(v.reste_du) FROM ventes v WHERE v.client_id = clients.id AND v.statut = ?), 0)'
+            .' - COALESCE((SELECT SUM(r.montant) FROM reglements_credit r WHERE r.client_id = clients.id), 0))';
         if ($request->boolean('debiteurs')) {
-            // Ceux qui doivent encore : restes dus moins remboursements > 0 (un
-            // client qui a tout remboursé n'y est plus). Les plus gros d'abord.
-            $dette = '(COALESCE((SELECT SUM(v.reste_du) FROM ventes v WHERE v.client_id = clients.id AND v.statut = ?), 0)'
-                .' - COALESCE((SELECT SUM(r.montant) FROM reglements_credit r WHERE r.client_id = clients.id), 0))';
+            // Ceux qui doivent encore (un client qui a tout remboursé n'y est
+            // plus). Les plus gros d'abord.
             $query->whereRaw("$dette > 0", [Vente::STATUT_VALIDEE])->reorder()->orderByRaw("$dette DESC", [Vente::STATUT_VALIDEE]);
+        } elseif ($request->boolean('avoirs')) {
+            // Ceux à qui la boutique garde de l'argent, les plus gros d'abord.
+            $query->whereRaw("$dette < 0", [Vente::STATUT_VALIDEE])->reorder()->orderByRaw("$dette ASC", [Vente::STATUT_VALIDEE]);
         }
 
         $page = $query->orderBy('nom')->paginate(30);

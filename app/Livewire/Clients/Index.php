@@ -127,7 +127,7 @@ class Index extends Component
         Client::findOrFail($clientId)->delete();
     }
 
-    /** Tous, ou « Ils vous doivent ». */
+    /** Tous, « Ils vous doivent » (debiteurs) ou « Vous leur gardez » (avoirs). */
     public string $filtre = 'tous';
 
     public function updatedFiltre(): void
@@ -151,6 +151,9 @@ class Index extends Component
             // « Ils vous doivent » : les plus grosses dettes d'abord, comme l'application.
             ->when($this->filtre === 'debiteurs', fn ($q) => $q->whereRaw("$dette > 0", [Vente::STATUT_VALIDEE])
                 ->reorder()->orderByRaw("$dette DESC", [Vente::STATUT_VALIDEE]))
+            // « Vous leur gardez » : ceux à qui la boutique garde le plus d'argent d'abord.
+            ->when($this->filtre === 'avoirs', fn ($q) => $q->whereRaw("$dette < 0", [Vente::STATUT_VALIDEE])
+                ->reorder()->orderByRaw("$dette ASC", [Vente::STATUT_VALIDEE]))
             ->orderBy('nom')
             ->paginate(20);
 
@@ -163,6 +166,7 @@ class Index extends Component
             'encours' => (int) $soldes->filter(fn (int $s) => $s > 0)->sum(),
             // L'argent des clients gardé par la boutique (avoirs).
             'avoirsTotal' => (int) -$soldes->filter(fn (int $s) => $s < 0)->sum(),
+            'nAvoirs' => $soldes->filter(fn (int $s) => $s < 0)->count(),
         ]);
     }
 }

@@ -29,7 +29,7 @@
             <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher par nom ou téléphone…" class="flex-1 min-w-0 bg-transparent outline-none">
         </label>
         <div class="flex flex-wrap gap-2">
-            @foreach (['tous' => ['Tous', 'check', $nClients], 'debiteurs' => ['Ils vous doivent', 'hourglass_bottom', $nDebiteurs]] as $cle => [$label, $icone, $nombre])
+            @foreach (['tous' => ['Tous', 'check', $nClients], 'debiteurs' => ['Ils vous doivent', 'hourglass_bottom', $nDebiteurs], 'avoirs' => ['Vous leur gardez', 'savings', $nAvoirs]] as $cle => [$label, $icone, $nombre])
                 <button wire:click="$set('filtre', '{{ $cle }}')" class="inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-bold {{ $filtre === $cle ? 'bg-jaune text-accent' : 'bg-puce text-accent hover:bg-accent-soft' }}">
                     <x-charte.icone :nom="$icone" :taille="18" />{{ $label }} <span class="opacity-70">{{ $nombre }}</span>
                 </button>
@@ -71,7 +71,7 @@
                 </span>
             </div>
         @empty
-            <x-charte.etat-vide icone="groups" :titre="$filtre === 'debiteurs' ? 'Personne ne vous doit rien.' : 'Aucun client pour l’instant.'" />
+            <x-charte.etat-vide icone="groups" :titre="match ($filtre) { 'debiteurs' => 'Personne ne vous doit rien.', 'avoirs' => 'Vous ne gardez d’argent pour personne.', default => 'Aucun client pour l’instant.' }" />
         @endforelse
         <div class="border-t border-separateur">
             <x-charte.pagination :pages="$clients" mot="clients" />
