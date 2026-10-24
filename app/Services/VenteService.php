@@ -402,7 +402,7 @@ class VenteService
             // Des chiffres déjà arrêtés ne doivent jamais bouger après coup :
             // - une journée passée (chiffre d'affaires, rapports) ;
             // Mode libre : le propriétaire a pris la responsabilité de ses
-            // ventes passées ; seules les dettes déjà remboursées restent protégées.
+            // ventes passées.
             $libre = ModeLibre::actif(Boutique::find($vente->boutique_id));
             $journee = app(Journee::class);
             $jourVente = $vente->jour_affaire ?? $vente->created_at->toDateString();
@@ -420,15 +420,10 @@ class VenteService
                 ]]);
             }
 
-            // - une dette déjà remboursée (le client aurait payé pour rien).
-            if ($vente->reste_du > 0 && $vente->client_id !== null) {
-                $client = Client::find($vente->client_id);
-                if ($client !== null && $client->soldeDu() < $vente->reste_du) {
-                    throw ValidationException::withMessages(['vente' => [
-                        'Le client a déjà remboursé une partie de ses achats à crédit : annuler cette vente fausserait sa dette.',
-                    ]]);
-                }
-            }
+            // Une vente à crédit déjà remboursée (ou payée avec ce que la
+            // boutique lui devait) s'annule aussi : son reste dû sort du compte
+            // du client, et ce qu'il a versé devient ce que la boutique lui doit
+            // (à lui rendre ou à déduire de ses prochains achats).
 
             $vente->update([
                 'statut' => Vente::STATUT_ANNULEE,

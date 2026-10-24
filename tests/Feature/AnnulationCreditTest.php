@@ -181,6 +181,10 @@ class AnnulationCreditTest extends TestCase
 
         // « Vendu à crédit » ne compte pas ce que l'avoir a payé.
         $this->api($this->admin)->getJson('/api/rapports?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertJsonPath('credit.accorde', 0);
+
+        // Annulée, la vente rend à Fatou ce que la boutique lui devait.
+        $this->api($this->admin)->postJson("/api/ventes/{$vente->json('id')}/annuler", ['motif' => 'Erreur'])->assertOk()->assertJsonPath('statut', 'annulee');
+        $this->assertSame(4000, $fatou->fresh()->avoir());
     }
 
     public function test_le_releve_de_compte_ligne_par_ligne(): void
@@ -238,7 +242,7 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(max(0, $doit - 6000), $apres->soldeDu());
     }
 
-    public function test_une_annulation_ne_touche_jamais_des_chiffres_arretes(): void
+    public function test_une_annulation_ne_touche_jamais_des_chiffres_arretes_mais_une_dette_remboursee_s_annule(): void
     {
         // Journée passée.
         $hier = $this->vendre($this->admin)->json('id');
@@ -253,16 +257,19 @@ class AnnulationCreditTest extends TestCase
         $this->api($this->caissier)->putJson("/api/sessions-caisse/{$session}/fermer", ['fond_final' => 20000])->assertOk();
         $this->api($this->admin)->postJson("/api/ventes/{$vente}/annuler", ['motif' => 'x'])->assertUnprocessable();
 
-        // Dette déjà en partie remboursée.
+        // Aucun de ces refus n'a touché au stock ni aux chiffres.
+        $this->assertSame(0, Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
+
+        // Une dette déjà en partie remboursée s'annule, elle : ce qu'elle a
+        // versé devient ce que la boutique lui doit.
         $this->dans();
+        $stock = $this->riz->fresh()->stock;
         $fatou = Client::create(['nom' => 'Fatou']);
         $credit = $this->vendre($this->admin, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->json('id');
         $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 3000, 'moyen_paiement' => 'especes'])->assertCreated();
-        $this->api($this->admin)->postJson("/api/ventes/{$credit}/annuler", ['motif' => 'x'])->assertUnprocessable();
-
-        // Aucun de ces refus n'a touché au stock ni aux chiffres.
-        $this->assertSame(4, $this->riz->fresh()->stock);
-        $this->assertSame(0, Vente::withoutGlobalScopes()->where('statut', 'annulee')->count());
+        $this->api($this->admin)->postJson("/api/ventes/{$credit}/annuler", ['motif' => 'x'])->assertOk();
+        $this->assertSame(3000, $fatou->fresh()->avoir());
+        $this->assertSame($stock, $this->riz->fresh()->stock);
     }
 
     public function test_paiement_partiel_le_reste_devient_la_dette_du_client(): void
