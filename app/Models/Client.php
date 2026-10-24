@@ -72,10 +72,24 @@ class Client extends Model
         return $restes;
     }
 
+    /**
+     * Le solde dans les deux sens : positif, le client doit ; négatif, la
+     * boutique lui garde de l'argent (avoir : de la monnaie gardée, une avance).
+     * Un achat à crédit se déduit de lui-même de cet avoir.
+     */
+    public function solde(): int
+    {
+        return (int) $this->ventes()->valides()->sum('reste_du') - (int) $this->reglements()->sum('montant');
+    }
+
     public function soldeDu(): int
     {
-        $credit = (int) $this->ventes()->valides()->sum('reste_du');
+        return max(0, $this->solde());
+    }
 
-        return max(0, $credit - (int) $this->reglements()->sum('montant'));
+    /** Ce que la boutique garde pour lui. */
+    public function avoir(): int
+    {
+        return max(0, -$this->solde());
     }
 }

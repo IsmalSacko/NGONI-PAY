@@ -14,7 +14,6 @@ use App\Services\ReglementsCredit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
 {
@@ -25,12 +24,15 @@ class ClientController extends Controller
     public function resume(): JsonResponse
     {
         $soldes = Client::query()->avecSoldeDu()->get(['id'])
-            ->map(fn (Client $c) => max(0, (int) $c->credit_total - (int) $c->reglements_total));
+            ->map(fn (Client $c) => (int) $c->credit_total - (int) $c->reglements_total);
 
         return response()->json([
             'clients' => $soldes->count(),
-            'debiteurs' => $soldes->filter()->count(),
-            'encours' => (int) $soldes->sum(),
+            'debiteurs' => $soldes->filter(fn (int $s) => $s > 0)->count(),
+            'encours' => (int) $soldes->filter(fn (int $s) => $s > 0)->sum(),
+            // L'argent des clients gardé par la boutique (avoirs).
+            'avoirs' => $soldes->filter(fn (int $s) => $s < 0)->count(),
+            'avoirs_total' => (int) -$soldes->filter(fn (int $s) => $s < 0)->sum(),
         ]);
     }
 
@@ -61,6 +63,7 @@ class ClientController extends Controller
         $page = $query->orderBy('nom')->paginate(30);
         $page->getCollection()->each(function (Client $c): void {
             $c->setAttribute('solde_du', max(0, (int) $c->credit_total - (int) $c->reglements_total));
+            $c->setAttribute('avoir', max(0, (int) $c->reglements_total - (int) $c->credit_total));
             $c->makeHidden(['credit_total', 'reglements_total']);
         });
 
@@ -112,6 +115,7 @@ class ClientController extends Controller
     {
         return response()->json([
             'solde_du' => $client->soldeDu(),
+            'avoir' => $client->avoir(),
             // Les ventes qui ont laissé une dette : payé sur le moment, et le reste.
             'achats' => $client->ventes()->valides()->where('reste_du', '>', 0)->latest()
                 ->get(['id', 'numero', 'total', 'montant_paye', 'reste_du', 'created_at', 'boutique_id'])
@@ -123,26 +127,25 @@ class ClientController extends Controller
         ]);
     }
 
-    /** Le client rembourse tout ou partie de sa dette. */
+    /**
+     * Le client verse de l'argent : il rembourse sa dette, et ce qui dépasse
+     * devient son avoir (monnaie gardée, avance), déduit de ses prochains
+     * achats à crédit.
+     */
     public function reglement(Request $request, Client $client): JsonResponse
     {
-        $solde = $client->soldeDu();
         $data = $request->validate([
-            'montant' => ['required', 'integer', 'min:1', 'max:'.max(1, $solde)],
+            'montant' => ['required', 'integer', 'min:1', 'max:100000000000'],
             'moyen_paiement' => ['required', Rule::in(array_values(array_filter(
                 array_map(fn (MoyenPaiement $m) => $m->value, MoyenPaiement::cases()),
                 fn (string $m) => $m !== MoyenPaiement::CreditClient->value,
             )))],
             'note' => ['nullable', 'string', 'max:255'],
-        ], ['montant.max' => "Le client ne doit que {$solde}."], ['montant' => 'montant']);
-
-        if ($solde <= 0) {
-            throw ValidationException::withMessages(['montant' => ['Ce client ne doit rien.']]);
-        }
+        ], [], ['montant' => 'montant']);
 
         $reglement = app(ReglementsCredit::class)->enregistrer($client, $request->user(), (int) $data['montant'], $data['moyen_paiement'], $data['note'] ?? null);
 
-        return response()->json(['solde_du' => $client->soldeDu(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
+        return response()->json(['solde_du' => $client->soldeDu(), 'avoir' => $client->avoir(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
     }
 
     public function destroy(Client $client): JsonResponse

@@ -7,6 +7,7 @@ namespace App\Livewire\Clients;
 use App\Livewire\Concerns\EstScopeParBoutique;
 use App\Models\Client;
 use App\Models\Vente;
+use App\Services\ReglementsCredit;
 use App\Support\Money\Montant;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -83,7 +84,9 @@ class Index extends Component
     {
         $this->resetValidation();
         $this->reglementClientId = $clientId;
-        $this->reglementMontant = Montant::saisie(Client::findOrFail($clientId)->soldeDu());
+        // Sa dette proposée ; sans dette, à saisir (le versement devient son avoir).
+        $doit = Client::findOrFail($clientId)->soldeDu();
+        $this->reglementMontant = $doit > 0 ? Montant::saisie($doit) : '';
         $this->reglementMoyen = 'especes';
     }
 
@@ -94,20 +97,22 @@ class Index extends Component
         $this->resetValidation();
 
         $client = Client::findOrFail($this->reglementClientId);
-        $solde = $client->soldeDu();
         $montant = Montant::parse($this->reglementMontant);
 
-        if ($montant === null || $montant <= 0 || $montant > $solde) {
-            $this->addError('reglementMontant', 'Montant entre 1 et '.Montant::format($solde).'.');
+        // Au-delà de la dette, le reste devient son avoir.
+        if ($montant === null || $montant <= 0) {
+            $this->addError('reglementMontant', 'Indiquez un montant.');
 
             return;
         }
 
-        $client->reglements()->create([
-            'montant' => $montant,
-            'moyen_paiement' => in_array($this->reglementMoyen, ['especes', 'orange_money', 'moov_money', 'wave', 'carte', 'virement'], true) ? $this->reglementMoyen : 'especes',
-            'user_id' => Auth::id(),
-        ]);
+        // Le même chemin que l'application : reçu numéroté, solde avant et après, séance de caisse.
+        app(ReglementsCredit::class)->enregistrer(
+            $client,
+            Auth::user(),
+            $montant,
+            in_array($this->reglementMoyen, ['especes', 'orange_money', 'moov_money', 'wave', 'carte', 'virement'], true) ? $this->reglementMoyen : 'especes',
+        );
         $this->reglementClientId = null;
     }
 
@@ -149,13 +154,15 @@ class Index extends Component
             ->orderBy('nom')
             ->paginate(20);
 
-        $soldes = Client::avecSoldeDu()->get()->map(fn ($c) => max(0, (int) $c->credit_total - (int) $c->reglements_total));
+        $soldes = Client::avecSoldeDu()->get()->map(fn ($c) => (int) $c->credit_total - (int) $c->reglements_total);
 
         return view('livewire.clients.index', [
             'clients' => $clients,
             'nClients' => $soldes->count(),
-            'nDebiteurs' => $soldes->filter()->count(),
-            'encours' => (int) $soldes->sum(),
+            'nDebiteurs' => $soldes->filter(fn (int $s) => $s > 0)->count(),
+            'encours' => (int) $soldes->filter(fn (int $s) => $s > 0)->sum(),
+            // L'argent des clients gardé par la boutique (avoirs).
+            'avoirsTotal' => (int) -$soldes->filter(fn (int $s) => $s < 0)->sum(),
         ]);
     }
 }

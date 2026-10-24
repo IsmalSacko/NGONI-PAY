@@ -17,7 +17,8 @@ class ReglementsCredit
         // La séance du caissier : un remboursement en espèces entre dans son
         // tiroir. Numéro de reçu et dette avant / après, figés maintenant.
         return DB::transaction(function () use ($client, $caissier, $montant, $moyen, $note): ReglementCredit {
-            $solde = $client->soldeDu();
+            // Dans les deux sens : un versement au-delà de la dette devient un avoir.
+            $solde = $client->solde();
 
             return $client->reglements()->create([
                 'montant' => $montant,

@@ -98,10 +98,8 @@ class AnnulationCreditTest extends TestCase
         $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated();
 
         $this->api($this->caissier)->getJson('/api/clients')->assertJsonPath('data.0.solde_du', 20000);
-        $this->api($this->caissier)->getJson('/api/clients/resume')->assertExactJson(['clients' => 1, 'debiteurs' => 1, 'encours' => 20000]);
+        $this->api($this->caissier)->getJson('/api/clients/resume')->assertExactJson(['clients' => 1, 'debiteurs' => 1, 'encours' => 20000, 'avoirs' => 0, 'avoirs_total' => 0]);
 
-        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 25000, 'moyen_paiement' => 'especes'])
-            ->assertUnprocessable();
         $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 6000, 'moyen_paiement' => 'orange_money'])
             ->assertCreated()->assertJsonPath('solde_du', 14000);
 
@@ -145,9 +143,39 @@ class AnnulationCreditTest extends TestCase
         Livewire::test(\App\Livewire\Clients\Index::class)
             ->assertSee('10 000')
             ->call('ouvrirReglement', $fatou->id)->assertSet('reglementMontant', '10000')
-            ->set('reglementMontant', '99999')->call('enregistrerReglement')->assertHasErrors('reglementMontant')
+            ->set('reglementMontant', '')->call('enregistrerReglement')->assertHasErrors('reglementMontant')
             ->set('reglementMontant', '4000')->call('enregistrerReglement')->assertHasNoErrors();
         $this->assertSame(6000, $fatou->fresh()->soldeDu());
+        // Un versement au-delà de la dette : le reste, la boutique le lui garde.
+        Livewire::test(\App\Livewire\Clients\Index::class)
+            ->call('ouvrirReglement', $fatou->id)->set('reglementMontant', '6500')->call('enregistrerReglement')->assertHasNoErrors()
+            ->assertSee('Vous lui gardez 500');
+        $this->assertSame(500, $fatou->fresh()->avoir());
+    }
+
+    public function test_la_monnaie_gardee_devient_un_avoir_deduit_des_achats_a_credit(): void
+    {
+        $fatou = Client::create(['nom' => 'Fatou']);
+        $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated();
+        $doit = $fatou->soldeDu();
+
+        // Elle verse 5 000 de plus que sa dette : sa dette est soldée, 5 000 lui sont gardés.
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => $doit + 5000, 'moyen_paiement' => 'especes'])
+            ->assertCreated()->assertJsonPath('solde_du', 0)->assertJsonPath('avoir', 5000)->assertJsonPath('recu.solde_avant', $doit)->assertJsonPath('recu.solde_apres', -5000);
+        $this->api($this->caissier)->getJson("/api/clients/{$fatou->id}/credit")->assertJsonPath('solde_du', 0)->assertJsonPath('avoir', 5000);
+        $this->api($this->caissier)->getJson('/api/clients')->assertJsonPath('data.0.solde_du', 0)->assertJsonPath('data.0.avoir', 5000);
+        $this->api($this->caissier)->getJson('/api/clients/resume')->assertJsonPath('avoirs', 1)->assertJsonPath('avoirs_total', 5000)
+            ->assertJsonPath('debiteurs', 0);
+
+        // Sans dette, un versement est aussi accepté : une avance.
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 1000, 'moyen_paiement' => 'especes'])->assertCreated();
+        $this->assertSame(6000, $fatou->fresh()->avoir());
+
+        // Un achat à crédit se déduit de l'avoir ; au-delà, elle doit de nouveau.
+        $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated();
+        $apres = $fatou->fresh();
+        $this->assertSame(max(0, 6000 - $doit), $apres->avoir());
+        $this->assertSame(max(0, $doit - 6000), $apres->soldeDu());
     }
 
     public function test_une_annulation_ne_touche_jamais_des_chiffres_arretes(): void

@@ -18,6 +18,9 @@
         @else
             <span>Personne ne vous doit rien</span>
         @endif
+        @if ($avoirsTotal > 0)
+            <span class="text-white">Vous gardez {{ \App\Support\Money\Montant::format($avoirsTotal) }} à vos clients (avoirs)</span>
+        @endif
     </x-charte.carte-heros>
 
     <div class="flex flex-col gap-3">
@@ -37,6 +40,7 @@
     <x-charte.carte class="overflow-hidden">
         @forelse ($clients as $client)
             @php($doit = max(0, (int) $client->credit_total - (int) $client->reglements_total))
+            @php($avoir = max(0, (int) $client->reglements_total - (int) $client->credit_total))
             <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-separateur last:border-b-0" wire:key="client-{{ $client->id }}">
                 <span class="w-11 h-11 shrink-0 rounded-full bg-jaune-doux text-accent font-extrabold flex items-center justify-center">{{ mb_strtoupper(collect(preg_split('/\s+/', trim($client->nom)))->take(2)->map(fn ($m) => mb_substr($m, 0, 1))->join('')) }}</span>
                 <span class="flex-1 min-w-0 flex flex-col">
@@ -48,13 +52,14 @@
                 @endif
                 @if ($doit > 0)
                     <x-charte.puce ton="danger" icone="hourglass_bottom">Doit {{ \App\Support\Money\Montant::format($doit) }}</x-charte.puce>
+                @elseif ($avoir > 0)
+                    {{-- De la monnaie gardée, une avance : déduite de ses prochains achats à crédit. --}}
+                    <x-charte.puce ton="succes" icone="savings">Vous lui gardez {{ \App\Support\Money\Montant::format($avoir) }}</x-charte.puce>
                 @endif
                 <span class="flex gap-1">
-                    @if ($doit > 0)
-                        @can('ventes.create')
-                            <button wire:click="ouvrirReglement('{{ $client->id }}')" class="h-9 px-3 rounded-xl bg-accent text-white text-xs font-bold">Remboursement</button>
-                        @endcan
-                    @endif
+                    @can('ventes.create')
+                        <button wire:click="ouvrirReglement('{{ $client->id }}')" class="h-9 px-3 rounded-xl bg-accent text-white text-xs font-bold">{{ $doit > 0 ? 'Remboursement' : 'Versement' }}</button>
+                    @endcan
                     @can('clients.update')
                         <button wire:click="modifier('{{ $client->id }}')" title="Modifier" class="w-9 h-9 rounded-xl bg-accent-soft text-accent inline-flex items-center justify-center"><x-charte.icone nom="edit" :taille="18" /></button>
                     @endcan
@@ -106,8 +111,9 @@
     @if ($reglementClientId)
         <div class="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 md:p-4" wire:click.self="$set('reglementClientId', null)">
             <form wire:submit="enregistrerReglement" class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-sm flex flex-col gap-3">
-                <h2 class="font-display font-extrabold text-xl text-accent">Règlement de crédit</h2>
+                <h2 class="font-display font-extrabold text-xl text-accent">Versement du client</h2>
                 <label class="text-sm font-semibold">Montant reçu
+                    <span class="block text-xs font-normal text-muted">Il rembourse d’abord sa dette ; ce qui dépasse, vous le lui gardez (avoir, déduit de ses prochains achats à crédit).</span>
                     <input wire:model="reglementMontant" type="text" inputmode="decimal" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
                 </label>
                 @error('reglementMontant') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
