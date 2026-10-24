@@ -25,6 +25,9 @@ final readonly class Appareil
     /** Empreinte du téléphone (identifiant haché par l'application), pour l'essai gratuit. */
     public const EN_TETE_EMPREINTE = 'X-Appareil-Empreinte';
 
+    /** « 1 » : robot de test de Google Play (Firebase Test Lab), signalé par l'application Android. */
+    public const EN_TETE_TEST = 'X-Appareil-Test';
+
     /** Plateformes connues, et leur libellé dans la console. */
     public const PLATEFORMES = [
         'android' => 'Android',
@@ -47,6 +50,12 @@ final readonly class Appareil
         $empreinte = strtolower(trim((string) $request->header(self::EN_TETE_EMPREINTE)));
 
         return preg_match('/^[a-f0-9]{64}$/', $empreinte) === 1 ? $empreinte : null;
+    }
+
+    /** Le robot de test de Google Play : il s'inscrit avec de faux comptes. */
+    public static function estTest(Request $request): bool
+    {
+        return $request->header(self::EN_TETE_TEST) === '1';
     }
 
     public static function depuisRequete(Request $request): self

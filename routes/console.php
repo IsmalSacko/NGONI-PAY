@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\NotificationApp;
+use App\Models\User;
+use App\Services\AnnonceTutoriel;
 use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
 use App\Services\Coffres;
@@ -10,6 +12,8 @@ use App\Services\NettoyageOrphelins;
 use App\Services\PaiementMobile;
 use App\Services\RappelFinEssai;
 use App\Services\RestaurationBoutique;
+use App\Services\SessionCaisseService;
+use App\Services\SuppressionCompte;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -99,11 +103,11 @@ Schedule::command('ecaisse:coffres')->hourly()->withoutOverlapping();
 // Les nouvelles vidéos d'aide : un seul résumé par semaine, le lundi à 10 h
 // (Bamako), au lieu d'une notification à chaque publication.
 Artisan::command('ecaisse:resume-videos', function () {
-    $auteur = \App\Models\User::where('est_admin_plateforme', true)->orderBy('created_at')->first();
+    $auteur = User::where('est_admin_plateforme', true)->orderBy('created_at')->first();
     if ($auteur === null) {
         return;
     }
-    $n = count(app(\App\Services\AnnonceTutoriel::class)->resumeDeLaSemaine($auteur));
+    $n = count(app(AnnonceTutoriel::class)->resumeDeLaSemaine($auteur));
     if ($n > 0) {
         $this->info("Résumé des vidéos : {$n} annonce(s).");
     }
@@ -112,12 +116,29 @@ Schedule::command('ecaisse:resume-videos')->weeklyOn(1, '10:00')->withoutOverlap
 
 // Caisse oubliée : rappel à 23 h, fermeture sans comptage à 4 h (heure du pays de chaque boutique).
 Artisan::command('ecaisse:caisses-oubliees', function () {
-    $b = app(\App\Services\SessionCaisseService::class)->passageHoraire(now());
+    $b = app(SessionCaisseService::class)->passageHoraire(now());
     if ($b['rappels'] + $b['fermees'] > 0) {
         $this->info("Caisses oubliées : {$b['rappels']} rappel(s), {$b['fermees']} fermeture(s) automatique(s).");
     }
 })->purpose('Rappelle à 23 h les caisses encore ouvertes, les ferme sans comptage à 4 h (heure du pays)');
 Schedule::command('ecaisse:caisses-oubliees')->hourly()->withoutOverlapping();
+
+// Faux comptes du robot de test de Google Play : effacés au bout d'un jour.
+Artisan::command('ecaisse:purger-comptes-test', function () {
+    $n = 0;
+    foreach (User::where('compte_test', true)->where('created_at', '<', now()->subDay())->get() as $compte) {
+        try {
+            app(SuppressionCompte::class)->supprimer($compte, $compte, parLuiMeme: true);
+            $n++;
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+    if ($n > 0) {
+        $this->info("Comptes de test effacés : {$n}.");
+    }
+})->purpose('Efface les comptes créés par le robot de test de Google Play, au bout d’un jour');
+Schedule::command('ecaisse:purger-comptes-test')->dailyAt('05:30')->withoutOverlapping();
 
 Artisan::command('ecaisse:bilan-mensuel', function () {
     $n = app(BilanMensuel::class)->envoyer(today());

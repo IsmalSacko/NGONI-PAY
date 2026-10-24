@@ -68,7 +68,10 @@ class BoutiqueRegistrationService
 
         // Deux inscriptions au même instant peuvent se gêner sur les rôles
         // (« deadlock », vu en prod) : la transaction est rejouée, jusqu'à 3 fois.
-        $resultat = DB::transaction(function () use ($data, $parrain): array {
+        // Robot de test de Google Play : un faux compte, ni compté comme essai
+        // du téléphone, ni signalé ; effacé au bout d'un jour (ecaisse:purger-comptes-test).
+        $test = (bool) ($data['appareil_test'] ?? false);
+        $resultat = DB::transaction(function () use ($data, $parrain, $test): array {
             $pays = Country::tryFrom(strtoupper($data['pays'])) ?? Country::default();
 
             $boutique = Boutique::create([
@@ -94,6 +97,9 @@ class BoutiqueRegistrationService
                 'email' => $data['email'] ?? null,
                 'password' => Hash::make($data['password']),
             ]);
+            if ($test) {
+                $user->forceFill(['compte_test' => true])->save();
+            }
             $user->assignRole('admin');
 
             $boutique->update(['proprietaire_id' => $user->id]);
@@ -110,7 +116,7 @@ class BoutiqueRegistrationService
             // Après le parrainage, qui rallonge l'essai : un téléphone déjà
             // utilisé n'en a aucun, parrainé ou non.
             $dejaVus = [];
-            if (EssaisAppareils::dejaUtilise($data['empreinte'] ?? null)) {
+            if (! $test && EssaisAppareils::dejaUtilise($data['empreinte'] ?? null)) {
                 $essai->update(['fin' => now()->subDay()->toDateString()]);
                 $dejaVus = EssaisAppareils::autresComptes($data['empreinte'], $user);
             }
@@ -118,12 +124,16 @@ class BoutiqueRegistrationService
             // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
             app(CatalogueDeDepart::class)->installer($boutique);
 
-            EssaisAppareils::noter($data['empreinte'] ?? null, $user);
+            if (! $test) {
+                EssaisAppareils::noter($data['empreinte'] ?? null, $user);
+            }
 
             return ['boutique' => $boutique->fresh(), 'user' => $user->fresh(), 'essai_offert' => $essai->fresh()->fin?->isFuture() ?? false, 'deja_vus' => $dejaVus];
         }, attempts: 3);
 
-        $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);
+        if (! $test) {
+            $this->prevenirExploitant($resultat['user'], $resultat['boutique'], nouveauCompte: true);
+        }
 
         // Inscription depuis un téléphone déjà utilisé : essai refusé, et
         // l'exploitant le sait tout de suite, avec les comptes du même téléphone.

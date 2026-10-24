@@ -112,4 +112,32 @@ class EssaiParAppareilTest extends TestCase
                 && str_contains($html, 'icone-192.png'); // l'en-tête commun, avec le logo
         });
     }
+
+    public function test_le_robot_de_test_de_google_play_n_alerte_personne_et_son_compte_s_efface(): void
+    {
+        $exploitant = User::factory()->create(['est_admin_plateforme' => true, 'is_active' => true]);
+        Mail::fake();
+        $this->inscrire('76000051', self::TELEPHONE_A);
+
+        // Le robot s'inscrit depuis le même téléphone : ni alerte de fraude, ni « Nouvelle inscription ».
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+        $robot = $this->withHeaders(['X-Appareil-Empreinte' => self::TELEPHONE_A, 'X-Appareil-Plateforme' => 'android', 'X-Appareil-Test' => '1'])
+            ->postJson('/api/inscription', [
+                'nom_boutique' => 'Boutique Test', 'pays' => 'SN', 'telephone' => '771234567',
+                'password' => 'password123', 'nom_utilisateur' => 'Jean Dupont',
+            ])->assertCreated()->json();
+        $this->assertSame(0, NotificationApp::where('user_id', $exploitant->id)->where('titre', '⚠️ Alerte fraude : essai bloqué')->count());
+        $this->assertSame(1, NotificationApp::where('user_id', $exploitant->id)->where('titre', 'Nouvelle inscription')->count(), 'seulement le vrai commerçant');
+        Mail::assertNotSent(FraudeEssaiMail::class);
+        $this->assertTrue((bool) User::find($robot['user']['id'])->compte_test);
+
+        // Effacé au bout d'un jour, le vrai compte reste.
+        $this->artisan('ecaisse:purger-comptes-test');
+        $this->assertNotNull(User::find($robot['user']['id']), 'pas avant un jour');
+        $this->travel(25)->hours();
+        $this->artisan('ecaisse:purger-comptes-test');
+        $this->assertNull(User::find($robot['user']['id']));
+        $this->assertSame(1, User::where('phone', '+22376000051')->count());
+    }
 }
