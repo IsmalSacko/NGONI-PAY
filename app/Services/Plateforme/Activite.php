@@ -53,6 +53,10 @@ class Activite
                     'pays' => $r->pays,
                     'pays_libelle' => $r->pays ? Encaissements::libellePays($r->pays) : null,
                     'vu_le' => $r->vu_le?->toIso8601String(),
+                    // « En ligne » vient du serveur : seul lui sait si l'application a
+                    // annoncé son départ. L'écran s'éteint de lui-même à l'heure dite.
+                    'en_ligne' => $r->en_ligne,
+                    'en_ligne_jusqua' => $r->en_ligne_jusqua?->toIso8601String(),
                     'plateforme' => $r->plateforme,
                     'plateforme_libelle' => Appareil::PLATEFORMES[$r->plateforme] ?? null,
                     'modele' => $r->modele,

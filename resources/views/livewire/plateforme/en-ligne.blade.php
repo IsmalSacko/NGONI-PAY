@@ -16,7 +16,7 @@
                 <div class="min-w-0 grow">
                     <p class="font-bold text-sm truncate">{{ $r->boutique ?? 'Sans boutique' }}</p>
                     <p class="text-xs text-muted truncate">{{ $r->nom }}</p>
-                    <p class="mt-1 text-xs {{ $r->en_ligne ? 'text-succes font-bold' : 'text-muted' }}">{{ \App\Services\Plateforme\Presences::depuis($r->vu_le) }}</p>
+                    <p class="mt-1 text-xs {{ $r->en_ligne ? 'text-succes font-bold' : 'text-muted' }}">{{ \App\Services\Plateforme\Presences::depuis($r->vu_le, $r->presence_jusqua) }}</p>
                 </div>
                 <div class="text-right text-xs text-muted shrink-0 max-w-[45%]">
                     <p class="font-bold text-ink">{{ \App\Support\Presence\Appareil::PLATEFORMES[$r->plateforme] ?? 'Appareil inconnu' }}</p>

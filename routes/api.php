@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PawapayWebhookController;
 use App\Http\Controllers\Api\PaysController;
 use App\Http\Controllers\Api\PlateformeController;
+use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\ProduitController;
 use App\Http\Controllers\Api\ProfilController;
 use App\Http\Controllers\Api\PublicationPlayController;
@@ -116,6 +117,13 @@ Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('platefo
 // doit réussir. Refusé (401), l'application relançait la déconnexion en boucle
 // — des milliers de requêtes par minute et par téléphone.
 Route::post('deconnexion', [AuthController::class, 'logout']);
+
+// Présence en temps réel : hors des contrôles de boutique et de conditions,
+// l'application est ouverte même sur l'écran qui les demande.
+Route::middleware(['auth:sanctum', 'throttle:20,1'])->group(function (): void {
+    Route::post('presence', [PresenceController::class, 'signal']);
+    Route::delete('presence', [PresenceController::class, 'depart']);
+});
 
 Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group(function (): void {
     Route::get('moi', [AuthController::class, 'me']);

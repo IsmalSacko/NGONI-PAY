@@ -35,6 +35,13 @@ class Presences
     public const EN_LIGNE_MINUTES = 2;
 
     /**
+     * Une application à jour se signale toutes les 15 s et annonce son départ
+     * (arrière-plan, déconnexion). Sans signal depuis 40 s — téléphone éteint,
+     * réseau coupé —, elle n'est plus tenue pour ouverte.
+     */
+    public const PRESENCE_SECONDES = 40;
+
+    /**
      * Les derniers vus, du plus récent au plus ancien.
      *
      * @return Collection<int, object{nom: string, boutique: ?string, pays: ?string, vu_le: CarbonInterface, en_ligne: bool, plateforme: ?string, modele: ?string}>
@@ -45,13 +52,15 @@ class Presences
             ->whereNotNull('users.vu_le')
             ->orderByDesc('users.vu_le')
             ->limit($combien)
-            ->get(['users.name', 'users.vu_le', 'users.vu_plateforme', 'users.vu_modele', 'b.nom as boutique', 'b.pays'])
+            ->get(['users.name', 'users.vu_le', 'users.presence_jusqua', 'users.vu_plateforme', 'users.vu_modele', 'b.nom as boutique', 'b.pays'])
             ->map(fn (User $u) => (object) [
                 'nom' => $u->name,
                 'boutique' => $u->boutique,
                 'pays' => $u->pays,
                 'vu_le' => $u->vu_le,
-                'en_ligne' => self::estEnLigne($u->vu_le),
+                'presence_jusqua' => $u->presence_jusqua,
+                'en_ligne' => self::estEnLigne($u->vu_le, $u->presence_jusqua),
+                'en_ligne_jusqua' => self::enLigneJusqua($u->vu_le, $u->presence_jusqua),
                 'plateforme' => $u->vu_plateforme,
                 'modele' => $u->vu_modele,
             ]);
@@ -59,7 +68,14 @@ class Presences
 
     public function nombreEnLigne(): int
     {
-        return $this->commercants()->where('users.vu_le', '>=', now()->subSeconds(self::EN_LIGNE_SECONDES))->count();
+        return $this->commercants()->where(fn (Builder $q) => $q
+            // Une application à jour : son signal n'a pas expiré.
+            ->where('users.presence_jusqua', '>', now())
+            // Sinon (version d'avant le signal, back-office) : vue depuis 90 s,
+            // et après son éventuel départ annoncé.
+            ->orWhere(fn (Builder $v) => $v->where('users.vu_le', '>=', now()->subSeconds(self::EN_LIGNE_SECONDES))
+                ->where(fn (Builder $d) => $d->whereNull('users.presence_jusqua')->orWhereColumn('users.vu_le', '>', 'users.presence_jusqua')))
+        )->count();
     }
 
     /** Utilisateurs vus depuis le début de la période. */
@@ -104,24 +120,45 @@ class Presences
             ->sortDesc();
     }
 
-    public static function estEnLigne(?CarbonInterface $vuLe): bool
+    /**
+     * Ouverte en ce moment. Une application à jour l'est jusqu'à l'expiration
+     * de son dernier signal, et ne l'est plus dès qu'elle annonce son départ.
+     * Une version d'avant le signal (ou le back-office) l'est 90 s après son
+     * dernier passage — et seulement s'il est postérieur à un départ annoncé.
+     */
+    public static function estEnLigne(?CarbonInterface $vuLe, ?CarbonInterface $presenceJusqua = null): bool
     {
-        return $vuLe !== null && $vuLe->gte(now()->subSeconds(self::EN_LIGNE_SECONDES));
+        return self::enLigneJusqua($vuLe, $presenceJusqua) !== null;
+    }
+
+    /** Jusqu'à quand on la tient pour ouverte ; null si elle ne l'est pas. */
+    public static function enLigneJusqua(?CarbonInterface $vuLe, ?CarbonInterface $presenceJusqua = null): ?CarbonInterface
+    {
+        if ($presenceJusqua !== null && $presenceJusqua->isFuture()) {
+            return $presenceJusqua;
+        }
+        if ($vuLe === null || ($presenceJusqua !== null && ! $vuLe->gt($presenceJusqua))) {
+            return null;
+        }
+        $fin = $vuLe->copy()->addSeconds(self::EN_LIGNE_SECONDES);
+
+        return $fin->isFuture() ? $fin : null;
     }
 
     /** « En ligne maintenant », « il y a 12 min », « il y a 1 h 12 », « il y a 3 j », puis la date. */
-    public static function depuis(?CarbonInterface $vuLe): string
+    public static function depuis(?CarbonInterface $vuLe, ?CarbonInterface $presenceJusqua = null): string
     {
         if ($vuLe === null) {
             return 'Jamais vu';
         }
-        if (self::estEnLigne($vuLe)) {
+        if (self::estEnLigne($vuLe, $presenceJusqua)) {
             return 'En ligne maintenant';
         }
 
         $minutes = (int) $vuLe->diffInMinutes(now());
 
         return match (true) {
+            $minutes < 1 => 'En ligne il y a moins d’1 min',
             $minutes < 2 => 'En ligne il y a 1 min',
             $minutes < 60 => "En ligne il y a {$minutes} min",
             $minutes < 24 * 60 => sprintf('En ligne il y a %d h %02d', intdiv($minutes, 60), $minutes % 60),
