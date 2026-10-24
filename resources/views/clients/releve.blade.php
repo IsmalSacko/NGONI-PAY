@@ -1,5 +1,5 @@
 @php($m = fn ($v) => \App\Support\Money\Montant::format((int) $v, $boutique->devise))
-@php($etat = fn (int $s) => $s > 0 ? 'Doit '.$m($s) : ($s < 0 ? 'Gardé '.$m(-$s) : 'Soldé'))
+@php($etat = fn (int $s) => $s > 0 ? 'Doit '.$m($s) : ($s < 0 ? 'Vous devez '.$m(-$s) : 'Soldé'))
 <!doctype html>
 <html lang="fr">
 <head>
@@ -65,7 +65,7 @@
     <div class="total">
         <span>Pris à crédit<br><b>{{ $m($r['pris']) }}</b></span>
         <span>Versé<br><b>{{ $m($r['verse']) }}</b></span>
-        <span>{{ $r['solde'] > 0 ? 'Il doit encore' : ($r['solde'] < 0 ? 'Vous lui gardez' : 'Compte soldé') }}<br><b class="{{ $r['solde'] > 0 ? 'doit' : ($r['solde'] < 0 ? 'garde' : '') }}">{{ $m(abs($r['solde'])) }}</b></span>
+        <span>{{ $r['solde'] > 0 ? 'Il doit encore' : ($r['solde'] < 0 ? 'Vous lui devez' : 'Compte soldé') }}<br><b class="{{ $r['solde'] > 0 ? 'doit' : ($r['solde'] < 0 ? 'garde' : '') }}">{{ $m(abs($r['solde'])) }}</b></span>
     </div>
     <p class="muted" style="margin-top:24px">Établi avec Ngoni Caisse</p>
 </body>

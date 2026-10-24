@@ -161,7 +161,7 @@ class ClientController extends Controller
                 array_map(fn (MoyenPaiement $m) => $m->value, MoyenPaiement::cases()),
                 fn (string $m) => $m !== MoyenPaiement::CreditClient->value,
             )))],
-        ], ['montant.max' => $avoir > 0 ? 'Vous ne lui gardez que '.Montant::format($avoir).'.' : 'Vous ne lui gardez rien.'], ['montant' => 'montant']);
+        ], ['montant.max' => $avoir > 0 ? 'Vous ne lui devez que '.Montant::format($avoir).'.' : 'Vous ne lui devez rien.'], ['montant' => 'montant']);
 
         $reglement = app(ReglementsCredit::class)->enregistrer($client, $request->user(), -(int) $data['montant'], $data['moyen_paiement'], 'Rendu au client');
 

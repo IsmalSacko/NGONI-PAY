@@ -19,7 +19,7 @@
             <span>Personne ne vous doit rien</span>
         @endif
         @if ($avoirsTotal > 0)
-            <span class="text-white">Vous gardez {{ \App\Support\Money\Montant::format($avoirsTotal) }} à vos clients (avoirs)</span>
+            <span class="text-white">Vous devez {{ \App\Support\Money\Montant::format($avoirsTotal) }} à vos clients (monnaie, avances)</span>
         @endif
     </x-charte.carte-heros>
 
@@ -29,7 +29,7 @@
             <input wire:model.live.debounce.300ms="recherche" type="text" placeholder="Rechercher par nom ou téléphone…" class="flex-1 min-w-0 bg-transparent outline-none">
         </label>
         <div class="flex flex-wrap gap-2">
-            @foreach (['tous' => ['Tous', 'check', $nClients], 'debiteurs' => ['Ils vous doivent', 'hourglass_bottom', $nDebiteurs], 'avoirs' => ['Vous leur gardez', 'savings', $nAvoirs]] as $cle => [$label, $icone, $nombre])
+            @foreach (['tous' => ['Tous', 'check', $nClients], 'debiteurs' => ['Ils vous doivent', 'hourglass_bottom', $nDebiteurs], 'avoirs' => ['Vous leur devez', 'savings', $nAvoirs]] as $cle => [$label, $icone, $nombre])
                 <button wire:click="$set('filtre', '{{ $cle }}')" class="inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-sm font-bold {{ $filtre === $cle ? 'bg-jaune text-accent' : 'bg-puce text-accent hover:bg-accent-soft' }}">
                     <x-charte.icone :nom="$icone" :taille="18" />{{ $label }} <span class="opacity-70">{{ $nombre }}</span>
                 </button>
@@ -54,7 +54,7 @@
                     <x-charte.puce ton="danger" icone="hourglass_bottom">Doit {{ \App\Support\Money\Montant::format($doit) }}</x-charte.puce>
                 @elseif ($avoir > 0)
                     {{-- De la monnaie gardée, une avance : déduite de ses prochains achats à crédit. --}}
-                    <x-charte.puce ton="succes" icone="savings">Vous lui gardez {{ \App\Support\Money\Montant::format($avoir) }}</x-charte.puce>
+                    <x-charte.puce ton="succes" icone="savings">Vous lui devez {{ \App\Support\Money\Montant::format($avoir) }}</x-charte.puce>
                 @endif
                 <span class="flex gap-1">
                     @can('ventes.create')
@@ -71,7 +71,7 @@
                 </span>
             </div>
         @empty
-            <x-charte.etat-vide icone="groups" :titre="match ($filtre) { 'debiteurs' => 'Personne ne vous doit rien.', 'avoirs' => 'Vous ne gardez d’argent pour personne.', default => 'Aucun client pour l’instant.' }" />
+            <x-charte.etat-vide icone="groups" :titre="match ($filtre) { 'debiteurs' => 'Personne ne vous doit rien.', 'avoirs' => 'Vous ne devez rien à personne.', default => 'Aucun client pour l’instant.' }" />
         @endforelse
         <div class="border-t border-separateur">
             <x-charte.pagination :pages="$clients" mot="clients" />
@@ -115,7 +115,7 @@
             <form wire:submit="enregistrerReglement" class="bg-paper rounded-t-[24px] md:rounded-[24px] p-6 shadow-carte-haute w-full md:max-w-sm flex flex-col gap-3">
                 <h2 class="font-display font-extrabold text-xl text-accent">Versement du client</h2>
                 <label class="text-sm font-semibold">Montant reçu
-                    <span class="block text-xs font-normal text-muted">Il rembourse d’abord sa dette ; ce qui dépasse, vous le lui gardez (avoir, déduit de ses prochains achats à crédit).</span>
+                    <span class="block text-xs font-normal text-muted">Il rembourse d’abord sa dette ; ce qui dépasse, vous le lui devez (déduit de ses prochains achats à crédit).</span>
                     <input wire:model="reglementMontant" type="text" inputmode="decimal" class="mt-1 w-full h-11 px-3 rounded-xl bg-white border border-border-strong font-normal">
                 </label>
                 @error('reglementMontant') <p class="text-sm text-danger-fg">{{ $message }}</p> @enderror
