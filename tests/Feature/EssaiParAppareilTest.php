@@ -10,6 +10,7 @@ use App\Models\NotificationApp;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -117,6 +118,7 @@ class EssaiParAppareilTest extends TestCase
     {
         $exploitant = User::factory()->create(['est_admin_plateforme' => true, 'is_active' => true]);
         Mail::fake();
+        \Illuminate\Support\Facades\Storage::fake('local');
         $this->inscrire('76000051', self::TELEPHONE_A);
 
         // Le robot s'inscrit depuis le même téléphone : ni alerte de fraude, ni « Nouvelle inscription ».
@@ -138,6 +140,7 @@ class EssaiParAppareilTest extends TestCase
         $this->travel(25)->hours();
         $this->artisan('ecaisse:purger-comptes-test');
         $this->assertNull(User::find($robot['user']['id']));
+        $this->assertSame([], Storage::disk('local')->files('suppressions'), 'sans sauvegarde');
         $this->assertSame(1, User::where('phone', '+22376000051')->count());
     }
 }

@@ -67,9 +67,12 @@ class SuppressionCompte
     }
 
     /**
+     * [$sauvegarder] à faux : sans copie (faux comptes du robot de test de
+     * Google Play, sans intérêt à garder).
+     *
      * @return array{boutiques: int, comptes: int, sauvegarde: string}
      */
-    public function supprimer(User $compte, User $exploitant, bool $parLuiMeme = false): array
+    public function supprimer(User $compte, User $exploitant, bool $parLuiMeme = false, bool $sauvegarder = true): array
     {
         // Le titulaire supprime lui-même son compte depuis l'application (règle
         // 5.1.1 de l'App Store) ; l'exploitant, lui, ne se supprime pas ici.
@@ -82,7 +85,7 @@ class SuppressionCompte
             throw ValidationException::withMessages(['compte' => [$raison]]);
         }
 
-        $sauvegarde = $this->sauvegarder($compte, $plan, $exploitant);
+        $sauvegarde = $sauvegarder ? $this->sauvegarder($compte, $plan, $exploitant) : '';
         $fichiers = $this->fichiers($plan);
 
         DB::transaction(function () use ($plan): void {

@@ -128,7 +128,8 @@ Artisan::command('ecaisse:purger-comptes-test', function () {
     $n = 0;
     foreach (User::where('compte_test', true)->where('created_at', '<', now()->subDay())->get() as $compte) {
         try {
-            app(SuppressionCompte::class)->supprimer($compte, $compte, parLuiMeme: true);
+            // Sans sauvegarde : un faux compte n'a rien à garder.
+            app(SuppressionCompte::class)->supprimer($compte, $compte, parLuiMeme: true, sauvegarder: false);
             $n++;
         } catch (Throwable $e) {
             report($e);
