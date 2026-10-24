@@ -183,6 +183,33 @@ class AnnulationCreditTest extends TestCase
         $this->api($this->admin)->getJson('/api/rapports?du='.today()->toDateString().'&au='.today()->toDateString())->assertOk()->assertJsonPath('credit.accorde', 0);
     }
 
+    public function test_le_releve_de_compte_ligne_par_ligne(): void
+    {
+        $fatou = Client::create(['nom' => 'Fatou']);
+        $total = $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated()->json('total');
+        $this->travel(1)->days();
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 2500, 'moyen_paiement' => 'especes'])->assertCreated();
+        $this->travel(1)->days();
+        $this->api($this->caissier)->postJson("/api/clients/{$fatou->id}/reglements", ['montant' => 600, 'moyen_paiement' => 'wave'])->assertCreated();
+
+        // Tout l'historique : l'achat, puis chaque versement, avec ce qui reste après chacun.
+        $r = $this->api($this->caissier)->getJson("/api/clients/{$fatou->id}/releve-compte")->assertOk()
+            ->assertJsonPath('client', 'Fatou')->assertJsonCount(3, 'lignes')
+            ->assertJsonPath('lignes.0.type', 'achat')->assertJsonPath('lignes.0.pris', $total)->assertJsonPath('lignes.0.solde', $total)
+            ->assertJsonPath('lignes.1.verse', 2500)->assertJsonPath('lignes.1.solde', $total - 2500)
+            ->assertJsonPath('lignes.2.verse', 600)->assertJsonPath('lignes.2.solde', $total - 3100)
+            ->assertJsonPath('solde', $total - 3100)->json();
+        $this->assertStringContainsString('Wave', $r['lignes'][2]['detail']);
+
+        // Une période : ce qui précède devient un report.
+        $this->api($this->caissier)->getJson("/api/clients/{$fatou->id}/releve-compte?du=".today()->toDateString())->assertOk()
+            ->assertJsonPath('report', $total - 2500)->assertJsonCount(1, 'lignes')->assertJsonPath('solde', $total - 3100);
+
+        // Le back-office l'imprime.
+        $this->actingAs($this->admin)->get("/clients/{$fatou->id}/releve")->assertOk()
+            ->assertSee('Relevé de compte')->assertSee('Fatou')->assertSee('Il doit encore');
+    }
+
     public function test_la_monnaie_gardee_devient_un_avoir_deduit_des_achats_a_credit(): void
     {
         $fatou = Client::create(['nom' => 'Fatou']);

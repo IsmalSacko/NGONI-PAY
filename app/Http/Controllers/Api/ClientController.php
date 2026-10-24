@@ -11,9 +11,11 @@ use App\Models\ReglementCredit;
 use App\Models\Vente;
 use App\Services\Fidelite;
 use App\Services\ReglementsCredit;
+use App\Services\ReleveCompte;
 use App\Support\Money\Montant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
@@ -109,6 +111,18 @@ class ClientController extends Controller
         $client->update($data);
 
         return response()->json($client);
+    }
+
+    /** Le relevé de compte : achats à crédit et versements, avec le solde après chaque ligne. */
+    public function releveCompte(Request $request, Client $client, ReleveCompte $releve): JsonResponse
+    {
+        $data = $request->validate(['du' => ['nullable', 'date'], 'au' => ['nullable', 'date', 'after_or_equal:du']]);
+
+        return response()->json([
+            'client' => $client->nom,
+            'telephone' => $client->telephone,
+            ...$releve->pour($client, isset($data['du']) ? Carbon::parse($data['du']) : null, isset($data['au']) ? Carbon::parse($data['au']) : null),
+        ]);
     }
 
     /** Ce que le client doit, ses achats à crédit et ses règlements. */

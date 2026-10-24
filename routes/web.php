@@ -189,6 +189,7 @@ Route::middleware(['auth', 'conditions', 'tenant', 'backoffice'])->group(functio
     Route::get('coffre', App\Livewire\Coffres\Index::class)->name('coffres.index')->middleware(['permission:dashboard.view', 'fonctionnalite:coffre']);
     Route::get('rapports', App\Livewire\Rapports\Index::class)->name('rapports.index')->middleware('permission:rapports.view');
     Route::get('statistiques', App\Livewire\Statistiques\Index::class)->name('statistiques.index')->middleware('permission:rapports.view');
+    Route::get('clients/{client}/releve', [ExportController::class, 'releveClient'])->name('clients.releve')->middleware('permission:clients.view');
     Route::get('rapports/imprimer', [ExportController::class, 'imprimer'])->name('rapports.imprimer')->middleware('permission:rapports.view');
     Route::get('exports/ventes', [ExportController::class, 'ventes'])->name('exports.ventes')->middleware(['permission:rapports.view', 'fonctionnalite:factures_exports']);
     Route::get('exports/stocks', [ExportController::class, 'stocks'])->name('exports.stocks')->middleware(['permission:rapports.view', 'fonctionnalite:factures_exports']);

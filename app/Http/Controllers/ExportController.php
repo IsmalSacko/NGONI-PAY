@@ -10,6 +10,7 @@ use App\Models\Cloture;
 use App\Models\Produit;
 use App\Models\Vente;
 use App\Services\Rapports;
+use App\Services\ReleveCompte;
 use App\Support\Fuseau;
 use App\Support\Money\Montant;
 use App\Support\Tenancy\TenantContext;
@@ -100,6 +101,22 @@ class ExportController extends Controller
             'boutique' => $this->boutique(),
             // Journée clôturée : le rapport est son ticket Z.
             'z' => $du->isSameDay($au) ? Cloture::whereDate('jour_affaire', $du)->first() : null,
+        ]);
+    }
+
+    /**
+     * Relevé de compte d'un client, à imprimer ou enregistrer en PDF : ses
+     * achats à crédit et ses versements, avec ce qui reste après chaque ligne.
+     * Sans période : tout son historique.
+     */
+    public function releveClient(Request $request, Client $client, ReleveCompte $releve): View
+    {
+        $data = $request->validate(['du' => ['nullable', 'date'], 'au' => ['nullable', 'date']]);
+
+        return view('clients.releve', [
+            'client' => $client,
+            'boutique' => $this->boutique(),
+            'r' => $releve->pour($client, isset($data['du']) ? Carbon::parse($data['du']) : null, isset($data['au']) ? Carbon::parse($data['au']) : null),
         ]);
     }
 

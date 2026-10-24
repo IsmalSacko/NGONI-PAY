@@ -60,6 +60,8 @@
                     @can('ventes.create')
                         <button wire:click="ouvrirReglement('{{ $client->id }}')" class="h-9 px-3 rounded-xl bg-accent text-white text-xs font-bold">{{ $doit > 0 ? 'Remboursement' : 'Versement' }}</button>
                     @endcan
+                    {{-- Le relevé de compte : achats à crédit, versements, ce qui reste après chaque ligne. --}}
+                    <a href="{{ route('clients.releve', $client) }}" target="_blank" title="Relevé de compte" class="w-9 h-9 rounded-xl bg-accent-soft text-accent inline-flex items-center justify-center no-underline"><x-charte.icone nom="receipt_long" :taille="18" /></a>
                     @can('clients.update')
                         <button wire:click="modifier('{{ $client->id }}')" title="Modifier" class="w-9 h-9 rounded-xl bg-accent-soft text-accent inline-flex items-center justify-center"><x-charte.icone nom="edit" :taille="18" /></button>
                     @endcan
