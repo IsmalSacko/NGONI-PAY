@@ -68,7 +68,10 @@ class ClientController extends Controller
             $query->whereRaw("$dette < 0", [Vente::STATUT_VALIDEE])->reorder()->orderByRaw("$dette ASC", [Vente::STATUT_VALIDEE]);
         }
 
-        $page = $query->orderBy('nom')->paginate(30);
+        // L'application ne lit qu'une page : toute la liste d'un coup (500), sinon
+        // un commerçant de 40 clients n'en voyait que 30 et ses comptes ne tombaient
+        // jamais juste avec le total « Vos clients vous doivent ».
+        $page = $query->orderBy('nom')->paginate(min(max($request->integer('par_page', 500), 1), 1000));
         $page->getCollection()->each(function (Client $c): void {
             $c->setAttribute('solde_du', max(0, (int) $c->credit_total - (int) $c->reglements_total));
             $c->setAttribute('avoir', max(0, (int) $c->reglements_total - (int) $c->credit_total));

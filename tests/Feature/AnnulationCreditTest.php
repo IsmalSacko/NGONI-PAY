@@ -168,6 +168,14 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(0, $fatou->fresh()->soldeDu());
     }
 
+    public function test_la_liste_des_clients_arrive_entiere_pas_seulement_30(): void
+    {
+        foreach (range(1, 40) as $i) {
+            Client::create(['nom' => sprintf('Client %02d', $i)]);
+        }
+        $this->api($this->caissier)->getJson('/api/clients')->assertOk()->assertJsonCount(40, 'data');
+    }
+
     public function test_payer_avec_son_avoir_a_la_caisse(): void
     {
         $fatou = Client::create(['nom' => 'Fatou', 'plafond_credit' => 1000]);
