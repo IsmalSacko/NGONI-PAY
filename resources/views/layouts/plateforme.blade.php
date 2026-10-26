@@ -4,7 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Console plateforme' }} · Ngoni Caisse</title>
-    <x-tete-commune />
+    {{-- La console dessine ses pictogrammes : pas de police d'icônes, sauf « Mon compte ». --}}
+    <x-tete-commune :icones="request()->routeIs('mon-compte')" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -25,7 +26,7 @@
     @endphp
     <header class="bg-accent text-white sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 h-16 flex items-center gap-1.5 sm:gap-3 md:gap-5">
-            <a href="{{ route('plateforme.tableau') }}" class="flex items-center gap-3 min-w-0">
+            <a href="{{ route('plateforme.tableau') }}" wire:navigate class="flex items-center gap-3 min-w-0">
                 {{-- Téléphone : le ticket seul ; le nom, à côté des boutons, n'y tient pas. --}}
                 <span class="shrink-0 sm:hidden"><x-logo taille="w-10 h-10" /></span>
                 <span class="shrink-0 hidden sm:block"><x-logo taille="w-10 h-10" :nom="true" /></span>
@@ -53,10 +54,11 @@
                 <button class="shrink-0 h-10 px-2.5 sm:px-3 rounded-xl text-sm font-bold text-rail hover:text-white hover:bg-nuit-clair">Quitter</button>
             </form>
         </div>
-        {{-- Onglets : défilants sur téléphone, l'actif en jaune. --}}
+        {{-- Onglets : défilants sur téléphone, l'actif en jaune. Navigation
+             Livewire : seule la page change, sans tout recharger. --}}
         <nav class="max-w-7xl mx-auto px-4 md:px-6 pb-3 flex gap-1.5 text-sm font-bold overflow-x-auto whitespace-nowrap [scrollbar-width:none]" aria-label="Navigation de la console">
             @foreach ($liens as $lien)
-                <a href="{{ route($lien['route']) }}"
+                <a href="{{ route($lien['route']) }}" wire:navigate
                    class="shrink-0 inline-flex items-center px-3.5 h-10 rounded-xl {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                     {{ $lien['label'] }}
                     @if (($lien['badge'] ?? 0) > 0)

@@ -1,6 +1,6 @@
 {{-- Commun à toutes les pages : icônes du site, couleur du navigateur et polices.
      Hors vitrine (indexer=false), les moteurs de recherche n'indexent pas. --}}
-@props(['indexer' => false])
+@props(['indexer' => false, 'icones' => true])
 @unless ($indexer)
     <meta name="robots" content="noindex, nofollow">
 @endunless
@@ -40,8 +40,12 @@
         document.querySelectorAll('[data-installer]').forEach((b) => b.hidden = true);
     });
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+{{-- Nunito Sans et Poppins sont servies par le site (resources/css/app.css). --}}
+{{-- Les mêmes pictogrammes que l'application (Material, arrondis) : 3 Mo chez
+     Google, chargés sans bloquer la page (media="print" puis « all ») — une
+     feuille de Google qui n'arrive pas ne fige plus l'affichage. Pas dans la
+     console, qui dessine les siens. --}}
+@if ($icones)
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=Poppins:wght@600;700;800&display=swap">
-{{-- Les mêmes pictogrammes que l'application (Material, arrondis). --}}
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&display=block">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&display=block">
+@endif

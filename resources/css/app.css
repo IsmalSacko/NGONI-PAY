@@ -1,4 +1,14 @@
 @import 'tailwindcss';
+/* Polices servies par le site, et non par Google : une feuille de Google qui
+   n'arrivait pas bloquait toute la page (scripts jamais démarrés, chargement
+   sans fin) ; vu dans la console le 26/10/2026. */
+@import '@fontsource/nunito-sans/400.css';
+@import '@fontsource/nunito-sans/600.css';
+@import '@fontsource/nunito-sans/700.css';
+@import '@fontsource/nunito-sans/800.css';
+@import '@fontsource/poppins/600.css';
+@import '@fontsource/poppins/700.css';
+@import '@fontsource/poppins/800.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
