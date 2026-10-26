@@ -42,10 +42,16 @@
 </script>
 {{-- Nunito Sans et Poppins sont servies par le site (resources/css/app.css). --}}
 {{-- Les mêmes pictogrammes que l'application (Material, arrondis) : 3 Mo chez
-     Google, chargés sans bloquer la page (media="print" puis « all ») — une
-     feuille de Google qui n'arrive pas ne fige plus l'affichage. Pas dans la
+     Google, demandés une fois la page chargée — une feuille de Google qui
+     n'arrive pas ne fige ni l'affichage ni la fin du chargement. Pas dans la
      console, qui dessine les siens. --}}
 @if ($icones)
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&display=block">
+<script>
+    addEventListener('load', () => {
+        const l = document.createElement('link');
+        l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&display=block';
+        document.head.appendChild(l);
+    });
+</script>
 @endif
