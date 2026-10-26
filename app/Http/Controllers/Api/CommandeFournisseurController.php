@@ -32,7 +32,9 @@ class CommandeFournisseurController extends Controller
         $data = $request->validate([
             'fournisseur_id' => ['required', 'uuid'],
             'lignes' => ['required', 'array', 'min:1', 'max:200'],
-            'lignes.*.produit_id' => ['required', 'uuid'],
+            // Sans produit_id : un article du catalogue du grossiste que je ne
+            // vends pas encore ; il se crée chez moi à la commande.
+            'lignes.*.produit_id' => ['nullable', 'uuid', 'required_without:lignes.*.produit_grossiste_id'],
             'lignes.*.quantite' => ['required', 'numeric', 'gt:0'],
             'lignes.*.prix_estime' => ['nullable', 'integer', 'min:0'],
             'lignes.*.produit_grossiste_id' => ['nullable', 'uuid'],

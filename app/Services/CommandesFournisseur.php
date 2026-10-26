@@ -15,8 +15,10 @@ use App\Models\PaiementFournisseur;
 use App\Models\Plan;
 use App\Models\Produit;
 use App\Models\ReglementCredit;
+use App\Models\UniteBoutique;
 use App\Models\User;
 use App\Support\Phone\PhoneNumber;
+use App\Support\Quantite;
 use App\Support\Tenancy\TenantContext;
 use App\Support\WhatsApp;
 use Illuminate\Support\Collection;
@@ -94,10 +96,19 @@ class CommandesFournisseur
      */
     public function commander(User $auteur, Fournisseur $fournisseur, array $lignes, ?string $note = null): CommandeFournisseur
     {
-        $produits = Produit::whereIn('id', array_column($lignes, 'produit_id'))->get()->keyBy('id');
         $grossiste = $this->boutiqueDuFournisseur($fournisseur);
 
-        $commande = DB::transaction(function () use ($auteur, $fournisseur, $lignes, $note, $produits, $grossiste): CommandeFournisseur {
+        $commande = DB::transaction(function () use ($auteur, $fournisseur, $lignes, $note, $grossiste): CommandeFournisseur {
+            // Un article de son catalogue que je ne vends pas encore : créé chez
+            // moi (son nom, son unité, son prix), la ligne le désigne ensuite.
+            foreach ($lignes as $i => $l) {
+                if (blank($l['produit_id'] ?? null)) {
+                    $lignes[$i]['produit_id'] = $this->creerDepuisCatalogue($grossiste, (string) ($l['produit_grossiste_id'] ?? ''))->id;
+                    $lignes[$i]['contenance'] = 1;
+                }
+            }
+            $produits = Produit::whereIn('id', array_column($lignes, 'produit_id'))->get()->keyBy('id');
+
             $commande = CommandeFournisseur::create([
                 'fournisseur_id' => $fournisseur->id,
                 'boutique_grossiste_id' => $grossiste?->id,
@@ -373,6 +384,41 @@ class CommandesFournisseur
         $u = rtrim(mb_strtolower(trim((string) $unite)), 's');
 
         return $u === '' ? null : $u;
+    }
+
+    /**
+     * L'article du grossiste devient le mien : même nom, même unité (si ma
+     * boutique la connaît), son prix pour prix d'achat et, à défaut d'autre,
+     * pour prix de vente — à corriger dans la fiche. Stock à zéro : la
+     * réception le remplira. Un article du même nom chez moi est repris.
+     */
+    private function creerDepuisCatalogue(?Boutique $grossiste, string $produitGrossisteId): Produit
+    {
+        $article = $grossiste === null ? null : Produit::withoutGlobalScopes()->where('boutique_id', $grossiste->id)->where('actif', true)->find($produitGrossisteId);
+        if ($article === null) {
+            throw ValidationException::withMessages(['lignes' => ['Article introuvable chez ce fournisseur.']]);
+        }
+        $existant = Produit::query()->whereRaw('LOWER(TRIM(nom)) = ?', [mb_strtolower(trim($article->nom))])->first();
+        if ($existant !== null) {
+            return $existant;
+        }
+        $prix = (int) ($this->vendEnGros($grossiste) && $article->prix_gros !== null ? $article->prix_gros : $article->prix_vente);
+        // Une unité que ma boutique ne connaît pas : l'article se vend à la pièce.
+        $unite = filled($article->unite) && (isset(Quantite::UNITES[$article->unite]) || UniteBoutique::where('nom', $article->unite)->exists())
+            ? $article->unite : null;
+        $code = filled($article->code_barre) && ! Produit::query()->whereIn('code_barre', Produit::variantesCodeBarre((string) $article->code_barre))->exists()
+            ? $article->code_barre : null;
+
+        return Produit::create([
+            'nom' => $article->nom,
+            'unite' => $unite,
+            'code_barre' => $code,
+            'prix_achat' => $prix,
+            'prix_vente' => (int) $article->prix_vente,
+            'taux_tva' => 0,
+            'stock' => 0,
+            'actif' => true,
+        ]);
     }
 
     private function retenir(string $grossisteId, string $produitRevendeurId, string $produitGrossisteId, float $contenance): void

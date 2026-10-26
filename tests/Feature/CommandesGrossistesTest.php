@@ -211,6 +211,45 @@ class CommandesGrossistesTest extends TestCase
             ->assertJsonPath('lignes.0.quantite', 72)->assertJsonPath('statut', 'envoyee');
     }
 
+    public function test_un_article_du_catalogue_que_je_n_ai_pas_se_cree_chez_moi_a_la_commande(): void
+    {
+        $this->dans($this->depot);
+        $huile = Produit::create(['nom' => 'Huile Dinor 5 L', 'unite' => 'bidon', 'code_barre' => '777001', 'prix_vente' => 9000, 'prix_gros' => 8200, 'taux_tva' => 0, 'stock' => 20]);
+        $this->dans($this->epicerie);
+        $fournisseur = Fournisseur::create(['nom' => 'Traoré', 'telephone' => '+22376001122'])->id;
+        $this->accepte();
+
+        // Sans produit_id : l'article se crée chez Awa, à son nom et à son prix.
+        $commande = $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [
+            ['produit_grossiste_id' => $huile->id, 'quantite' => 4],
+            ['produit_id' => $this->riz->id, 'quantite' => 2],
+        ]])->assertCreated()->assertJsonPath('total_estime', 4 * 8200 + 2 * 12000)->json();
+
+        $this->dans($this->epicerie);
+        $cree = Produit::where('nom', 'Huile Dinor 5 L')->sole();
+        $this->assertSame(8200, (int) $cree->prix_achat);
+        $this->assertSame(9000, (int) $cree->prix_vente);
+        $this->assertSame('bidon', $cree->unite);
+        $this->assertSame('777001', $cree->code_barre);
+        $this->assertEquals(0, $cree->stock);
+        $this->assertSame($cree->id, collect($commande['lignes'])->firstWhere('nom', 'Huile Dinor 5 L')['produit_id']);
+        // Retenu : la prochaine fois, le catalogue le reconnaît chez moi.
+        $this->api($this->awa)->getJson("/api/fournisseurs/{$fournisseur}/catalogue?q=dinor")->assertJsonPath('data.0.chez_moi.produit_id', $cree->id);
+
+        // Recommandé : pas de doublon.
+        $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [
+            ['produit_grossiste_id' => $huile->id, 'quantite' => 1],
+        ]])->assertCreated();
+        $this->dans($this->epicerie);
+        $this->assertSame(1, Produit::where('nom', 'Huile Dinor 5 L')->count());
+
+        // Ni l'un ni l'autre : refusé ; un article d'un autre grossiste : introuvable.
+        $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [['quantite' => 1]]])
+            ->assertUnprocessable();
+        $this->api($this->awa)->postJson('/api/commandes-fournisseur', ['fournisseur_id' => $fournisseur, 'lignes' => [['produit_grossiste_id' => $this->riz->id, 'quantite' => 1]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('lignes');
+    }
+
     public function test_les_paliers_du_revendeur_font_la_conversion_sans_rien_demander(): void
     {
         // Le grossiste vend l'huile au carton ; le revendeur la vend au litre, son carton fait 24 L.
