@@ -40,6 +40,12 @@ class ReleveCompte
         foreach ($client->reglements()->get() as $r) {
             /** @var ReglementCredit $r */
             $montant = (int) $r->montant;
+            if ($r->moyen_paiement === ReglementCredit::AJUSTEMENT) {
+                $mouvements->push(['le' => $r->created_at, 'ordre' => 1, 'detail' => ($montant < 0 ? 'Dette augmentée' : 'Dette diminuée').($r->note ? ' : '.$r->note : ''),
+                    'pris' => $montant < 0 ? -$montant : 0, 'verse' => max(0, $montant), 'type' => 'ajustement']);
+
+                continue;
+            }
             $moyen = MoyenPaiement::tryFrom((string) $r->moyen_paiement)?->label();
             $detail = ($montant < 0 ? 'Rendu au client' : 'Versement'.($r->note && $r->note !== 'Rendu au client' ? ' : '.$r->note : ''))
                 .($moyen ? ' ('.$moyen.')' : '').($r->numero ? ' · reçu n° '.$r->numero : '');

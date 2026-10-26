@@ -32,4 +32,26 @@ class ReglementsCredit
             ]);
         });
     }
+
+    /**
+     * « + » / « − » sur la dette : le client doit [ecart] de plus (positif :
+     * ancienne dette, crédit hors application) ou de moins (négatif : erreur,
+     * remise). Noté comme un règlement de sens inverse, hors caisse et sans
+     * reçu, pour que chaque calcul du solde le suive et que le relevé le montre.
+     */
+    public function ajusterDette(Client $client, User $auteur, int $ecart, ?string $motif = null): ReglementCredit
+    {
+        return DB::transaction(function () use ($client, $auteur, $ecart, $motif): ReglementCredit {
+            $solde = $client->solde();
+
+            return $client->reglements()->create([
+                'montant' => -$ecart,
+                'moyen_paiement' => ReglementCredit::AJUSTEMENT,
+                'note' => $motif,
+                'user_id' => $auteur->id,
+                'solde_avant' => $solde,
+                'solde_apres' => $solde + $ecart,
+            ]);
+        });
+    }
 }

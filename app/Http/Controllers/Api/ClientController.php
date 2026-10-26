@@ -145,7 +145,7 @@ class ClientController extends Controller
                 ->map(fn (Vente $v) => ['id' => $v->id, 'numero_facture' => $v->numero_facture, 'total' => $v->total,
                     'paye' => (int) $v->montant_paye, 'reste' => (int) $v->reste_du, 'date' => $v->created_at]),
             // Chaque remboursement porte son reçu (réimprimable).
-            'reglements' => $client->reglements()->with(['caissier:id,name', 'client'])->orderByDesc('numero')->latest()->get()
+            'reglements' => $client->reglements()->encaissements()->with(['caissier:id,name', 'client'])->orderByDesc('numero')->latest()->get()
                 ->map(fn (ReglementCredit $r) => $r->recu()),
         ]);
     }
@@ -190,6 +190,26 @@ class ClientController extends Controller
         $reglement = app(ReglementsCredit::class)->enregistrer($client, $request->user(), (int) $data['montant'], $data['moyen_paiement'], $data['note'] ?? null);
 
         return response()->json(['solde_du' => $client->soldeDu(), 'avoir' => $client->avoir(), 'recu' => $reglement->load(['caissier', 'client'])->recu()], 201);
+    }
+
+    /**
+     * « + » / « − » sur la dette : le client doit [montant] de plus (ancienne
+     * dette, crédit hors application) ou de moins (erreur, remise). Aucun
+     * argent ne bouge ; le relevé garde la ligne et son motif.
+     */
+    public function ajusterDette(Request $request, Client $client): JsonResponse
+    {
+        $du = $client->soldeDu();
+        $data = $request->validate([
+            'sens' => ['required', Rule::in(['augmenter', 'diminuer'])],
+            'montant' => ['required', 'integer', 'min:1', 'max:'.($request->input('sens') === 'diminuer' ? max(1, $du) : 100000000000)],
+            'motif' => ['nullable', 'string', 'max:255'],
+        ], ['montant.max' => $request->input('sens') === 'diminuer' ? ($du > 0 ? 'Il ne doit que '.Montant::format($du).'.' : 'Il ne doit rien.') : 'Montant trop grand.'], ['montant' => 'montant']);
+
+        $ecart = $data['sens'] === 'diminuer' ? -(int) $data['montant'] : (int) $data['montant'];
+        app(ReglementsCredit::class)->ajusterDette($client, $request->user(), $ecart, $data['motif'] ?? null);
+
+        return response()->json(['solde_du' => $client->soldeDu(), 'avoir' => $client->avoir()], 201);
     }
 
     public function destroy(Client $client): JsonResponse

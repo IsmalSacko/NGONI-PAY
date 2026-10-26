@@ -319,7 +319,7 @@ class Statistiques
 
         $noms = Client::whereIn('id', $parClient->pluck('client_id'))->pluck('nom', 'id');
         $debiteurs = Client::query()->avecSoldeDu()
-            ->withMax('reglements as dernier_reglement', 'created_at')
+            ->withMax(['reglements as dernier_reglement' => fn ($q) => $q->encaissements()], 'created_at')
             ->get(['id', 'nom', 'telephone'])
             ->map(fn (Client $c) => [
                 'nom' => $c->nom,

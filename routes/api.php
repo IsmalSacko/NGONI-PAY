@@ -250,6 +250,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::get('clients/{client}/releve-compte', [ClientController::class, 'releveCompte'])->middleware('permission:clients.view');
     // Rendre l'argent gardé (avoir) : comme un versement, en sens inverse.
     Route::post('clients/{client}/restitution', [ClientController::class, 'restitution'])->middleware(['permission:ventes.create']);
+    // « + » / « − » sur la dette : il doit plus ou moins, sans argent reçu.
+    Route::post('clients/{client}/dettes', [ClientController::class, 'ajusterDette'])->middleware(['permission:clients.update', 'abonnement']);
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->middleware(['permission:clients.delete', 'abonnement']);
 
     Route::get('equipe', [EquipeController::class, 'index'])->middleware('permission:utilisateurs.view');

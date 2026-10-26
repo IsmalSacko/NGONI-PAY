@@ -16,12 +16,21 @@ class ReglementCredit extends Model
 
     protected $table = 'reglements_credit';
 
+    /** « + » / « − » sur la dette : ni argent reçu, ni reçu ; il corrige le montant dû. */
+    public const AJUSTEMENT = 'ajustement';
+
     protected $fillable = ['client_id', 'user_id', 'session_caisse_id', 'numero', 'montant', 'solde_avant', 'solde_apres', 'moyen_paiement', 'note'];
 
     /** @return BelongsTo<Client, $this> */
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class)->withTrashed();
+    }
+
+    /** L'argent vraiment reçu ou rendu : tout sauf les modifications de dette. */
+    public function scopeEncaissements($query)
+    {
+        return $query->where('moyen_paiement', '!=', self::AJUSTEMENT);
     }
 
     /**

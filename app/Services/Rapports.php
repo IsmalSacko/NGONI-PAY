@@ -112,7 +112,7 @@ class Rapports
                 // aujourd'hui — leur crédit de la période, plafonné à leur dette
                 // actuelle. Baisse à chaque remboursement.
                 'encore_du' => $encoreDu = $this->encoreDu($valides),
-                'rembourse' => $rembourse = (int) ReglementCredit::whereBetween('created_at', [$debut, $fin])->sum('montant'),
+                'rembourse' => $rembourse = (int) ReglementCredit::encaissements()->whereBetween('created_at', [$debut, $fin])->sum('montant'),
             ],
             // L'argent réellement reçu : le payé des ventes et les dettes
             // remboursées. Le chiffre des ventes, lui, compte aussi le crédit.

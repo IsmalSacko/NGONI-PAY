@@ -168,6 +168,33 @@ class AnnulationCreditTest extends TestCase
         $this->assertSame(0, $fatou->fresh()->soldeDu());
     }
 
+    public function test_augmenter_ou_diminuer_la_dette_sans_argent_recu(): void
+    {
+        $fatou = Client::create(['nom' => 'Fatou']);
+        $total = $this->vendre($this->caissier, ['moyen_paiement' => 'credit_client', 'client_id' => $fatou->id])->assertCreated()->json('total');
+
+        // « + » : une ancienne dette de 10 000.
+        $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/dettes", ['sens' => 'augmenter', 'montant' => 10000, 'motif' => 'Ancienne dette'])
+            ->assertCreated()->assertJsonPath('solde_du', $total + 10000);
+
+        // « − » : jamais plus que ce qu'elle doit.
+        $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/dettes", ['sens' => 'diminuer', 'montant' => $total + 10001])
+            ->assertUnprocessable()->assertJsonValidationErrors('montant');
+        $this->api($this->admin)->postJson("/api/clients/{$fatou->id}/dettes", ['sens' => 'diminuer', 'montant' => 4000, 'motif' => 'Erreur'])
+            ->assertCreated()->assertJsonPath('solde_du', $total + 6000);
+        $this->assertSame($total + 6000, $fatou->fresh()->soldeDu());
+
+        // Ni reçu, ni argent encaissé dans les rapports ; le relevé montre chaque ligne.
+        $this->api($this->admin)->getJson("/api/clients/{$fatou->id}/credit")->assertOk()->assertJsonCount(0, 'reglements');
+        $this->api($this->admin)->getJson('/api/rapports?du='.today()->toDateString().'&au='.today()->toDateString())
+            ->assertOk()->assertJsonPath('encaisse.remboursements', 0);
+        $this->api($this->admin)->getJson("/api/clients/{$fatou->id}/releve-compte")->assertOk()
+            ->assertJsonPath('lignes.1.type', 'ajustement')->assertJsonPath('lignes.1.pris', 10000)
+            ->assertJsonPath('lignes.1.detail', 'Dette augmentée : Ancienne dette')
+            ->assertJsonPath('lignes.2.verse', 4000)->assertJsonPath('lignes.2.detail', 'Dette diminuée : Erreur')
+            ->assertJsonPath('solde', $total + 6000);
+    }
+
     public function test_la_liste_des_clients_arrive_entiere_pas_seulement_30(): void
     {
         foreach (range(1, 40) as $i) {
