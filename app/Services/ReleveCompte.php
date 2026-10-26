@@ -70,8 +70,14 @@ class ReleveCompte
             if ($au !== null && $m['le']->gt($au->copy()->endOfDay())) {
                 continue;
             }
-            $pris += $m['pris'];
-            $verse += $m['verse'];
+            // Une dette diminuée n'est pas de l'argent versé : elle réduit le
+            // total pris, et « Versé » reste ce que le client a payé.
+            if ($m['type'] === 'ajustement') {
+                $pris += $m['pris'] - $m['verse'];
+            } else {
+                $pris += $m['pris'];
+                $verse += $m['verse'];
+            }
             $lignes[] = ['date' => $m['le']->toIso8601String(), 'detail' => $m['detail'], 'pris' => $m['pris'], 'verse' => $m['verse'], 'solde' => $solde, 'type' => $m['type']];
         }
 

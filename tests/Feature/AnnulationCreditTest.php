@@ -192,7 +192,9 @@ class AnnulationCreditTest extends TestCase
             ->assertJsonPath('lignes.1.type', 'ajustement')->assertJsonPath('lignes.1.pris', 10000)
             ->assertJsonPath('lignes.1.detail', 'Dette augmentée : Ancienne dette')
             ->assertJsonPath('lignes.2.verse', 4000)->assertJsonPath('lignes.2.detail', 'Dette diminuée : Erreur')
-            ->assertJsonPath('solde', $total + 6000);
+            ->assertJsonPath('solde', $total + 6000)
+            // « Versé » : seulement l'argent payé ; la baisse réduit « Pris ».
+            ->assertJsonPath('pris', $total + 6000)->assertJsonPath('verse', 0);
     }
 
     public function test_la_liste_des_clients_arrive_entiere_pas_seulement_30(): void
