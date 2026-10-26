@@ -7,6 +7,7 @@ namespace App\Services\Console;
 use App\Enums\Country;
 use App\Models\Abonnement;
 use App\Models\Boutique;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -49,13 +50,16 @@ class ComptesConsole
         $boutiques = fn () => Boutique::withoutGlobalScopes()->select('id')->whereColumn('proprietaire_id', 'abonnements.user_id');
         $ventes = fn () => DB::table('ventes')->where('statut', 'validee')->whereIn('boutique_id', $boutiques());
         $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        // Le type de compte d'abord : l'index des jetons commence par lui. Sans
+        // lui, MySQL relisait toute la table pour chaque compte (0,9 s la page).
+        $jetons = fn () => DB::table('personal_access_tokens')->where('tokenable_type', (new User)->getMorphClass())->whereColumn('tokenable_id', 'abonnements.user_id');
 
         $q = Abonnement::query()->avecCompte()
             ->select('abonnements.*')
             ->addSelect([
                 'inscrit_le' => DB::table('users')->select('created_at')->whereColumn('users.id', 'abonnements.user_id'),
                 'nom_compte' => DB::table('users')->select('name')->whereColumn('users.id', 'abonnements.user_id'),
-                'derniere_app' => DB::table('personal_access_tokens')->selectRaw('MAX(last_used_at)')->whereColumn('tokenable_id', 'abonnements.user_id'),
+                'derniere_app' => $jetons()->selectRaw('MAX(last_used_at)'),
                 'nb_ventes' => $ventes()->selectRaw('COUNT(*)'),
                 'ca_30j' => $ventes()->where('created_at', '>=', now()->subDays(30))->selectRaw('COALESCE(SUM(total), 0)'),
             ]);
@@ -86,7 +90,7 @@ class ComptesConsole
         match ($f['usage'] ?? '') {
             'vend' => $q->whereExists($ventes()->where('created_at', '>=', now()->subDays(7))->selectRaw('1')),
             'jamais_vendu' => $q->whereNotExists($ventes()->selectRaw('1')),
-            'dormants' => $q->whereNotExists(DB::table('personal_access_tokens')->whereColumn('tokenable_id', 'abonnements.user_id')->where('last_used_at', '>=', now()->subDays(14))->selectRaw('1')),
+            'dormants' => $q->whereNotExists($jetons()->where('last_used_at', '>=', now()->subDays(14))->selectRaw('1')),
             default => null,
         };
 

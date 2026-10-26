@@ -55,7 +55,8 @@ class UtilisateursConsole
     public function requete(array $f): Builder
     {
         $proprietaires = fn () => Boutique::withoutGlobalScopes()->whereNotNull('proprietaire_id')->select('proprietaire_id');
-        $jetons = fn () => DB::table('personal_access_tokens')->whereColumn('tokenable_id', 'users.id');
+        // Le type de compte d'abord : l'index des jetons commence par lui.
+        $jetons = fn () => DB::table('personal_access_tokens')->where('tokenable_type', (new User)->getMorphClass())->whereColumn('tokenable_id', 'users.id');
         $acceptations = fn () => DB::table('acceptations_conditions')->whereColumn('acceptations_conditions.user_id', 'users.id');
         $version = ConditionsUtilisation::version();
 
