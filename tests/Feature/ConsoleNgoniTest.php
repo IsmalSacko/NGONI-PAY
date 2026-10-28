@@ -85,4 +85,20 @@ class ConsoleNgoniTest extends TestCase
             ->assertOk()->json('data'))->firstWhere('code', 'pro');
         $this->assertSame(12000, collect($pro['tarifs'])->firstWhere('mois', 1)['montant']);
     }
+
+    public function test_une_autre_application_enregistre_sa_vente_dans_la_boutique_de_l_exploitant(): void
+    {
+        config(['ecaisse.boutique_ventes_abonnements' => $this->boutique->id]);
+        $vente = [
+            'reference' => 'demande-42', 'application' => 'ngoni-sante',
+            'client' => ['nom' => 'CSCom de Banconi', 'telephone' => '+22370000001', 'adresse' => 'Ngoni Santé · Centre de santé'],
+            'libelle' => 'Abonnement Ngoni Santé · Pro · 3 mois', 'montant' => 42000, 'moyen' => 'orange_money',
+        ];
+
+        $id = $this->postJson('/api/console/v1/ventes', $vente, $this->cle)->assertCreated()->json('vente.id');
+        // Rejouée, elle ne double pas.
+        $this->assertSame($id, $this->postJson('/api/console/v1/ventes', $vente, $this->cle)->assertCreated()->json('vente.id'));
+        $this->assertSame(1, \App\Models\Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
+        $this->assertSame(42000, (int) \App\Models\Vente::withoutGlobalScopes()->find($id)->total);
+    }
 }

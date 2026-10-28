@@ -69,8 +69,60 @@ class VenteAbonnement
             return null;
         }
 
-        // La caisse de l'exploitant : son compte rattaché à cette boutique,
-        // sinon le propriétaire de la boutique.
+        return $this->encaisserDans(
+            $boutique,
+            'ngoni-caisse/demande-abonnement/'.$demande->id,
+            fn () => $this->client($demande)?->id,
+            $this->lignes($demande),
+            $this->moyen($demande->moyen),
+        );
+    }
+
+    /**
+     * L'abonnement payé d'une autre application IsmaelDev (Ngoni Santé,
+     * Atelier…), approuvé dans la Console Ngoni : la même vente dans la même
+     * boutique, le client de l'autre application en client. La référence
+     * (application + demande) rend l'appel rejouable sans doubler la vente.
+     *
+     * @param  array{reference: string, application: string, client: array{nom: string, telephone?: string|null, email?: string|null, adresse?: string|null}, libelle: string, montant: int, moyen?: string|null}  $v
+     */
+    public function enregistrerExterne(array $v): ?Vente
+    {
+        $boutiqueId = config('ecaisse.boutique_ventes_abonnements');
+        $boutique = blank($boutiqueId) ? null : Boutique::find($boutiqueId);
+        if ($boutique === null || $v['montant'] <= 0) {
+            return null;
+        }
+
+        return $this->encaisserDans(
+            $boutique,
+            'console-ngoni/'.$v['application'].'/'.$v['reference'],
+            function () use ($v): ?string {
+                $c = $v['client'];
+                $telephone = $c['telephone'] ?? null;
+                $existant = filled($telephone) ? Client::where('telephone', $telephone)->first() : null;
+
+                return ($existant ?? Client::create([
+                    'nom' => $c['nom'],
+                    'telephone' => $telephone,
+                    'email' => $c['email'] ?? null,
+                    'adresse' => $c['adresse'] ?? null,
+                ]))->id;
+            },
+            [['libelle' => mb_substr($v['libelle'], 0, 120), 'prix_unitaire' => $v['montant'], 'quantite' => 1]],
+            $this->moyen($v['moyen'] ?? null),
+        );
+    }
+
+    /**
+     * Encaisse à la caisse de l'exploitant (son compte rattaché à la boutique,
+     * sinon le propriétaire), puis rend la boutique d'avant.
+     *
+     * @param  callable(): (int|string|null)  $client
+     * @param  list<array{libelle: string, prix_unitaire: int, quantite: int}>  $lignes
+     */
+    private function encaisserDans(Boutique $boutique, string $reference, callable $client, array $lignes, MoyenPaiement $moyen): ?Vente
+    {
         $caissier = User::where('est_admin_plateforme', true)->where('boutique_id', $boutique->id)->first()
             ?? User::find($boutique->proprietaire_id);
         if ($caissier === null) {
@@ -82,12 +134,18 @@ class VenteAbonnement
         $precedente = $this->tenant->boutiqueId();
         $this->tenant->setBoutique($boutique->id);
         try {
+            $referenceLocale = Uuid::uuid5(Uuid::NAMESPACE_URL, $reference)->toString();
+            $deja = Vente::withoutGlobalScopes()->where('boutique_id', $boutique->id)->where('reference_locale', $referenceLocale)->first();
+            if ($deja !== null) {
+                return $deja;
+            }
+
             return $this->ventes->encaisser([
-                'reference_locale' => Uuid::uuid5(Uuid::NAMESPACE_URL, 'ngoni-caisse/demande-abonnement/'.$demande->id)->toString(),
-                'client_id' => $this->client($demande)?->id,
-                'lignes' => $this->lignes($demande),
+                'reference_locale' => $referenceLocale,
+                'client_id' => $client(),
+                'lignes' => $lignes,
                 'remise' => 0,
-                'moyen_paiement' => $this->moyen($demande)->value,
+                'moyen_paiement' => $moyen->value,
                 'montant_recu' => null,
                 'vendue_hors_ligne' => false,
             ], $caissier);
@@ -145,9 +203,9 @@ class VenteAbonnement
     }
 
     /** Le moyen de la caisse le plus proche ; les autres (MTN, Free…) sont nommés sur la ligne. */
-    private function moyen(DemandeAbonnement $demande): MoyenPaiement
+    private function moyen(?string $moyen): MoyenPaiement
     {
-        $code = mb_strtolower((string) $demande->moyen);
+        $code = mb_strtolower((string) $moyen);
 
         return match (true) {
             str_contains($code, 'wave') => MoyenPaiement::Wave,

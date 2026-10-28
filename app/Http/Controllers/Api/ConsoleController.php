@@ -14,6 +14,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\GestionPlans;
+use App\Services\VenteAbonnement;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -236,6 +237,33 @@ class ConsoleController extends Controller
         $this->refusMetier(fn () => $gestion->enregistrer([$plan->id => $p], array_intersect_key($tarifs, [$plan->id => true])));
 
         return $this->formules($gestion);
+    }
+
+    /**
+     * L'abonnement payé d'une autre application, approuvé dans la console :
+     * une vente dans la boutique de l'exploitant (comme les abonnements
+     * Ngoni Caisse). Rejoué, il ne double pas.
+     */
+    public function vente(Request $request, VenteAbonnement $ventes): JsonResponse
+    {
+        $d = $request->validate([
+            'reference' => ['required', 'string', 'max:120'],
+            'application' => ['required', 'string', 'max:40', 'alpha_dash'],
+            'client' => ['required', 'array'],
+            'client.nom' => ['required', 'string', 'max:120'],
+            'client.telephone' => ['nullable', 'string', 'max:30'],
+            'client.email' => ['nullable', 'email', 'max:120'],
+            'client.adresse' => ['nullable', 'string', 'max:255'],
+            'libelle' => ['required', 'string', 'max:255'],
+            'montant' => ['required', 'integer', 'min:1'],
+            'moyen' => ['nullable', 'string', 'max:30'],
+        ]);
+        $vente = $ventes->enregistrerExterne($d);
+        if ($vente === null) {
+            return response()->json(['message' => 'La boutique des ventes d’abonnement n’est pas réglée (ECAISSE_BOUTIQUE_VENTES_ABONNEMENTS).'], 422);
+        }
+
+        return response()->json(['vente' => ['id' => $vente->id, 'numero' => $vente->numero, 'numero_facture' => $vente->numero_facture, 'total' => (int) $vente->total]], 201);
     }
 
     /** « Boutique Awa » ; « Boutique Awa (+2) » quand le propriétaire en a plusieurs. */

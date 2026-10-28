@@ -87,6 +87,7 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::post('comptes/{user}/abonnement', 'accorder');
     Route::get('formules', 'formules');
     Route::patch('formules/{code}', 'modifierFormule');
+    Route::post('ventes', 'vente');
 });
 
 // Console de l'exploitant dans l'application : hors du contexte d'une
