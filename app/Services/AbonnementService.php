@@ -10,6 +10,7 @@ use App\Mail\DemandeAbonnementMail;
 use App\Models\Abonnement;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
+use App\Models\JournalAbonnement;
 use App\Models\Plan;
 use App\Models\User;
 use App\Support\Apres;
@@ -396,32 +397,49 @@ class AbonnementService
 
     /**
      * Accord manuel par l'exploitant (paiement reçu hors demande, geste
-     * commercial, prolongation d'essai). `$fin` NULL = sans échéance. Une
-     * demande en attente du même compte est soldée.
-     */
-    /**
+     * commercial, prolongation d'essai). `$fin` NULL = sans échéance, prise
+     * telle quelle. Une demande en attente du même compte est soldée.
+     *
+     * Avec un paiement (`montant` > 0) : comme une demande validée — reçu
+     * numéroté, vente dans la boutique de l'exploitant. La demande en attente
+     * du compte (payée hors ligne) le porte ; sinon une demande est créée.
+     *
      * @param  list<string>|null  $fonctions  fonctions accordées en plus de la formule ;
      *                                        null : celles déjà accordées restent
+     * @param  array{montant?: int|null, moyen?: string|null, reference?: string|null}|null  $paiement
+     * @param  string|null  $par  qui a décidé, pour le journal (défaut : l'exploitant)
      */
-    public function accorder(User $proprietaire, string $plan, ?Carbon $fin, User $exploitant, ?string $note = null, ?array $fonctions = null): Abonnement
-    {
+    public function accorder(
+        User $proprietaire,
+        string $plan,
+        ?Carbon $fin,
+        User $exploitant,
+        ?string $note = null,
+        ?array $fonctions = null,
+        ?Carbon $debut = null,
+        ?array $paiement = null,
+        ?string $par = null,
+    ): Abonnement {
         $modele = Plan::parCode($plan);
         if ($modele === null) {
             throw ValidationException::withMessages(['plan' => ['Plan inconnu.']]);
         }
-        // Seules les fonctions hors de la formule s'accordent : celles qu'elle
-        // inclut ne se retirent pas, et n'ont pas à être gardées en double.
-        $accordees = $fonctions === null ? null : array_values(array_filter(
-            array_intersect(array_keys(Plan::FONCTIONNALITES), $fonctions),
-            fn (string $f) => ! $modele->inclut($f),
-        ));
+        $accordees = $fonctions === null ? null : self::horsFormule($modele, $fonctions);
+        $montant = (int) ($paiement['montant'] ?? 0);
+        $par ??= $exploitant->name;
 
-        $abonnement = DB::transaction(function () use ($proprietaire, $plan, $fin, $exploitant, $note, $accordees): Abonnement {
+        $demande = null;
+        $abonnement = DB::transaction(function () use ($proprietaire, $modele, $plan, $fin, $exploitant, $note, $accordees, $debut, $paiement, $montant, $par, &$demande): Abonnement {
+            $courant = Abonnement::where('user_id', $proprietaire->id)->first();
+            // Période du reçu : la date donnée, sinon la suite de la même offre en cours, sinon aujourd'hui.
+            $periodeDebut = $debut ?? ($courant !== null && $courant->estEnCours() && $courant->plan === $plan && $courant->fin?->isFuture()
+                ? $courant->fin->copy() : now());
+
             $abonnement = Abonnement::updateOrCreate(
                 ['user_id' => $proprietaire->id],
                 [
                     'plan' => $plan,
-                    'debut' => now()->toDateString(),
+                    'debut' => ($debut ?? now())->toDateString(),
                     'fin' => $fin?->toDateString(),
                     'est_actif' => true,
                     'est_manuel' => true,
@@ -431,25 +449,141 @@ class AbonnementService
                 ],
             );
 
+            if ($montant > 0) {
+                $demande = $this->demandePayee($proprietaire, $modele, $periodeDebut, $fin, $exploitant, $note, $paiement ?? [], $montant, $par);
+            }
+
             DemandeAbonnement::where('user_id', $proprietaire->id)->enAttente()->update([
                 'statut' => StatutDemande::Approuvee->value,
                 'decide_le' => now(),
                 'decide_par' => $exploitant->id,
+                'decide_par_nom' => $par,
                 'note_decision' => 'Accordé manuellement depuis la console.',
+            ]);
+
+            JournalAbonnement::create([
+                'user_id' => $proprietaire->id,
+                'type' => JournalAbonnement::ACCORD,
+                'plan' => $plan,
+                'debut' => $periodeDebut->toDateString(),
+                'fin' => $fin?->toDateString(),
+                'montant' => $montant > 0 ? $montant : null,
+                'devise' => $montant > 0 ? $demande?->devise : null,
+                'moyen' => $paiement['moyen'] ?? null,
+                'reference' => $paiement['reference'] ?? null,
+                'demande_id' => $demande?->id,
+                'par' => $par,
+                'note' => $note,
             ]);
 
             return $abonnement;
         });
 
-        $this->prevenirActivation($abonnement);
+        $this->prevenirActivation($abonnement, null, $demande?->recu_numero);
+        if ($demande !== null) {
+            app(VenteAbonnement::class)->apresValidation($demande);
+        }
 
         return $abonnement;
     }
 
-    /** Fin immédiate : plus aucune action possible dans ses boutiques. */
-    public function revoquer(User $proprietaire): void
+    /**
+     * Le paiement d'un accord, écrit comme une demande validée : la demande en
+     * attente du compte payée hors ligne (pas un paiement en ligne en cours),
+     * sinon une nouvelle. Elle porte le reçu et compte dans les recettes.
+     *
+     * @param  array{moyen?: string|null, reference?: string|null}  $paiement
+     */
+    private function demandePayee(User $proprietaire, Plan $plan, Carbon $debut, ?Carbon $fin, User $exploitant, ?string $note, array $paiement, int $montant, string $par): DemandeAbonnement
     {
-        $proprietaire->abonnement()->first()?->expirerMaintenant();
+        // Durée payée en mois (au moins un) ; la durée la plus proche pour le libellé du reçu.
+        $mois = $fin === null ? 0 : max(1, min(255, (int) round($debut->copy()->startOfDay()->diffInDays($fin->copy()->startOfDay(), true) / 30.4)));
+        $cycle = collect(CycleFacturation::cases())->filter(fn (CycleFacturation $c) => $c->mois() <= max(1, $mois))->last() ?? CycleFacturation::Mensuel;
+        if ($fin === null) {
+            $cycle = CycleFacturation::Annuel;
+        }
+
+        $demande = DemandeAbonnement::where('user_id', $proprietaire->id)->enAttente()
+            ->whereNull('jeko_paiement_id')->whereNull('fedapay_transaction_id')->whereNull('pawapay_deposit_id')
+            ->oldest('id')->first()
+            ?? new DemandeAbonnement([
+                'user_id' => $proprietaire->id,
+                'demande_par' => null,
+                'boutique_id' => $proprietaire->boutiquesPossedees()->withoutGlobalScopes()->orderBy('created_at')->value('id'),
+                'telephone_contact' => $proprietaire->phone,
+            ]);
+
+        $demande->fill([
+            'plan' => $plan->code,
+            'cycle' => $cycle,
+            'mois' => $mois,
+            'montant' => $montant,
+            'devise' => $demande->devise ?? $plan->tarifs->first()?->devise ?? 'XOF',
+            'moyen' => $paiement['moyen'] ?? $demande->moyen,
+            'reference' => $paiement['reference'] ?? null,
+            'statut' => StatutDemande::Approuvee,
+            'decide_le' => now(),
+            'decide_par' => $exploitant->id,
+            'decide_par_nom' => $par,
+            'note_decision' => trim('Accordé depuis la console, paiement reçu. '.($note ?? '')),
+            'periode_debut' => $debut->toDateString(),
+            'periode_fin' => $fin?->toDateString(),
+        ])->save();
+        $demande->update(['recu_numero' => RecuAbonnement::numero($demande)]);
+
+        return $demande;
+    }
+
+    /**
+     * Fonctions accordées en plus de la formule, sans changer le reste de
+     * l'abonnement (options du compte dans la Console Ngoni).
+     *
+     * @param  list<string>  $fonctions
+     */
+    public function reglerFonctions(User $proprietaire, array $fonctions): Abonnement
+    {
+        $abonnement = $proprietaire->abonnement()->first();
+        if ($abonnement === null) {
+            throw ValidationException::withMessages(['fonctions' => ['Ce compte n’a pas encore d’abonnement.']]);
+        }
+        $modele = $abonnement->planModele();
+        $abonnement->update(['fonctions_accordees' => $modele === null ? [] : self::horsFormule($modele, $fonctions)]);
+
+        return $abonnement->fresh();
+    }
+
+    /**
+     * Seules les fonctions hors de la formule s'accordent : celles qu'elle
+     * inclut ne se retirent pas, et n'ont pas à être gardées en double.
+     *
+     * @param  list<string>  $fonctions
+     * @return list<string>
+     */
+    private static function horsFormule(Plan $modele, array $fonctions): array
+    {
+        return array_values(array_filter(
+            array_intersect(array_keys(Plan::FONCTIONNALITES), $fonctions),
+            fn (string $f) => ! $modele->inclut($f),
+        ));
+    }
+
+    /** Fin immédiate : plus aucune action possible dans ses boutiques. Notée au journal du compte. */
+    public function revoquer(User $proprietaire, ?User $exploitant = null, ?string $motif = null, ?string $par = null): void
+    {
+        $abonnement = $proprietaire->abonnement()->first();
+        if ($abonnement === null) {
+            return;
+        }
+        $plan = $abonnement->plan;
+        $abonnement->expirerMaintenant();
+        JournalAbonnement::create([
+            'user_id' => $proprietaire->id,
+            'type' => JournalAbonnement::REVOCATION,
+            'plan' => $plan,
+            'fin' => $abonnement->fin?->toDateString(),
+            'par' => $par ?? $exploitant?->name,
+            'note' => $motif,
+        ]);
     }
 
     private function exigerEnAttente(DemandeAbonnement $demande): void

@@ -52,6 +52,7 @@ return [
     // La Console Ngoni, commune à toutes les applications IsmaelDev.
     'console_ngoni' => [
         'cle' => env('ECAISSE_CLE_CONSOLE', ''),
+        'url' => env('CONSOLE_NGONI_URL', 'https://console.ismaeldev.fr'),
     ],
 
 ];

@@ -20,8 +20,8 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'pawapay_deposit_id', 'frais_mobile',
-        'statut', 'decide_le', 'decide_par', 'note_decision', 'parrain_recompense_id', 'recu_numero', 'periode_debut', 'periode_fin',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'pawapay_deposit_id', 'reference', 'frais_mobile',
+        'statut', 'decide_le', 'decide_par', 'decide_par_nom', 'note_decision', 'parrain_recompense_id', 'recu_numero', 'periode_debut', 'periode_fin',
     ];
 
     protected function casts(): array
@@ -52,6 +52,16 @@ class DemandeAbonnement extends Model
     public function demandeur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'demande_par');
+    }
+
+    /**
+     * L'exploitant qui a tranché (null : approuvée d'elle-même, payée en ligne).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function decideur(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decide_par');
     }
 
     /**
@@ -101,6 +111,22 @@ class DemandeAbonnement extends Model
             $secondes < 3600 => intdiv($secondes, 60).' min',
             default => intdiv($secondes, 3600).' h '.str_pad((string) intdiv($secondes % 3600, 60), 2, '0', STR_PAD_LEFT),
         };
+    }
+
+    /**
+     * Référence du paiement : celle saisie à la validation, sinon le numéro
+     * de transaction du prestataire en ligne.
+     */
+    public function referencePaiement(): ?string
+    {
+        return $this->reference ?? $this->jeko_transaction_id ?? $this->jeko_paiement_id ?? $this->fedapay_transaction_id ?? $this->pawapay_deposit_id;
+    }
+
+    /** Qui a tranché : « Console · Ismaila », l'exploitant, ou personne (paiement en ligne). */
+    public function decidePar(): ?string
+    {
+        return $this->decide_par_nom ?? $this->decideur?->name
+            ?? ($this->statut === StatutDemande::Approuvee && $this->decide_par === null ? 'Paiement en ligne' : null);
     }
 
     /** Payée (ou en cours de paiement) en ligne : Jèko ou FedaPay. Elle s'approuve seule. */

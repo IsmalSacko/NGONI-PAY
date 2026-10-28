@@ -27,7 +27,7 @@ class RecuAbonnement
             'd' => $demande,
             'plan' => Plan::parCode($demande->plan)?->nom ?? ucfirst($demande->plan),
             'moyen' => $this->moyen($demande),
-            'reference' => $demande->jeko_transaction_id ?? $demande->jeko_paiement_id ?? $demande->fedapay_transaction_id ?? $demande->pawapay_deposit_id,
+            'reference' => $demande->referencePaiement(),
             'client' => $demande->boutique?->nom ?? $demande->proprietaire?->name,
         ])->setPaper('a5')->output();
     }

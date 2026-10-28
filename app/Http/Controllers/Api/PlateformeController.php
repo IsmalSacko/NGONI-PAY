@@ -263,9 +263,9 @@ class PlateformeController extends Controller
         return response()->json(['message' => "Abonnement de {$user->name} mis à jour.", 'abonnement' => $this->abonnement($abonnement)]);
     }
 
-    public function revoquer(User $user, AbonnementService $service): JsonResponse
+    public function revoquer(User $user, Request $request, AbonnementService $service): JsonResponse
     {
-        $service->revoquer($user);
+        $service->revoquer($user, $request->user());
 
         return response()->json(['message' => "Abonnement de {$user->name} révoqué : ses boutiques passent en lecture seule."]);
     }

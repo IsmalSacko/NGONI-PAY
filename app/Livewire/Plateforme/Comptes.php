@@ -171,7 +171,7 @@ class Comptes extends Component
     public function revoquer(string $userId, AbonnementService $service): void
     {
         $proprietaire = User::findOrFail($userId);
-        $service->revoquer($proprietaire);
+        $service->revoquer($proprietaire, Auth::user());
         $this->info = "Abonnement de {$proprietaire->name} révoqué : ses boutiques passent en lecture seule.";
     }
 

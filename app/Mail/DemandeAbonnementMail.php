@@ -45,7 +45,8 @@ class DemandeAbonnementMail extends Mailable
                 'moyen' => self::MOYENS[$demande->moyen] ?? $demande->moyen,
                 'whatsapp' => WhatsApp::link($demande->telephone_contact ?: $proprietaire?->phone),
                 'abonnement' => $proprietaire?->abonnement,
-                'lienConsole' => url('/plateforme/demandes'),
+                // La Console Ngoni, commune à toutes les applications IsmaelDev.
+                'lienConsole' => rtrim((string) config('services.console_ngoni.url'), '/').'/demandes?app=ngoni-caisse',
             ],
         );
     }

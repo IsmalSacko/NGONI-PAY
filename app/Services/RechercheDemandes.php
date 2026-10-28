@@ -41,7 +41,8 @@ class RechercheDemandes
     }
 
     /**
-     * Dans la boutique, le propriétaire, le demandeur et le numéro de contact.
+     * Dans la boutique, le propriétaire, le demandeur, le numéro de contact et
+     * la note du demandeur (n° de transaction collé depuis le SMS).
      * Un numéro se cherche par ses chiffres : « 76 00 00 00 », « +223 76… » et
      * « 76000000 » se retrouvent.
      */
@@ -62,7 +63,9 @@ class RechercheDemandes
         $q->where(function (Builder $w) use ($texte, $chiffres, $personne): void {
             $w->whereHas('boutique', fn (Builder $b) => $b->where('nom', 'like', $texte))
                 ->orWhereHas('proprietaire', $personne)
-                ->orWhereHas('demandeur', $personne);
+                ->orWhereHas('demandeur', $personne)
+                ->orWhere('note', 'like', $texte)
+                ->orWhere('preuve_note', 'like', $texte);
             if (strlen($chiffres) >= 4) {
                 $w->orWhere('telephone_contact', 'like', '%'.$chiffres.'%');
             }

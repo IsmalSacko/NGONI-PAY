@@ -75,7 +75,7 @@ Route::post('connexion', [AuthController::class, 'login']);
 Route::post('mot-de-passe-oublie', [AuthController::class, 'motDePasseOublie'])->middleware('throttle:reinit-demande');
 Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiserMotDePasse'])->middleware('throttle:reinit-code');
 
-// La Console Ngoni (commune à toutes les applications IsmaelDev), contrat v1.
+// La Console Ngoni (commune à toutes les applications IsmaelDev), contrat v1 et ses ajouts v1.1.
 Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->controller(ConsoleController::class)->group(function (): void {
     Route::get('resume', 'resume');
     Route::get('demandes', 'demandes');
@@ -83,9 +83,13 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::post('demandes/{demande}/approuver', 'approuver');
     Route::post('demandes/{demande}/refuser', 'refuser');
     Route::get('comptes', 'comptes');
+    Route::get('comptes/{user}', 'compte');
     Route::post('comptes/{user}/valider', 'valider');
     Route::post('comptes/{user}/abonnement', 'accorder');
+    Route::post('comptes/{user}/revoquer', 'revoquer');
+    Route::post('comptes/{user}/options', 'reglerOptions');
     Route::post('comptes/{user}/interne', 'marquerInterne');
+    Route::get('recettes', 'recettes');
     Route::get('formules', 'formules');
     Route::patch('formules/{code}', 'modifierFormule');
     Route::post('ventes', 'vente');
