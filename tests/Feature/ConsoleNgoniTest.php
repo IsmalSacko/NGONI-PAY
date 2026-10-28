@@ -101,4 +101,15 @@ class ConsoleNgoniTest extends TestCase
         $this->assertSame(1, \App\Models\Vente::withoutGlobalScopes()->where('boutique_id', $this->boutique->id)->count());
         $this->assertSame(42000, (int) \App\Models\Vente::withoutGlobalScopes()->find($id)->total);
     }
+
+    public function test_valider_a_un_montant_negocie(): void
+    {
+        $demande = app(AbonnementService::class)->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel);
+
+        $this->postJson("/api/console/v1/demandes/{$demande->id}/approuver", ['montant' => 9000, 'note' => 'Remise négociée'], $this->cle)->assertOk();
+        $demande->refresh();
+        $this->assertSame(9000, (int) $demande->montant);
+        $this->assertStringContainsString('demandé : 10 000', (string) $demande->note_decision);
+        $this->assertStringContainsString('Remise négociée', (string) $demande->note_decision);
+    }
 }

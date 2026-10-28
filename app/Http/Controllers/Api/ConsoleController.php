@@ -94,9 +94,21 @@ class ConsoleController extends Controller
         return Storage::disk('local')->response($demande->preuve_chemin);
     }
 
-    public function approuver(DemandeAbonnement $demande, AbonnementService $service): JsonResponse
+    /**
+     * Valider, au montant demandé ou à un montant négocié (`montant`, `note`) :
+     * le reçu et la vente prennent le montant validé ; le montant demandé
+     * reste écrit dans la décision.
+     */
+    public function approuver(DemandeAbonnement $demande, Request $request, AbonnementService $service): JsonResponse
     {
-        $this->refusMetier(fn () => $service->approuver($demande, $this->exploitant()));
+        $v = $request->validate(['montant' => ['nullable', 'integer', 'min:0'], 'note' => ['nullable', 'string', 'max:255']]);
+        $note = filled($v['note'] ?? null) ? (string) $v['note'] : null;
+        if ($demande->statut === StatutDemande::EnAttente && isset($v['montant']) && (int) $v['montant'] !== (int) $demande->montant) {
+            $avant = number_format((int) $demande->montant, 0, ',', ' ');
+            $note = trim("Montant ajusté (demandé : {$avant} {$demande->devise}). ".($note ?? ''));
+            $demande->update(['montant' => (int) $v['montant']]);
+        }
+        $this->refusMetier(fn () => $service->approuver($demande, $this->exploitant(), $note));
 
         return response()->json(['demande' => ['id' => (string) $demande->id, 'statut' => $demande->fresh()?->statut->value, 'recu_numero' => $demande->fresh()?->recu_numero]]);
     }
