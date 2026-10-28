@@ -49,4 +49,9 @@ return [
         'fallback_model' => env('GEMINI_FALLBACK_MODEL', 'gemini-3.5-flash'),
     ],
 
+    // La Console Ngoni, commune à toutes les applications IsmaelDev.
+    'console_ngoni' => [
+        'cle' => env('ECAISSE_CLE_CONSOLE', ''),
+    ],
+
 ];

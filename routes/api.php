@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\ConsoleController;
 use App\Http\Controllers\Api\AbonnementController;
 use App\Http\Controllers\Api\AchatController;
 use App\Http\Controllers\Api\AppareilController;
@@ -73,6 +74,20 @@ Route::post('connexion', [AuthController::class, 'login']);
 // Limités : un code à 6 chiffres ne doit pas pouvoir être deviné en rafale.
 Route::post('mot-de-passe-oublie', [AuthController::class, 'motDePasseOublie'])->middleware('throttle:reinit-demande');
 Route::post('reinitialiser-mot-de-passe', [AuthController::class, 'reinitialiserMotDePasse'])->middleware('throttle:reinit-code');
+
+// La Console Ngoni (commune à toutes les applications IsmaelDev), contrat v1.
+Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->controller(ConsoleController::class)->group(function (): void {
+    Route::get('resume', 'resume');
+    Route::get('demandes', 'demandes');
+    Route::get('demandes/{demande}/preuve', 'preuve');
+    Route::post('demandes/{demande}/approuver', 'approuver');
+    Route::post('demandes/{demande}/refuser', 'refuser');
+    Route::get('comptes', 'comptes');
+    Route::post('comptes/{user}/valider', 'valider');
+    Route::post('comptes/{user}/abonnement', 'accorder');
+    Route::get('formules', 'formules');
+    Route::patch('formules/{code}', 'modifierFormule');
+});
 
 // Console de l'exploitant dans l'application : hors du contexte d'une
 // boutique (pas de « tenant »), elle voit tous les comptes.

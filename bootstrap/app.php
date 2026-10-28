@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\AccesBackOffice;
+use App\Http\Middleware\CleConsole;
 use App\Http\Middleware\EstAdminPlateforme;
 use App\Http\Middleware\ExigeAbonnementActif;
 use App\Http\Middleware\ExigeAppPourLesFractions;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'abonnement' => ExigeAbonnementActif::class,
             'fonctionnalite' => ExigeFonctionnalite::class,
             'plateforme' => EstAdminPlateforme::class,
+            'cle-console' => CleConsole::class,
             'backoffice' => AccesBackOffice::class,
             'conditions' => ExigeConditions::class,
             'app-a-jour' => ExigeAppPourLesFractions::class,
