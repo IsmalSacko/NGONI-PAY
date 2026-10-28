@@ -85,6 +85,7 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::get('comptes', 'comptes');
     Route::post('comptes/{user}/valider', 'valider');
     Route::post('comptes/{user}/abonnement', 'accorder');
+    Route::post('comptes/{user}/interne', 'marquerInterne');
     Route::get('formules', 'formules');
     Route::patch('formules/{code}', 'modifierFormule');
     Route::post('ventes', 'vente');

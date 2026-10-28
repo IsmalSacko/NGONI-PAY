@@ -112,4 +112,14 @@ class ConsoleNgoniTest extends TestCase
         $this->assertStringContainsString('demandé : 10 000', (string) $demande->note_decision);
         $this->assertStringContainsString('Remise négociée', (string) $demande->note_decision);
     }
+
+    public function test_les_comptes_de_l_exploitant_sont_hors_des_chiffres(): void
+    {
+        $this->getJson('/api/console/v1/resume', $this->cle)->assertJsonPath('comptes', 1);
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/interne", ['interne' => true], $this->cle)->assertOk();
+
+        $this->getJson('/api/console/v1/resume', $this->cle)->assertJsonPath('comptes', 0)->assertJsonPath('internes', 1);
+        $this->assertSame([], $this->getJson('/api/console/v1/comptes', $this->cle)->json('data'));
+        $this->assertTrue($this->getJson('/api/console/v1/comptes?filtre=interne', $this->cle)->json('data.0.interne'));
+    }
 }

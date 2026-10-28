@@ -32,10 +32,22 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ConsoleController extends Controller
 {
+    /** Les comptes de l'exploitant, ses essais et le robot de Google Play : pas des clients. */
+    private static function interne(User $u): bool
+    {
+        return (bool) $u->compte_interne || (bool) $u->est_admin_plateforme || (bool) $u->compte_test;
+    }
+
+    /** @param  Builder<User>  $u */
+    private static function clients(Builder $u): Builder
+    {
+        return $u->where('compte_interne', false)->where('est_admin_plateforme', false)->where('compte_test', false);
+    }
+
     public function resume(): JsonResponse
     {
         $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today()));
-        $base = fn () => Abonnement::query()->avecCompte();
+        $base = fn () => Abonnement::query()->avecCompte()->whereHas('proprietaire', fn ($u) => self::clients($u));
         $comptes = $base()->count();
         $actifs = $enCours($base())->count();
         $essais = $enCours($base()->where('plan', 'essai'))->count();
@@ -43,14 +55,16 @@ class ConsoleController extends Controller
         return response()->json([
             'application' => ['code' => 'ngoni-caisse', 'nom' => 'Ngoni Caisse'],
             'comptes' => $comptes,
+            'internes' => Abonnement::query()->avecCompte()->count() - $comptes,
             'a_valider' => 0,
-            'nouveaux_30j' => User::where('created_at', '>=', now()->subDays(30))->whereHas('boutiquesPossedees')->count(),
+            'nouveaux_30j' => self::clients(User::query())->where('created_at', '>=', now()->subDays(30))->whereHas('boutiquesPossedees')->count(),
             'essais' => $essais,
             'essais_bientot_finis' => $enCours($base()->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3))->count(),
             'abonnes' => $actifs - $essais,
             'echus' => $comptes - $actifs,
-            'demandes_en_attente' => DemandeAbonnement::enAttente()->count(),
+            'demandes_en_attente' => DemandeAbonnement::enAttente()->whereHas('proprietaire', fn ($u) => self::clients($u))->count(),
             'encaisse_mois' => DemandeAbonnement::where('statut', StatutDemande::Approuvee)->where('decide_le', '>=', now()->startOfMonth())
+                ->whereHas('proprietaire', fn ($u) => self::clients($u))
                 ->groupBy('devise')->select('devise', DB::raw('SUM(montant) as total'))->get()
                 ->map(fn ($r) => ['devise' => (string) $r->devise, 'total' => (int) $r->total])->values(),
         ]);
@@ -67,6 +81,7 @@ class ConsoleController extends Controller
         return response()->json(['data' => $demandes->map(fn (DemandeAbonnement $d) => [
             'id' => (string) $d->id,
             'compte' => ['id' => (string) $d->user_id, 'nom' => $this->nomCompte($d->proprietaire, $d->boutique?->nom)],
+            'interne' => $d->proprietaire !== null && self::interne($d->proprietaire),
             'formule' => $d->plan,
             'formule_nom' => $noms[$d->plan] ?? $d->plan,
             'mois' => $d->cycle?->mois() ?? (int) $d->mois,
@@ -132,6 +147,9 @@ class ConsoleController extends Controller
             ->when($q !== '', fn ($r) => $r->whereHas('proprietaire', fn ($u) => $u->where('name', 'like', "%{$q}%")->orWhere('phone', 'like', "%{$q}%")
                 ->orWhereHas('boutiquesPossedees', fn ($b) => $b->withoutGlobalScopes()->where('nom', 'like', "%{$q}%"))))
             ->when($filtre === 'a_valider', fn ($r) => $r->whereRaw('1 = 0'))
+            ->when($filtre === 'interne',
+                fn ($r) => $r->whereHas('proprietaire', fn ($u) => $u->where(fn ($w) => $w->where('compte_interne', true)->orWhere('est_admin_plateforme', true)->orWhere('compte_test', true))),
+                fn ($r) => $r->whereHas('proprietaire', fn ($u) => self::clients($u)))
             ->when($filtre === 'essai', fn ($r) => $enCours($r->where('plan', 'essai')))
             ->when($filtre === 'abonne', fn ($r) => $enCours($r->where('plan', '!=', 'essai')))
             ->when($filtre === 'echu', fn ($r) => $r->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
@@ -166,6 +184,7 @@ class ConsoleController extends Controller
                 'en_cours' => $a->estEnCours(),
                 'manuel' => (bool) $a->est_manuel,
                 'note' => $a->note_admin,
+                'interne' => $u !== null && self::interne($u),
             ];
         })->values()]);
     }
@@ -174,6 +193,15 @@ class ConsoleController extends Controller
     public function valider(): JsonResponse
     {
         return response()->json(['message' => 'Les comptes Ngoni Caisse n’ont pas besoin d’être validés.']);
+    }
+
+    /** Marquer un compte comme étant à l'exploitant (ou plus) : hors des chiffres. */
+    public function marquerInterne(User $user, Request $request): JsonResponse
+    {
+        $interne = (bool) $request->validate(['interne' => ['required', 'boolean']])['interne'];
+        $user->forceFill(['compte_interne' => $interne])->save();
+
+        return response()->json(['message' => $interne ? "{$user->name} est marqué comme à vous." : "{$user->name} redevient un client."]);
     }
 
     public function accorder(User $user, Request $request, AbonnementService $service): JsonResponse
