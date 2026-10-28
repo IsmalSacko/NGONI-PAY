@@ -212,6 +212,7 @@ class VenteAbonnement
             str_contains($code, 'orange') => MoyenPaiement::OrangeMoney,
             str_contains($code, 'moov') => MoyenPaiement::MoovMoney,
             str_contains($code, 'carte') => MoyenPaiement::Carte,
+            str_contains($code, 'espece') => MoyenPaiement::Especes,
             default => MoyenPaiement::Virement,
         };
     }
