@@ -42,7 +42,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ConsoleController extends Controller
 {
     /** Ce que la console peut faire ici, en plus du contrat v1 (voir Ajouts v1.1). */
-    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement'];
+    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai'];
 
     /** Moyens d'un paiement reçu hors de l'application (valider, accorder). */
     private const MOYENS = [MoyenPaiement::Especes, MoyenPaiement::OrangeMoney, MoyenPaiement::MoovMoney, MoyenPaiement::Wave, MoyenPaiement::Carte, MoyenPaiement::Virement];
@@ -306,6 +306,7 @@ class ConsoleController extends Controller
             'fin' => $a->fin?->toDateString(),
             'en_cours' => $a->estEnCours(),
             'manuel' => (bool) $a->est_manuel,
+            'essai_prolongeable' => $a->estEssai(),
             'note' => $a->note_admin,
             'interne' => $u !== null && self::interne($u),
         ];
@@ -420,14 +421,16 @@ class ConsoleController extends Controller
             ];
         }
 
-        // L'essai, offert à l'inscription : l'abonnement est né avec lui.
+        // L'essai, offert à l'inscription : l'abonnement est né avec lui. Prolongé,
+        // sa fin d'origine n'est plus connue : les prolongations la disent.
+        $prolonge = $journal->contains('type', JournalAbonnement::ESSAI);
         $lignes[] = [
             'type' => 'essai',
             'le' => $a->created_at?->toIso8601String(),
             'formule' => Plan::ESSAI,
             'formule_nom' => $noms[Plan::ESSAI] ?? 'Essai',
             'debut' => $a->created_at?->toDateString(),
-            'fin' => $a->estEssai() ? $a->fin?->toDateString() : null,
+            'fin' => $a->estEssai() && ! $prolonge ? $a->fin?->toDateString() : null,
             'montant' => null, 'devise' => null, 'moyen' => null, 'reference' => null, 'recu_numero' => null,
             'statut' => null, 'par' => null, 'note' => null,
         ];
@@ -570,6 +573,26 @@ class ConsoleController extends Controller
         });
 
         return response()->json(['message' => "Abonnement de {$user->name} mis à jour.", 'recu_numero' => $recu]);
+    }
+
+    /**
+     * Prolonger l'essai gratuit jusqu'à `fin` (incluse) : ni reçu ni vente,
+     * la demande en attente reste ; le compte est prévenu.
+     */
+    public function prolongerEssai(User $user, Request $request, AbonnementService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'fin' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'note' => ['nullable', 'string', 'max:200'],
+        ], ['fin.after_or_equal' => 'La fin de l’essai doit être aujourd’hui ou plus tard.']);
+        $fin = Carbon::parse($data['fin']);
+        $this->refusMetier(fn () => $service->prolongerEssai($user, $fin, $this->exploitant(), filled($data['note'] ?? null) ? trim((string) $data['note']) : null, $this->par($request)));
+        $a = Abonnement::where('user_id', $user->id)->with(['proprietaire.boutiquesPossedees' => fn ($b) => $b->withoutGlobalScopes()])->firstOrFail();
+
+        return response()->json([
+            'message' => "Essai de {$this->nomCompte($a->proprietaire)} prolongé jusqu’au {$fin->format('d/m/Y')}.",
+            'compte' => $this->ligneCompte($a, $this->membres(collect([$user->id])), Plan::pluck('nom', 'code')),
+        ]);
     }
 
     public function formules(GestionPlans $gestion): JsonResponse

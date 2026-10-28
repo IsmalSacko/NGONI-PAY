@@ -373,4 +373,38 @@ class ConsoleNgoniTest extends TestCase
         $html = (new DemandeAbonnementMail($demande))->render();
         $this->assertStringContainsString('https://console.ismaeldev.fr/demandes?app=ngoni-caisse', $html);
     }
+
+    public function test_prolonger_l_essai_reste_un_essai_sans_recu_ni_vente(): void
+    {
+        $demande = app(AbonnementService::class)->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel);
+        $fin = today()->addDays(40)->toDateString();
+        $this->assertContains('prolonger_essai', $this->getJson('/api/console/v1/resume', $this->cle)->json('application.capacites'));
+        $this->assertTrue($this->getJson("/api/console/v1/comptes/{$this->awa->id}", $this->cle)->json('compte.essai_prolongeable'));
+
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/essai", ['fin' => $fin, 'note' => 'Découvre encore'], $this->cle)->assertOk()
+            ->assertJsonPath('compte.formule', Plan::ESSAI)->assertJsonPath('compte.fin', $fin)->assertJsonPath('compte.en_cours', true);
+
+        $abo = Abonnement::where('user_id', $this->awa->id)->first();
+        $this->assertTrue($abo->estEssai() && $abo->estEnCours());
+        $this->assertSame(StatutDemande::EnAttente, $demande->fresh()->statut);
+        $this->assertSame(0, Vente::withoutGlobalScopes()->count());
+        $this->assertDatabaseHas('notifications_app', ['user_id' => $this->awa->id, 'titre' => 'Votre essai gratuit est prolongé']);
+        $historique = $this->getJson("/api/console/v1/comptes/{$this->awa->id}", $this->cle)->json('historique');
+        $ligne = collect($historique)->firstWhere('par', 'Console · Ismaila');
+        $this->assertSame(['essai', $fin, null], [$ligne['type'], $ligne['fin'], $ligne['recu_numero']]);
+        $this->assertSame('Essai prolongé jusqu’au '.today()->addDays(40)->format('d/m/Y').' · Découvre encore', $ligne['note']);
+    }
+
+    public function test_un_essai_fini_se_prolonge_mais_pas_une_formule(): void
+    {
+        Abonnement::where('user_id', $this->awa->id)->update(['fin' => today()->subDays(3)->toDateString()]);
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/essai", ['fin' => today()->subDay()->toDateString()], $this->cle)->assertUnprocessable();
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/essai", ['fin' => today()->addWeek()->toDateString()], $this->cle)->assertOk()
+            ->assertJsonPath('compte.en_cours', true);
+
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/abonnement", ['formule' => 'pro', 'fin' => today()->addMonth()->toDateString()], $this->cle)->assertOk();
+        $this->assertFalse($this->getJson("/api/console/v1/comptes/{$this->awa->id}", $this->cle)->json('compte.essai_prolongeable'));
+        $this->postJson("/api/console/v1/comptes/{$this->awa->id}/essai", ['fin' => today()->addWeek()->toDateString()], $this->cle)->assertUnprocessable();
+        $this->assertSame('pro', Abonnement::where('user_id', $this->awa->id)->value('plan'));
+    }
 }

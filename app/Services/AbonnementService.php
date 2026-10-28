@@ -489,6 +489,49 @@ class AbonnementService
     }
 
     /**
+     * Prolonger l'essai gratuit jusqu'à `$fin` (incluse), qu'il coure encore
+     * ou soit fini : il reste un essai (toutes les fonctions, badge « essai »),
+     * sans reçu ni vente, et une demande en attente reste en attente. Le
+     * compte est prévenu (« Votre essai gratuit est prolongé »).
+     */
+    public function prolongerEssai(User $proprietaire, Carbon $fin, User $exploitant, ?string $note, string $par): Abonnement
+    {
+        $courant = Abonnement::where('user_id', $proprietaire->id)->first();
+        if ($courant === null || ! $courant->estEssai()) {
+            throw ValidationException::withMessages(['plan' => ['Seul un essai se prolonge : ce compte a une formule. Accordez-lui plutôt une formule.']]);
+        }
+        if ($fin->copy()->endOfDay()->isPast()) {
+            throw ValidationException::withMessages(['fin' => ['La fin de l’essai doit être aujourd’hui ou plus tard.']]);
+        }
+
+        $abonnement = DB::transaction(function () use ($courant, $proprietaire, $fin, $exploitant, $note, $par): Abonnement {
+            $debut = $courant->estEnCours() && $courant->fin !== null ? Carbon::parse($courant->fin)->addDay() : now();
+            $courant->update([
+                'fin' => $fin->toDateString(),
+                'est_actif' => true,
+                'est_manuel' => true,
+                'accorde_par' => $exploitant->id,
+                'note_admin' => $note,
+            ]);
+            JournalAbonnement::create([
+                'user_id' => $proprietaire->id,
+                'type' => JournalAbonnement::ESSAI,
+                'plan' => Plan::ESSAI,
+                'debut' => ($debut->gt($fin) ? $fin : $debut)->toDateString(),
+                'fin' => $fin->toDateString(),
+                'par' => $par,
+                'note' => 'Essai prolongé jusqu’au '.$fin->format('d/m/Y').(filled($note) ? ' · '.$note : ''),
+            ]);
+
+            return $courant;
+        });
+
+        $this->prevenirActivation($abonnement);
+
+        return $abonnement;
+    }
+
+    /**
      * Le paiement d'un accord, écrit comme une demande validée : la demande en
      * attente du compte payée hors ligne (pas un paiement en ligne en cours),
      * sinon une nouvelle. Elle porte le reçu et compte dans les recettes.

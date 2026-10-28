@@ -17,6 +17,9 @@ class JournalAbonnement extends Model
 
     public const REVOCATION = 'revocation';
 
+    /** L'essai gratuit prolongé par l'exploitant. */
+    public const ESSAI = 'essai';
+
     protected $table = 'journal_abonnements';
 
     protected $fillable = [

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\ConsoleController;
 use App\Http\Controllers\Api\AbonnementController;
 use App\Http\Controllers\Api\AchatController;
 use App\Http\Controllers\Api\AppareilController;
@@ -15,6 +14,7 @@ use App\Http\Controllers\Api\CoffreController;
 use App\Http\Controllers\Api\CommandeFournisseurController;
 use App\Http\Controllers\Api\CommandePressingController;
 use App\Http\Controllers\Api\CommandeRestaurantController;
+use App\Http\Controllers\Api\ConsoleController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepenseController;
 use App\Http\Controllers\Api\EquipeController;
@@ -88,6 +88,7 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::post('comptes/{user}/valider', 'valider');
     Route::post('comptes/{user}/abonnement', 'accorder');
     Route::post('comptes/{user}/revoquer', 'revoquer');
+    Route::post('comptes/{user}/essai', 'prolongerEssai');
     Route::post('comptes/{user}/options', 'reglerOptions');
     Route::post('comptes/{user}/interne', 'marquerInterne');
     Route::get('recettes', 'recettes');
