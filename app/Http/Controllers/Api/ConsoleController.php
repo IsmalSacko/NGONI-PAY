@@ -17,6 +17,8 @@ use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\Console\AbonnementsConsole;
 use App\Services\GestionPlans;
+use App\Services\PaiementMobile;
+use App\Services\Parrainage;
 use App\Services\RechercheDemandes;
 use App\Services\VenteAbonnement;
 use Carbon\Carbon;
@@ -40,7 +42,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ConsoleController extends Controller
 {
     /** Ce que la console peut faire ici, en plus du contrat v1 (voir Ajouts v1.1). */
-    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique'];
+    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement'];
 
     /** Moyens d'un paiement reçu hors de l'application (valider, accorder). */
     private const MOYENS = [MoyenPaiement::Especes, MoyenPaiement::OrangeMoney, MoyenPaiement::MoovMoney, MoyenPaiement::Wave, MoyenPaiement::Carte, MoyenPaiement::Virement];
@@ -127,6 +129,9 @@ class ConsoleController extends Controller
             'frais' => (int) $d->frais_mobile,
             // Payée en ligne, validée sans personne.
             'automatique' => $d->statut === StatutDemande::Approuvee && $d->decide_par === null,
+            // Un paiement chez un opérateur en ligne : on peut lui redemander où il en est.
+            'en_ligne' => $d->paiementEnLigne(),
+            'parrainage' => app(Parrainage::class)->pourDemande($d),
             'statut' => $d->statut->value,
             'motif_refus' => $d->statut === StatutDemande::Refusee ? $d->note_decision : null,
             'note_decision' => $d->note_decision,
@@ -139,6 +144,43 @@ class ConsoleController extends Controller
             'demandeur_telephone' => $d->demandeur?->phone ?? $d->proprietaire?->phone,
             'le' => $d->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Redemander à l'opérateur en ligne où en est le paiement : s'il est
+     * arrivé, la demande en attente s'active ; payé alors que la demande est
+     * close, on le signale pour accorder à la main.
+     */
+    public function verifierPaiement(DemandeAbonnement $demande, PaiementMobile $paiements): JsonResponse
+    {
+        if (! $demande->paiementEnLigne()) {
+            return response()->json(['message' => 'Ce n’est pas un paiement en ligne : vérifiez-le sur votre compte.'], 422);
+        }
+        $moyen = $demande->libellePaiementEnLigne();
+        if ($demande->statut === StatutDemande::EnAttente) {
+            $demande = $paiements->verifier($demande);
+            if ($demande->statut === StatutDemande::Approuvee) {
+                return response()->json(['message' => "Paiement reçu ({$moyen}) : l’abonnement est activé.", 'alerte' => false, 'statut' => $demande->statut->value]);
+            }
+        }
+        $statut = $paiements->statutChezPrestataire($demande);
+        if ($statut === 'payee' && $demande->statut !== StatutDemande::Approuvee) {
+            return response()->json([
+                'message' => "Payé chez l’opérateur ({$moyen}) alors que la demande est ".mb_strtolower($demande->statut->libelle()).' : l’abonnement ne s’est pas activé. Accordez-le depuis la fiche du compte.',
+                'alerte' => true,
+                'statut' => $demande->statut->value,
+            ]);
+        }
+
+        return response()->json([
+            'message' => $moyen.' : '.match ($statut) {
+                'payee' => 'paiement reçu.',
+                'refusee' => 'paiement refusé ou annulé chez l’opérateur, rien n’a été prélevé.',
+                default => 'aucun paiement reçu (jamais validé chez l’opérateur, ou encore en cours).',
+            },
+            'alerte' => false,
+            'statut' => $demande->statut->value,
+        ]);
     }
 
     public function preuve(DemandeAbonnement $demande): Response

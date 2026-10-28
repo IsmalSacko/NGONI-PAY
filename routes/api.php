@@ -80,6 +80,7 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::get('resume', 'resume');
     Route::get('demandes', 'demandes');
     Route::get('demandes/{demande}/preuve', 'preuve');
+    Route::post('demandes/{demande}/verifier', 'verifierPaiement');
     Route::post('demandes/{demande}/approuver', 'approuver');
     Route::post('demandes/{demande}/refuser', 'refuser');
     Route::get('comptes', 'comptes');

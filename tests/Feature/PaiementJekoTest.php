@@ -253,6 +253,25 @@ class PaiementJekoTest extends TestCase
         $this->assertSame(StatutDemande::Annulee, $demande->fresh()->statut);
     }
 
+    public function test_la_console_redemande_a_l_operateur_et_alerte_si_paye_apres_annulation(): void
+    {
+        config(['services.console_ngoni.cle' => 'cle-de-test-console']);
+        $cle = ['Authorization' => 'Bearer cle-de-test-console', 'X-Console-Operateur' => 'Ismaila'];
+        $this->exploitant();
+        $demande = $this->payer();
+        $this->assertTrue($this->getJson('/api/console/v1/demandes?statut=toutes', $cle)->assertOk()->json('data.0.en_ligne'));
+        $this->api()->deleteJson("/api/abonnement/demandes/{$demande->id}")->assertOk();
+
+        $this->postJson("/api/console/v1/demandes/{$demande->id}/verifier", [], $cle)->assertOk()
+            ->assertJsonPath('alerte', false)->assertJsonPath('statut', 'annulee');
+
+        $this->statutJeko = 'success';
+        $r = $this->postJson("/api/console/v1/demandes/{$demande->id}/verifier", [], $cle)->assertOk();
+        $this->assertTrue($r->json('alerte'));
+        $this->assertStringContainsString('Payé chez l’opérateur', $r->json('message'));
+        $this->assertSame(StatutDemande::Annulee, $demande->fresh()->statut);
+    }
+
     private function exploitant(): User
     {
         $exploitant = User::create(['name' => 'Ismael', 'phone' => '+33605758494', 'password' => 'password123']);
