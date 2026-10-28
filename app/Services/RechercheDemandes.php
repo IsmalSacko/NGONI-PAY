@@ -7,10 +7,9 @@ namespace App\Services;
 use App\Enums\StatutDemande;
 use App\Models\DemandeAbonnement;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 
 /**
- * Demandes d'abonnement de la console, web comme application : un onglet par
+ * Demandes d'abonnement de la Console Ngoni (ConsoleController) : un onglet par
  * statut, une recherche (boutique, téléphone, nom, e-mail), et l'ordre de
  * travail — à traiter, la plus ancienne d'abord ; le reste, la plus récente.
  */
@@ -27,17 +26,6 @@ class RechercheDemandes
             ->when($statut === StatutDemande::EnAttente, fn ($q) => $q->oldest('id'), fn ($q) => $q
                 ->orderByRaw('CASE WHEN statut = ? THEN 0 ELSE 1 END', [StatutDemande::EnAttente->value])
                 ->latest('id'));
-    }
-
-    /**
-     * Le nombre de chaque onglet, recherche comprise.
-     *
-     * @return Collection<string, int>
-     */
-    public function comptes(string $recherche): Collection
-    {
-        return DemandeAbonnement::query()->tap(fn (Builder $q) => $this->chercher($q, $recherche))->toBase()
-            ->selectRaw('statut, count(*) as n')->groupBy('statut')->pluck('n', 'statut')->map(fn ($n) => (int) $n);
     }
 
     /**

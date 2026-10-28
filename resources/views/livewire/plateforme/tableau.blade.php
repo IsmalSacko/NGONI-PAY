@@ -139,14 +139,11 @@
         </section>
     </div>
 
-    {{-- Abonnements : ce que le tableau montrait déjà, en bandeau. --}}
+    {{-- Abonnements : demandes, paiements et formules se gèrent dans la Console Ngoni. --}}
     <div class="flex flex-wrap items-center gap-3 {{ $carte }} px-4 md:px-5 py-4 text-sm">
-        <span class="inline-flex items-center gap-2.5"><x-plateforme.icone-chip nom="ok" ton="succes" taille="w-9 h-9" /><span><span class="font-display font-extrabold text-lg text-succes tabular-nums">{{ $abonnements['actifs'] }}</span> abonnements actifs</span></span>
-        <span class="inline-flex items-center gap-2.5 sm:ml-4"><x-plateforme.icone-chip nom="horloge" ton="danger" taille="w-9 h-9" /><span><span class="font-display font-extrabold text-lg text-danger-fg tabular-nums">{{ $abonnements['expires'] }}</span> expirés (lecture seule)</span></span>
-        @if ($abonnements['demandes'] > 0)
-            <a href="{{ route('plateforme.demandes') }}" class="w-full sm:w-auto sm:ml-auto h-10 px-4 rounded-xl bg-jaune text-accent font-extrabold inline-flex items-center justify-center hover:brightness-95">
-                Traiter les {{ $abonnements['demandes'] }} demande(s) en attente
-            </a>
-        @endif
+        <span class="inline-flex items-center gap-2.5"><x-plateforme.icone-chip nom="carte" taille="w-9 h-9" /><span>Demandes d’abonnement, paiements et formules : dans la Console Ngoni.</span></span>
+        <a href="{{ \App\Support\ConsoleNgoni::demandes() }}" target="_blank" rel="noopener" class="w-full sm:w-auto sm:ml-auto h-10 px-4 rounded-xl bg-jaune text-accent font-extrabold inline-flex items-center justify-center hover:brightness-95">
+            Abonnements : Console Ngoni ↗
+        </a>
     </div>
 </div>

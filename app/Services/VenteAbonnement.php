@@ -11,6 +11,7 @@ use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
 use App\Models\Vente;
+use App\Support\ConsoleNgoni;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -50,7 +51,7 @@ class VenteAbonnement
                 app(AlertesExploitant::class)->envoyer(
                     'Vente d’abonnement non enregistrée',
                     ($demande->boutique?->nom ?? 'Une boutique').' : l’abonnement est actif, mais sa vente n’a pas pu être enregistrée. À saisir à la main.',
-                    '/console/demandes',
+                    ConsoleNgoni::demandes(),
                 );
             }
         });

@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
+use App\Support\ConsoleNgoni;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -165,7 +166,7 @@ class PaiementJeko
                 ($demande->boutique?->nom ?? 'Une boutique').' · '.$plan.' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.$moyen
                     .($demande->frais_mobile > 0 ? ' (dont '.number_format($demande->frais_mobile, 0, ',', ' ').' F de frais)' : '')
                     .($abonnement->fin ? ' · jusqu’au '.$abonnement->fin->format('d/m/Y') : ''),
-                '/console/demandes',
+                ConsoleNgoni::demandes(),
             );
 
             return $demande->fresh();

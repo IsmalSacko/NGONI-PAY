@@ -11,13 +11,9 @@
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
     @php
-        $enAttente = \App\Models\DemandeAbonnement::enAttente()->count();
         $liens = [
             ['route' => 'plateforme.tableau', 'label' => 'Tableau de bord'],
             ['route' => 'plateforme.comptes', 'label' => 'Comptes'],
-            ['route' => 'plateforme.demandes', 'label' => 'Demandes', 'badge' => $enAttente],
-            ['route' => 'plateforme.abonnements', 'label' => 'Abonnements'],
-            ['route' => 'plateforme.plans', 'label' => 'Plans et tarifs'],
             ['route' => 'plateforme.utilisateurs', 'label' => 'Utilisateurs'],
             ['route' => 'plateforme.annonces', 'label' => 'Annonces'],
             ['route' => 'plateforme.tutoriels', 'label' => 'Tutoriels'],
@@ -61,11 +57,13 @@
                 <a href="{{ route($lien['route']) }}" wire:navigate
                    class="shrink-0 inline-flex items-center px-3.5 h-10 rounded-xl {{ request()->routeIs($lien['route']) ? 'bg-jaune text-accent' : 'text-rail hover:text-white hover:bg-nuit-clair' }}">
                     {{ $lien['label'] }}
-                    @if (($lien['badge'] ?? 0) > 0)
-                        <span class="ml-1.5 rounded-full bg-danger-fg text-white px-1.5 text-xs">{{ $lien['badge'] }}</span>
-                    @endif
                 </a>
             @endforeach
+            {{-- Demandes, paiements, formules : gérés dans la Console Ngoni, commune aux applications. --}}
+            <a href="{{ \App\Support\ConsoleNgoni::demandes() }}" target="_blank" rel="noopener"
+               class="shrink-0 inline-flex items-center gap-1.5 px-3.5 h-10 rounded-xl text-rail hover:text-white hover:bg-nuit-clair">
+                Abonnements : Console Ngoni <span aria-hidden="true">↗</span>
+            </a>
         </nav>
     </header>
     <main class="max-w-7xl mx-auto px-4 md:px-6 py-5 md:py-8">

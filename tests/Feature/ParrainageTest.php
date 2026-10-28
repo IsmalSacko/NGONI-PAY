@@ -206,7 +206,7 @@ class ParrainageTest extends TestCase
         $this->assertStringContainsString('illimité', NotificationApp::where('user_id', $this->awa->id)->sole()->message);
     }
 
-    public function test_seule_la_demande_qui_recompense_est_marquee_dans_la_console(): void
+    public function test_seule_la_demande_qui_recompense_est_marquee(): void
     {
         ['user' => $fatou, 'boutique' => $boutiqueFatou] = $this->inscrire('Fatou', '76008202', $this->codeAwa());
         $service = app(AbonnementService::class);
@@ -215,8 +215,6 @@ class ParrainageTest extends TestCase
 
         $premiere = $service->soumettre($boutiqueFatou, $fatou, 'basic', CycleFacturation::Mensuel);
         $this->assertSame(['etat' => 'a_venir', 'parrain' => 'Awa'], $parrainage->pourDemande($premiere->fresh()));
-        $this->api($this->exploitant)->getJson('/api/plateforme/demandes')
-            ->assertOk()->assertJsonPath('data.0.parrainage.etat', 'a_venir')->assertJsonPath('data.0.parrainage.parrain', 'Awa');
 
         $service->approuver($premiere, $this->exploitant);
         $this->assertSame(['etat' => 'recompense', 'parrain' => 'Awa'], $parrainage->pourDemande($premiere->fresh()));

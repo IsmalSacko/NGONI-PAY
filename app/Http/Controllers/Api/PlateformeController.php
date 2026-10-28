@@ -4,26 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\CycleFacturation;
 use App\Http\Controllers\Controller;
 use App\Models\Abonnement;
 use App\Models\Annonce;
 use App\Models\Boutique;
-use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
 use App\Models\Vente;
-use App\Services\AbonnementService;
 use App\Services\ComptesPlateforme;
 use App\Services\ConditionsUtilisation;
-use App\Services\Console\AbonnementsConsole;
 use App\Services\Console\ComptesConsole;
 use App\Services\Console\UtilisateursConsole;
 use App\Services\GestionAnnonces;
-use App\Services\GestionPlans;
-use App\Services\Parrainage;
 use App\Services\Plateforme\Activite;
-use App\Services\RechercheDemandes;
 use App\Services\ReinitialisationBoutique;
 use App\Services\SuppressionCompte;
 use App\Support\Periode;
@@ -31,98 +24,25 @@ use App\Support\WhatsApp;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Console de l'exploitant dans l'application : les mêmes gestes que la
- * console web (/plateforme), sur les mêmes services.
+ * console web (/plateforme), sur les mêmes services. Les abonnements
+ * (demandes, paiements, formules, accords) se gèrent dans la Console Ngoni.
  */
 class PlateformeController extends Controller
 {
-    /** Plans et tarifs, pour la page « Plans » de la console de l'application. */
-    public function plans(GestionPlans $gestion): JsonResponse
-    {
-        ['plans' => $plans, 'tarifs' => $tarifs] = $gestion->etat();
-
-        return response()->json([
-            'plans' => collect($plans)->map(fn (array $p, int $id) => [
-                'id' => $id,
-                'code' => $p['code'],
-                'nom' => $p['nom'],
-                'description' => $p['description'],
-                'jours_essai' => $p['jours_essai'],
-                'max_boutiques' => $p['max_boutiques'],
-                'max_membres' => $p['max_membres'],
-                'est_actif' => (bool) $p['est_actif'],
-                'essai' => $p['essai'],
-                'fonctionnalites' => array_keys(array_filter($p['fonctionnalites'])),
-                // Abonnement à vie : prix (vide = pas proposé), texte et période.
-                'prix_a_vie' => $p['prix_a_vie'],
-                'texte_a_vie' => $p['texte_a_vie'],
-                'a_vie_debut' => $p['a_vie_debut'],
-                'a_vie_fin' => $p['a_vie_fin'],
-                'tarifs' => collect($tarifs[$id] ?? [])->map(fn (array $t, string $cycle) => [
-                    'cycle' => $cycle,
-                    'libelle' => CycleFacturation::from($cycle)->libelle(),
-                    'montant' => $t['montant'],
-                    'actif' => (bool) $t['actif'],
-                ])->values(),
-            ])->values(),
-            'fonctionnalites' => collect(Plan::FONCTIONNALITES)->map(fn (string $l, string $c) => ['code' => $c, 'libelle' => $l])->values(),
-        ]);
-    }
-
-    /** Enregistre plans et tarifs : les mêmes règles que la console web (GestionPlans). */
-    public function enregistrerPlans(Request $request, GestionPlans $gestion): JsonResponse
-    {
-        $request->validate(['plans' => ['required', 'array'], 'plans.*.id' => ['required', 'integer']]);
-        $plans = [];
-        $tarifs = [];
-        foreach ($request->input('plans') as $p) {
-            $plans[(int) $p['id']] = [
-                'nom' => $p['nom'] ?? null,
-                'description' => $p['description'] ?? null,
-                'jours_essai' => $p['jours_essai'] ?? null,
-                'max_boutiques' => $p['max_boutiques'] ?? null,
-                'max_membres' => $p['max_membres'] ?? null,
-                'est_actif' => (bool) ($p['est_actif'] ?? false),
-                'fonctionnalites' => array_fill_keys(array_map('strval', (array) ($p['fonctionnalites'] ?? [])), true),
-            ];
-            // Abonnement à vie : seulement s'il est envoyé (une application plus
-            // ancienne ne le connaît pas et ne doit pas l'effacer).
-            if (array_key_exists('prix_a_vie', $p)) {
-                foreach (['prix_a_vie', 'texte_a_vie', 'a_vie_debut', 'a_vie_fin'] as $champ) {
-                    $plans[(int) $p['id']][$champ] = $p[$champ] ?? null;
-                }
-            }
-            foreach ((array) ($p['tarifs'] ?? []) as $t) {
-                $tarifs[(int) $p['id']][(string) ($t['cycle'] ?? '')] = ['montant' => $t['montant'] ?? null, 'actif' => (bool) ($t['actif'] ?? false)];
-            }
-        }
-        $gestion->enregistrer($plans, $tarifs);
-
-        return $this->plans($gestion);
-    }
-
+    /** Chiffres de la plateforme ; les abonnements se suivent dans la Console Ngoni. */
     public function tableau(): JsonResponse
     {
-        $actifs = Abonnement::avecCompte()->where('est_actif', true)
-            ->where(fn ($q) => $q->whereNull('fin')->orWhereDate('fin', '>=', today()))
-            ->count();
         $ventesDuJour = Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today());
 
         return response()->json([
             'comptes' => Abonnement::avecCompte()->count(),
-            'actifs' => $actifs,
-            'expires' => Abonnement::avecCompte()->count() - $actifs,
-            'par_plan' => Abonnement::avecCompte()->select('plan', DB::raw('COUNT(*) as n'))->groupBy('plan')->pluck('n', 'plan'),
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),
             'inscriptions_7j' => User::where('created_at', '>=', now()->subDays(7))->whereNotNull('boutique_id')->count(),
-            'demandes' => DemandeAbonnement::enAttente()->count(),
             'ventes_jour' => (clone $ventesDuJour)->count(),
             // Franc CFA seulement : additionner francs et centimes d'euro n'aurait pas de sens.
             'montant_jour_fcfa' => (int) (clone $ventesDuJour)
@@ -135,60 +55,6 @@ class PlateformeController extends Controller
     public function activite(Request $request, Activite $activite): JsonResponse
     {
         return response()->json($activite->pour(Periode::depuis($request->query('periode'))));
-    }
-
-    public function demandes(Request $request): JsonResponse
-    {
-        // Mêmes onglets et même recherche que la console web (RechercheDemandes).
-        $recherche = app(RechercheDemandes::class);
-        $q = (string) $request->query('q', '');
-        $demandes = $recherche->requete((string) $request->query('filtre', 'en_attente'), $q)->limit(100)->get();
-
-        return response()->json(['comptes' => $recherche->comptes($q), 'data' => $demandes->map(fn (DemandeAbonnement $d) => [
-            'id' => $d->id,
-            'statut' => $d->statut->value,
-            'plan' => $d->plan,
-            'cycle' => $d->cycle->libelle(),
-            'montant' => $d->montant,
-            'devise' => $d->devise,
-            'moyen' => $d->moyen,
-            'note' => $d->note,
-            'decision' => $d->note_decision,
-            'preuve' => $d->preuveExiste(),
-            'preuve_note' => $d->preuve_note,
-            'cree_le' => $d->created_at?->toIso8601String(),
-            'decide_le' => $d->decide_le?->toIso8601String(),
-            'boutique' => $d->boutique?->nom,
-            'proprietaire' => $d->proprietaire?->name,
-            'telephone' => $d->telephone_contact ?: $d->proprietaire?->phone,
-            'whatsapp' => WhatsApp::link($d->telephone_contact ?: $d->proprietaire?->phone),
-            'demandeur' => $d->demandeur && $d->demandeur->id !== $d->proprietaire?->id ? $d->demandeur->name : null,
-            'abonnement' => $this->abonnement($d->proprietaire?->abonnement),
-            'parrainage' => app(Parrainage::class)->pourDemande($d),
-        ])]);
-    }
-
-    /** Preuve de paiement : hors du disque public, servie à l'exploitant seul. */
-    public function preuve(DemandeAbonnement $demande): Response
-    {
-        abort_unless($demande->preuveExiste(), 404);
-
-        return Storage::disk('local')->response($demande->preuve_chemin);
-    }
-
-    public function approuver(DemandeAbonnement $demande, Request $request, AbonnementService $service): JsonResponse
-    {
-        $abonnement = $service->approuver($demande, $request->user());
-
-        return response()->json(['message' => 'Demande approuvée.', 'abonnement' => $this->abonnement($abonnement)]);
-    }
-
-    public function refuser(DemandeAbonnement $demande, Request $request, AbonnementService $service): JsonResponse
-    {
-        $data = $request->validate(['motif' => ['required', 'string', 'max:500']], ['motif.required' => 'Indiquez le motif : le commerçant le verra.']);
-        $service->refuser($demande, $request->user(), $data['motif']);
-
-        return response()->json(['message' => 'Demande refusée.']);
     }
 
     public function comptes(Request $request, ComptesConsole $console): JsonResponse
@@ -250,26 +116,6 @@ class PlateformeController extends Controller
         ]);
     }
 
-    public function accorder(User $user, Request $request, AbonnementService $service): JsonResponse
-    {
-        $data = $request->validate([
-            'plan' => ['required', 'exists:plans,code'],
-            'fin' => ['nullable', 'date', 'after_or_equal:today'],
-            'note' => ['nullable', 'string', 'max:255'],
-        ], ['fin.after_or_equal' => 'La fin doit être aujourd’hui ou plus tard.']);
-
-        $abonnement = $service->accorder($user, $data['plan'], isset($data['fin']) ? Carbon::parse($data['fin']) : null, $request->user(), $data['note'] ?? null);
-
-        return response()->json(['message' => "Abonnement de {$user->name} mis à jour.", 'abonnement' => $this->abonnement($abonnement)]);
-    }
-
-    public function revoquer(User $user, Request $request, AbonnementService $service): JsonResponse
-    {
-        $service->revoquer($user, $request->user());
-
-        return response()->json(['message' => "Abonnement de {$user->name} révoqué : ses boutiques passent en lecture seule."]);
-    }
-
     public function utilisateurs(Request $request, UtilisateursConsole $console): JsonResponse
     {
         $requete = $console->requete([
@@ -313,28 +159,6 @@ class PlateformeController extends Controller
                 'tris' => UtilisateursConsole::TRIS,
                 'pays' => app(ComptesConsole::class)->pays(),
             ],
-        ]);
-    }
-
-    /** Abonnements payés, par canal (Jèko, pawaPay, FedaPay, validés à la main), avec les totaux. */
-    public function abonnementsPayes(Request $request, AbonnementsConsole $console): JsonResponse
-    {
-        $periode = (string) $request->query('periode', 'tout');
-        $page = $console->requete([
-            'canal' => $request->query('canal'),
-            'periode' => $periode,
-            'recherche' => $request->query('recherche'),
-        ])->paginate(50);
-
-        return response()->json([
-            'data' => $page->getCollection()->map(fn ($d) => AbonnementsConsole::ligne($d))->values(),
-            'total' => $page->total(),
-            'page' => $page->currentPage(),
-            'pages' => $page->lastPage(),
-            'totaux' => $console->totaux($periode),
-            'accordes' => $console->accordes(),
-            'canaux' => AbonnementsConsole::CANAUX,
-            'periodes' => AbonnementsConsole::PERIODES,
         ]);
     }
 

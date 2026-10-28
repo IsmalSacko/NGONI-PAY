@@ -63,13 +63,27 @@ class ConsoleMobileTest extends TestCase
     {
         $jetonAwa = $this->awa->createToken('app')->plainTextToken;
         $this->withToken($jetonAwa)->getJson('/api/plateforme/tableau')->assertForbidden();
-        $this->withToken($jetonAwa)->getJson('/api/plateforme/demandes')->assertForbidden();
+        $this->withToken($jetonAwa)->getJson('/api/plateforme/comptes')->assertForbidden();
 
         // L'exploitant voit toute la plateforme, pas seulement sa boutique.
-        $this->console()->getJson('/api/plateforme/tableau')->assertOk()->assertJsonPath('boutiques', 2);
+        $this->console()->getJson('/api/plateforme/tableau')->assertOk()->assertJsonPath('boutiques', 2)
+            ->assertJsonMissingPath('demandes')->assertJsonMissingPath('actifs');
         $this->console()->getJson('/api/plateforme/comptes?recherche=pressing')->assertOk()
             ->assertJsonPath('data.0.nom', 'Awa')->assertJsonPath('data.0.boutiques.0', 'Pressing Awa');
         $this->console()->getJson('/api/moi')->assertOk()->assertJsonPath('user.est_admin_plateforme', true);
+    }
+
+    public function test_les_abonnements_ne_se_gerent_plus_depuis_l_application(): void
+    {
+        // Demandes, paiements, formules, accords : dans la Console Ngoni seulement.
+        $demande = app(AbonnementService::class)->soumettre($this->boutiqueAwa, $this->awa, 'basic', CycleFacturation::Mensuel);
+        $this->console()->getJson('/api/plateforme/demandes')->assertNotFound();
+        $this->console()->postJson("/api/plateforme/demandes/{$demande->id}/approuver")->assertNotFound();
+        $this->console()->postJson("/api/plateforme/comptes/{$this->awa->id}/accorder", ['plan' => 'pro'])->assertNotFound();
+        $this->console()->postJson("/api/plateforme/comptes/{$this->awa->id}/revoquer")->assertNotFound();
+        $this->console()->getJson('/api/plateforme/plans')->assertNotFound();
+        $this->console()->getJson('/api/plateforme/abonnements')->assertNotFound();
+        $this->assertSame('en_attente', $demande->fresh()->statut->value);
     }
 
     public function test_on_trouve_un_compte_par_le_nom_de_sa_boutique_partout(): void
@@ -93,7 +107,8 @@ class ConsoleMobileTest extends TestCase
         $this->assertStringContainsString('Awa · Pressing Awa', $alertes()->where('titre', 'Nouvelle inscription')->value('message'));
 
         $demande = app(AbonnementService::class)->soumettre($this->boutiqueAwa, $this->awa, 'basic', CycleFacturation::Mensuel);
-        $this->assertSame(1, $alertes()->where('titre', 'Demande d’abonnement')->where('lien', '/console/demandes')->count());
+        // L'onglet Demandes a quitté l'application : l'alerte ouvre la Console Ngoni.
+        $this->assertSame(1, $alertes()->where('titre', 'Demande d’abonnement')->where('lien', 'https://console.ismaeldev.fr/demandes?app=ngoni-caisse')->count());
         $this->assertStringContainsString('Pressing Awa demande', $alertes()->where('titre', 'Demande d’abonnement')->value('message'));
 
         app(AbonnementService::class)->annuler($demande);
@@ -109,7 +124,7 @@ class ConsoleMobileTest extends TestCase
         $demande = app(AbonnementService::class)->soumettre($this->boutiqueAwa, $this->awa, 'basic', CycleFacturation::Mensuel);
         $demande->update(['moyen' => 'wave']);
 
-        $this->console()->postJson("/api/plateforme/demandes/{$demande->id}/approuver")->assertOk();
+        app(AbonnementService::class)->approuver($demande, $this->exploitant);
 
         $vente = Vente::withoutGlobalScopes()->where('boutique_id', $this->exploitant->boutique_id)->with('lignes')->sole();
         $this->assertSame((int) $demande->montant, (int) $vente->total);
@@ -117,33 +132,6 @@ class ConsoleMobileTest extends TestCase
         $this->assertSame('Plan Basic · 1 mois', $vente->lignes->sole()->nom_produit);
         $client = Client::withoutGlobalScopes()->findOrFail($vente->client_id);
         $this->assertSame(['Awa', $this->awa->phone], [$client->nom, $client->telephone]);
-    }
-
-    public function test_approuver_et_refuser_une_demande_depuis_l_application(): void
-    {
-        $service = app(AbonnementService::class);
-        $demande = $service->soumettre($this->boutiqueAwa, $this->awa, 'basic', CycleFacturation::Mensuel);
-
-        $this->console()->getJson('/api/plateforme/demandes')->assertOk()
-            ->assertJsonPath('data.0.id', $demande->id)->assertJsonPath('data.0.boutique', 'Pressing Awa')
-            ->assertJsonPath('data.0.whatsapp', 'https://wa.me/22376008201');
-        $this->console()->postJson("/api/plateforme/demandes/{$demande->id}/approuver")->assertOk()->assertJsonPath('abonnement.plan', 'basic');
-        $this->assertSame('basic', $this->awa->abonnement()->first()->plan);
-
-        $autre = $service->soumettre($this->boutiqueAwa, $this->awa, 'pro', CycleFacturation::Mensuel);
-        $this->console()->postJson("/api/plateforme/demandes/{$autre->id}/refuser")->assertUnprocessable()->assertJsonValidationErrors('motif');
-        $this->console()->postJson("/api/plateforme/demandes/{$autre->id}/refuser", ['motif' => 'Paiement non reçu'])->assertOk();
-        $this->assertSame('refusee', $autre->fresh()->statut->value);
-    }
-
-    public function test_accorder_puis_revoquer_un_abonnement(): void
-    {
-        $fin = now()->addMonths(3)->toDateString();
-        $this->console()->postJson("/api/plateforme/comptes/{$this->awa->id}/accorder", ['plan' => 'pro', 'fin' => $fin])
-            ->assertOk()->assertJsonPath('abonnement.plan', 'pro')->assertJsonPath('abonnement.fin', $fin);
-
-        $this->console()->postJson("/api/plateforme/comptes/{$this->awa->id}/revoquer")->assertOk();
-        $this->assertFalse($this->awa->abonnement()->first()->estEnCours());
     }
 
     public function test_desactiver_un_compte_et_donner_un_mot_de_passe_provisoire(): void

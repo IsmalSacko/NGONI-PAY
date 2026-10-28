@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\DemandeAbonnement;
+use App\Support\ConsoleNgoni;
 use App\Support\WhatsApp;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -46,7 +47,7 @@ class DemandeAbonnementMail extends Mailable
                 'whatsapp' => WhatsApp::link($demande->telephone_contact ?: $proprietaire?->phone),
                 'abonnement' => $proprietaire?->abonnement,
                 // La Console Ngoni, commune à toutes les applications IsmaelDev.
-                'lienConsole' => rtrim((string) config('services.console_ngoni.url'), '/').'/demandes?app=ngoni-caisse',
+                'lienConsole' => ConsoleNgoni::demandes(),
             ],
         );
     }

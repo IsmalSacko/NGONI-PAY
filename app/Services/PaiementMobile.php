@@ -10,6 +10,7 @@ use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\User;
+use App\Support\ConsoleNgoni;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -68,7 +69,7 @@ class PaiementMobile
             ($demande->boutique?->nom ?? 'Une boutique').' · '.(Plan::parCode($demande->plan)?->nom ?? $demande->plan).' '.mb_strtolower($demande->cycle->libelle())
                 .' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.($demande->libellePaiementEnLigne() ?? 'paiement en ligne')
                 .' · en attente de l’opérateur',
-            '/console/demandes',
+            ConsoleNgoni::demandes(),
         );
 
         return $paiement;
@@ -212,7 +213,7 @@ class PaiementMobile
             ($demande->boutique?->nom ?? 'Une boutique').' · '.$plan.' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.$moyen
                 .($demande->frais_mobile > 0 ? ' (dont '.number_format($demande->frais_mobile, 0, ',', ' ').' F de frais)' : '')
                 .($fin ? ' · jusqu’au '.$fin : ''),
-            '/console/demandes',
+            ConsoleNgoni::demandes(),
         );
     }
 }

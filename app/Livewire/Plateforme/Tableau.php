@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plateforme;
 
-use App\Models\Abonnement;
 use App\Models\Boutique;
-use App\Models\DemandeAbonnement;
 use App\Services\Plateforme\Encaissements;
 use App\Services\Plateforme\Presences;
 use App\Support\CouleursGraphiques;
@@ -38,9 +36,6 @@ class Tableau extends Component
         $boutiques = Boutique::count();
         $nouvelles = Boutique::where('created_at', '>=', $periode->debut)->count();
         $nouvellesAvant = Boutique::whereBetween('created_at', [$precedente->debut, $precedente->fin])->count();
-        $actifsAbonnement = Abonnement::avecCompte()->where('est_actif', true)
-            ->where(fn ($q) => $q->whereNull('fin')->orWhereDate('fin', '>=', today()))
-            ->count();
 
         return view('livewire.plateforme.tableau', [
             'choix' => Periode::CHOIX,
@@ -64,11 +59,6 @@ class Tableau extends Component
                     'valeur' => $n,
                     'couleur' => CouleursGraphiques::plateforme($p),
                 ])->values()->all(),
-            'abonnements' => [
-                'actifs' => $actifsAbonnement,
-                'expires' => Abonnement::avecCompte()->count() - $actifsAbonnement,
-                'demandes' => DemandeAbonnement::enAttente()->count(),
-            ],
         ]);
     }
 

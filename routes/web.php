@@ -16,12 +16,9 @@ use App\Livewire\Categories\Index as CategoriesIndex;
 use App\Livewire\Clients\Index as ClientsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\MonCompte;
-use App\Livewire\Plateforme\Abonnements;
 use App\Livewire\Plateforme\Annonces;
 use App\Livewire\Plateforme\ApplicationsOrdinateur;
 use App\Livewire\Plateforme\Comptes;
-use App\Livewire\Plateforme\Demandes;
-use App\Livewire\Plateforme\Plans;
 use App\Livewire\Plateforme\Tableau;
 use App\Livewire\Plateforme\Tutoriels;
 use App\Livewire\Plateforme\Utilisateurs;
@@ -209,23 +206,14 @@ Route::middleware(['auth', 'conditions', 'tenant', 'backoffice'])->group(functio
 // Son propre compte (nom, téléphone, e-mail, mot de passe) : commerçant comme exploitant.
 Route::get('mon-compte', MonCompte::class)->middleware(['auth', 'tenant'])->name('mon-compte');
 
-// Console de l'exploitant : comptes, abonnements, demandes, plans, utilisateurs.
+// Console de l'exploitant : comptes, utilisateurs, annonces, tutoriels. Les
+// abonnements (demandes, paiements, formules) : dans la Console Ngoni.
 Route::middleware(['auth', 'conditions', 'plateforme'])->prefix('plateforme')->name('plateforme.')->group(function (): void {
     Route::get('/', Tableau::class)->name('tableau');
     Route::get('comptes', Comptes::class)->name('comptes');
-    Route::get('demandes', Demandes::class)->name('demandes');
-    Route::get('abonnements', Abonnements::class)->name('abonnements');
-    Route::get('plans', Plans::class)->name('plans');
     Route::get('utilisateurs', Utilisateurs::class)->name('utilisateurs');
     Route::get('annonces', Annonces::class)->name('annonces');
     Route::get('tutoriels', Tutoriels::class)->name('tutoriels');
     Route::get('applications-ordinateur', ApplicationsOrdinateur::class)->name('applications');
     Route::post('applications-ordinateur/envoi', EnvoiInstallateurController::class)->name('applications.envoi');
-
-    // Preuve de paiement : stockée hors du disque public, servie à l'exploitant seul.
-    Route::get('demandes/{demande}/preuve', function (DemandeAbonnement $demande) {
-        abort_unless($demande->preuveExiste(), 404);
-
-        return Storage::disk('local')->response($demande->preuve_chemin);
-    })->name('preuve');
 });

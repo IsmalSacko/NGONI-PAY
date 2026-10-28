@@ -14,6 +14,7 @@ use App\Models\JournalAbonnement;
 use App\Models\Plan;
 use App\Models\User;
 use App\Support\Apres;
+use App\Support\ConsoleNgoni;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -209,7 +210,7 @@ class AbonnementService
         if ($parrainage !== null) {
             $alerte .= " · 🎁 filleul de {$parrainage['parrain']}";
         }
-        app(AlertesExploitant::class)->envoyer('Demande d’abonnement', $alerte, '/console/demandes');
+        app(AlertesExploitant::class)->envoyer('Demande d’abonnement', $alerte, ConsoleNgoni::demandes());
 
         return $demande;
     }
@@ -231,7 +232,7 @@ class AbonnementService
             'Demande annulée',
             ($demande->boutique?->nom ?? 'Une boutique').' a retiré sa demande '.ucfirst($demande->plan)
                 .($enLigne !== null ? ' ('.$enLigne.') '.$demande->delaiDecision().' après l’avoir lancée, sans payer.' : '.'),
-            '/console/demandes',
+            ConsoleNgoni::demandes(),
         );
     }
 

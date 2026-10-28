@@ -96,21 +96,13 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
 });
 
 // Console de l'exploitant dans l'application : hors du contexte d'une
-// boutique (pas de « tenant »), elle voit tous les comptes.
+// boutique (pas de « tenant »), elle voit tous les comptes. Les abonnements
+// (demandes, paiements, formules, accords) se gèrent dans la Console Ngoni.
 Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('plateforme')->controller(PlateformeController::class)->group(function (): void {
     Route::get('tableau', 'tableau');
-    Route::get('plans', 'plans');
-    Route::put('plans', 'enregistrerPlans');
     Route::get('activite', 'activite');
-    Route::get('demandes', 'demandes');
-    Route::get('demandes/{demande}/preuve', 'preuve')->name('api.plateforme.preuve');
-    Route::post('demandes/{demande}/approuver', 'approuver');
-    Route::post('demandes/{demande}/refuser', 'refuser');
     Route::get('comptes', 'comptes');
-    Route::post('comptes/{user}/accorder', 'accorder');
-    Route::post('comptes/{user}/revoquer', 'revoquer');
     Route::get('utilisateurs', 'utilisateurs');
-    Route::get('abonnements', 'abonnementsPayes');
     Route::post('utilisateurs/{user}/basculer', 'basculer');
     Route::post('utilisateurs/{user}/mot-de-passe', 'motDePasse');
     Route::get('utilisateurs/{user}/suppression', 'apercuSuppression');

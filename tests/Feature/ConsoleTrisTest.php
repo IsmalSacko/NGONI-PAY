@@ -13,13 +13,14 @@ use App\Models\User;
 use App\Models\Vente;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\ConditionsUtilisation;
+use App\Services\Console\AbonnementsConsole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** Console : comptes et utilisateurs filtrés, triés, paginés ; abonnements payés par canal. */
+/** Console : comptes et utilisateurs filtrés, triés, paginés ; abonnements payés par canal (Console Ngoni). */
 class ConsoleTrisTest extends TestCase
 {
     use RefreshDatabase;
@@ -106,19 +107,23 @@ class ConsoleTrisTest extends TestCase
         $payer('fanta', 'wave', 40000, false);
         $payer('awa', 'orange_money', 4000, false);
 
-        $r = $this->api()->getJson('/api/plateforme/abonnements')->assertOk();
-        $r->assertJsonPath('totaux..nombre', 4)
-            ->assertJsonPath('totaux.jeko.nombre', 1)
-            ->assertJsonPath('totaux.pawapay.nombre', 1)
-            ->assertJsonPath('totaux.manuel.nombre', 2)
-            ->assertJsonPath('totaux.manuel.montant', 44000);
+        // Les recettes de la Console Ngoni (contrat v1.1), par canal.
+        config(['services.console_ngoni.cle' => 'cle-de-test-console']);
+        $r = $this->getJson('/api/console/v1/recettes', ['Authorization' => 'Bearer cle-de-test-console'])->assertOk();
+        $r->assertJsonCount(4, 'data')
+            ->assertJsonPath('totaux.0.devise', 'XOF')
+            ->assertJsonPath('totaux.0.total', 52000)
+            ->assertJsonPath('totaux.0.frais', 120);
 
-        $lignes = collect($r->json('data'))->keyBy('moyen');
+        $lignes = collect($r->json('data'))->keyBy('moyen_libelle');
         $this->assertTrue($lignes['Wave via Jèko']['automatique']);
+        $this->assertSame('jeko', $lignes['Wave via Jèko']['canal']);
         $this->assertSame('pawapay', $lignes['Free Money via pawaPay']['canal']);
         $this->assertFalse($lignes['Orange Money']['automatique']);
+        $this->assertSame('manuel', $lignes['Orange Money']['canal']);
 
-        $this->api()->getJson('/api/plateforme/abonnements?canal=manuel')->assertJsonPath('total', 2);
+        $this->assertSame(2, app(AbonnementsConsole::class)->requete(['canal' => 'manuel'])->count());
+        $this->assertSame(44000, (int) app(AbonnementsConsole::class)->requete(['canal' => 'manuel'])->sum('montant'));
     }
 
     public function test_la_console_web_filtre_trie_et_montre_les_abonnements(): void
@@ -133,8 +138,8 @@ class ConsoleTrisTest extends TestCase
         Livewire::actingAs($admin)->test(Utilisateurs::class)
             ->set('role', 'exploitants')->assertSee('Ismael')->assertDontSee('Fanta');
 
-        $this->actingAs($admin)->get('/plateforme/abonnements')->assertOk()
-            ->assertSee('Abonnements')->assertSee('Validés à la main')->assertSee('pawaPay');
+        // Les abonnements payés : dans la Console Ngoni, plus dans la console web.
+        $this->actingAs($admin)->get('/plateforme/abonnements')->assertNotFound();
     }
 
     public function test_les_utilisateurs_se_filtrent_par_conditions_acceptees(): void

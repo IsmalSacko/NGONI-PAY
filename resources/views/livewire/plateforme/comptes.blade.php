@@ -5,7 +5,8 @@
     <div class="flex items-end justify-between gap-4 flex-wrap">
         <div>
             <h1 class="font-display font-extrabold text-2xl md:text-3xl">Comptes</h1>
-            <p class="text-sm text-muted">Propriétaires, leurs boutiques et leur abonnement.</p>
+            <p class="text-sm text-muted">Propriétaires, leurs boutiques et leur abonnement. L’abonnement se gère dans la
+                <a href="{{ $lienConsole }}" target="_blank" rel="noopener" class="font-bold text-accent underline">Console Ngoni</a>.</p>
         </div>
         <div class="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
             <label class="relative flex-1 md:flex-none">
@@ -116,20 +117,6 @@
                         @if ($abonnement->est_manuel)<span class="rounded-full bg-puce px-2 py-0.5 text-[11px] font-bold text-muted">manuel</span>@endif
                         @if (($n = count($abonnement->fonctionsAccordees())) > 0)<span class="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent" title="{{ collect($abonnement->fonctionsAccordees())->map(fn ($c) => \App\Models\Plan::FONCTIONNALITES[$c])->join(', ') }}">+ {{ $n }} fonction{{ $n > 1 ? 's' : '' }} accordée{{ $n > 1 ? 's' : '' }}</span>@endif
                         <x-statut-abonnement :abonnement="$abonnement" />
-                        <span class="flex items-center gap-1 ml-auto lg:ml-1">
-                            <button wire:click="gerer('{{ $abonnement->user_id }}')"
-                                    class="h-9 px-3.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 hover:bg-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 {{ $compteOuvert === $abonnement->user_id ? 'bg-accent text-white' : 'bg-accent-soft text-accent' }}">
-                                <x-plateforme.picto nom="carte" class="w-4 h-4" />Gérer
-                            </button>
-                            @if ($abonnement->estEnCours())
-                                <button wire:click="revoquer('{{ $abonnement->user_id }}')"
-                                        wire:confirm="Mettre fin à l’abonnement maintenant ? Ses boutiques passent en lecture seule."
-                                        title="Révoquer l’abonnement"
-                                        class="h-9 px-2.5 rounded-lg text-xs font-bold text-danger-fg inline-flex items-center gap-1.5 hover:bg-danger-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-fg/30">
-                                    <x-plateforme.picto nom="stop" class="w-4 h-4" /><span class="sr-only sm:not-sr-only">Révoquer</span>
-                                </button>
-                            @endif
-                        </span>
                     </div>
                 </div>
 
@@ -164,54 +151,6 @@
                         <li class="text-muted text-sm rounded-xl bg-fond-tableau px-3 py-2.5">aucune boutique</li>
                     @endforelse
                 </ul>
-
-                @if ($compteOuvert === $abonnement->user_id)
-                    <form wire:submit="accorder" class="mt-4 rounded-xl bg-accent-soft/50 ring-1 ring-accent/10 p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-bold text-muted mb-1">Plan</label>
-                            <select wire:model.live="plan" class="{{ $champ }} w-full">
-                                @foreach ($plans as $p)
-                                    <option value="{{ $p->code }}">{{ $p->nom }}{{ $p->estEssai() ? ' (prolonger)' : '' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-muted mb-1">Fin (incluse)</label>
-                            <input wire:model="fin" type="date" @disabled($sansEcheance) class="{{ $champ }} w-full disabled:opacity-50">
-                            @error('fin') <p class="text-xs text-danger-fg mt-1">{{ $message }}</p> @enderror
-                        </div>
-                        <label class="flex items-center gap-2 text-sm font-semibold h-11 cursor-pointer">
-                            <input wire:model.live="sansEcheance" type="checkbox" class="w-4 h-4 accent-accent"> Sans échéance
-                        </label>
-                        <div>
-                            <label class="block text-xs font-bold text-muted mb-1">Note</label>
-                            <input wire:model="note" type="text" class="{{ $champ }} w-full">
-                        </div>
-                        {{-- Fonctions : celles de la formule sont fixes ; les autres s'accordent à la main. --}}
-                        @php($formule = \App\Models\Plan::parCode($plan))
-                        <fieldset class="md:col-span-4">
-                            <legend class="text-xs font-bold text-muted mb-2">Fonctions <span class="font-normal">— celles de la formule sont incluses d’office ; cochez celles que vous accordez en plus</span></legend>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                @foreach (\App\Models\Plan::FONCTIONNALITES as $code => $libelle)
-                                    @php($incluse = $formule?->inclut($code) ?? false)
-                                    <label wire:key="fonction-{{ $code }}" class="flex items-start gap-2 rounded-lg px-3 py-2 text-sm {{ $incluse ? 'bg-white/60 text-muted cursor-not-allowed' : 'bg-white cursor-pointer hover:bg-puce' }}">
-                                        @if ($incluse)
-                                            <input type="checkbox" checked disabled class="mt-0.5 w-4 h-4 accent-accent">
-                                            <span>{{ $libelle }} <span class="block text-xs">dans la formule</span></span>
-                                        @else
-                                            <input type="checkbox" wire:model="accordees" value="{{ $code }}" class="mt-0.5 w-4 h-4 accent-accent">
-                                            <span class="font-semibold">{{ $libelle }} @if (in_array($code, $accordees, true))<span class="block text-xs font-normal text-accent">accordée</span>@endif</span>
-                                        @endif
-                                    </label>
-                                @endforeach
-                            </div>
-                        </fieldset>
-                        <div class="md:col-span-4 flex gap-3">
-                            <button type="submit" class="h-11 px-5 rounded-xl bg-accent text-white font-bold hover:bg-accent-dark">Enregistrer</button>
-                            <button type="button" wire:click="$set('compteOuvert', null)" class="h-11 px-5 rounded-xl bg-white ring-1 ring-border-strong font-bold hover:bg-puce">Annuler</button>
-                        </div>
-                    </form>
-                @endif
             </div>
         @empty
             <p class="rounded-2xl bg-white shadow-carte p-6 text-center text-muted">Aucun compte.</p>

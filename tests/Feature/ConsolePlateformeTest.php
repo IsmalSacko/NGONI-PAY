@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\CycleFacturation;
-use App\Enums\StatutDemande;
 use App\Livewire\Plateforme\Comptes;
-use App\Livewire\Plateforme\Demandes;
-use App\Livewire\Plateforme\Plans;
 use App\Livewire\Plateforme\Utilisateurs;
 use App\Models\Boutique;
 use App\Models\DemandeAbonnement;
@@ -16,8 +13,8 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
+use App\Services\RechercheDemandes;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -34,11 +31,15 @@ class ConsolePlateformeTest extends TestCase
 
     private Boutique $boutique;
 
+    /** La Console Ngoni (contrat v1) : c'est là que se règlent les formules. */
+    private array $cle = ['Authorization' => 'Bearer cle-de-test-console', 'X-Console-Operateur' => 'Ismaila'];
+
     protected function setUp(): void
     {
         parent::setUp();
         Mail::fake();
         Storage::fake('local');
+        config(['services.console_ngoni.cle' => 'cle-de-test-console']);
 
         ['user' => $this->awa, 'boutique' => $this->boutique] = app(BoutiqueRegistrationService::class)->register([
             'nom' => 'Pressing Awa', 'pays' => 'ML', 'telephone' => '76008201',
@@ -54,8 +55,14 @@ class ConsolePlateformeTest extends TestCase
         $this->get('/plateforme')->assertRedirect();
         $this->actingAs($this->awa)->get('/plateforme')->assertForbidden();
 
-        foreach (['/plateforme', '/plateforme/comptes', '/plateforme/demandes', '/plateforme/plans', '/plateforme/utilisateurs'] as $page) {
-            $this->actingAs($this->exploitant)->get($page)->assertOk();
+        foreach (['/plateforme', '/plateforme/comptes', '/plateforme/utilisateurs'] as $page) {
+            $this->actingAs($this->exploitant)->get($page)->assertOk()
+                ->assertSee('Abonnements : Console Ngoni')
+                ->assertSee('https://console.ismaeldev.fr/demandes?app=ngoni-caisse', false);
+        }
+        // Demandes, abonnements payés, plans : dans la Console Ngoni seulement.
+        foreach (['/plateforme/demandes', '/plateforme/abonnements', '/plateforme/plans'] as $page) {
+            $this->actingAs($this->exploitant)->get($page)->assertNotFound();
         }
     }
 
@@ -65,61 +72,24 @@ class ConsolePlateformeTest extends TestCase
         $this->assertTrue($this->awa->fresh()->est_admin_plateforme);
     }
 
-    public function test_accorder_puis_revoquer_un_abonnement(): void
+    public function test_les_comptes_montrent_l_abonnement_sans_le_gerer(): void
     {
         $this->actingAs($this->exploitant);
 
         Livewire::test(Comptes::class)
             ->assertSee('Pressing Awa')
             ->assertSee('wa.me/22376008201')
-            ->call('gerer', $this->awa->id)
-            ->set('plan', 'pro')
-            ->set('fin', now()->addYear()->toDateString())
-            ->call('accorder')
-            ->assertHasNoErrors();
-
-        $abonnement = $this->awa->abonnement()->first();
-        $this->assertSame('pro', $abonnement->plan);
-        $this->assertTrue($abonnement->est_manuel);
-        $this->assertSame(now()->addYear()->toDateString(), $abonnement->fin->toDateString());
-
-        Livewire::test(Comptes::class)->call('revoquer', $this->awa->id)
-            ->assertSee('expiré le '.now()->subDay()->format('d/m/Y'));
-        $this->assertFalse($this->awa->abonnement()->first()->estEnCours());
-    }
-
-    public function test_approuver_ou_refuser_une_demande_avec_sa_preuve(): void
-    {
-        $service = app(AbonnementService::class);
-        $demande = $service->soumettre($this->boutique, $this->awa, 'basic', CycleFacturation::Mensuel,
-            preuve: UploadedFile::fake()->image('recu.jpg'));
-
-        $this->actingAs($this->awa)->get(route('plateforme.preuve', $demande))->assertForbidden();
-        $this->actingAs($this->exploitant)->get(route('plateforme.preuve', $demande))->assertOk();
-
-        Livewire::test(Demandes::class)
-            ->assertSee('Voir la preuve de paiement')
-            ->call('approuver', $demande->id)
-            ->assertSee('Demande approuvée');
-        $this->assertSame('basic', $this->awa->abonnement()->first()->plan);
-
-        // Refus : motif obligatoire, visible par le commerçant.
-        $this->awa->abonnement()->update(['plan' => 'essai', 'fin' => now()->subDay()->toDateString()]);
-        $autre = $service->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel);
-        Livewire::test(Demandes::class)
-            ->call('demanderRefus', $autre->id)->call('refuser')->assertHasErrors('motif')
-            ->set('motif', 'Paiement introuvable')->call('refuser')->assertHasNoErrors();
-        $this->assertSame(StatutDemande::Refusee, $autre->fresh()->statut);
+            ->assertSee('essai')
+            ->assertSee('Console Ngoni')
+            ->assertDontSee('Révoquer')
+            ->assertDontSee('Sans échéance');
     }
 
     public function test_une_demande_payee_a_vie_s_approuve_sans_echeance(): void
     {
         $demande = app(AbonnementService::class)->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Annuel);
 
-        Livewire::actingAs($this->exploitant)->test(Demandes::class)
-            ->assertSee('Sans échéance')
-            ->call('approuver', $demande->id, true)
-            ->assertSee('sans échéance');
+        app(AbonnementService::class)->approuver($demande, $this->exploitant, sansEcheance: true);
 
         $abonnement = $this->awa->abonnement()->first();
         $this->assertSame('pro', $abonnement->plan);
@@ -135,77 +105,55 @@ class ConsolePlateformeTest extends TestCase
         $this->awa->abonnement()->update(['plan' => 'essai', 'fin' => now()->subDay()->toDateString()]);
         $enAttente = $service->soumettre($this->boutique, $this->awa, 'pro', CycleFacturation::Mensuel);
         DemandeAbonnement::whereKey($enAttente->id)->update(['created_at' => now()->subDays(3)]);
-        $this->actingAs($this->exploitant);
+        $recherche = app(RechercheDemandes::class);
+        $ids = fn (string $onglet, string $terme = '') => $recherche->requete($onglet, $terme)->pluck('id')->all();
 
-        // À traiter par défaut : seule la demande en attente, et son ancienneté.
-        Livewire::test(Demandes::class)
-            ->assertSee('1 demande')
-            ->assertSee('Approuver')
-            ->assertSee('Depuis 3 jours')
-            ->assertViewHas('demandes', fn ($p) => $p->pluck('id')->all() === [$enAttente->id]);
-
-        Livewire::test(Demandes::class)->set('filtre', 'approuvee')
-            ->assertViewHas('demandes', fn ($p) => $p->pluck('id')->all() === [$approuvee->id]);
+        // À traiter : seule la demande en attente ; l'onglet des approuvées, l'autre.
+        $this->assertSame([$enAttente->id], $ids('en_attente'));
+        $this->assertSame([$approuvee->id], $ids('approuvee'));
 
         // Recherche par boutique, par numéro (chiffres seuls) ou par nom.
         foreach (['pressing', '76 00 82 01', 'awa'] as $terme) {
-            Livewire::test(Demandes::class)->set('filtre', 'toutes')->set('recherche', $terme)
-                ->assertViewHas('demandes', fn ($p) => $p->count() === 2);
+            $this->assertCount(2, $ids('toutes', $terme));
         }
-        Livewire::test(Demandes::class)->set('filtre', 'toutes')->set('recherche', 'Boutique inconnue')
-            ->assertViewHas('demandes', fn ($p) => $p->count() === 0)
-            ->assertSee('Aucune demande ne correspond');
+        $this->assertSame([], $ids('toutes', 'Boutique inconnue'));
     }
 
-    public function test_les_plans_se_reglent_depuis_la_console(): void
+    public function test_les_plans_se_reglent_depuis_la_console_ngoni(): void
     {
-        $basic = Plan::parCode('basic');
-        $essai = Plan::parCode('essai');
-        $this->actingAs($this->exploitant);
-
-        Livewire::test(Plans::class)
-            ->set("tarifs.{$basic->id}.monthly.montant", '5000')
-            ->set("plans.{$essai->id}.jours_essai", '14')
-            ->set("plans.{$basic->id}.max_membres", '')
-            ->call('enregistrer')
-            ->assertHasNoErrors();
+        $this->patchJson('/api/console/v1/formules/basic', ['tarifs' => [['mois' => 1, 'montant' => 5000]], 'max_membres' => null], $this->cle)->assertOk();
+        // L'essai reste proposé, même si l'on envoie le contraire.
+        $this->patchJson('/api/console/v1/formules/essai', ['jours_essai' => 14, 'actif' => false], $this->cle)->assertOk();
 
         $basic = Plan::parCode('basic');
         $this->assertSame(5000, $basic->tarif(CycleFacturation::Mensuel)->montant);
         $this->assertNull($basic->max_membres);
         $this->assertSame(14, Plan::parCode('essai')->jours_essai);
+        $this->assertTrue((bool) Plan::parCode('essai')->est_actif);
         $this->getJson('/api/plans')->assertJsonPath('data.1.tarifs.0.montant', 5000);
+
+        // Un montant négatif est refusé.
+        $this->patchJson('/api/console/v1/formules/basic', ['tarifs' => [['mois' => 1, 'montant' => -10]]], $this->cle)->assertStatus(422);
     }
 
-    public function test_l_abonnement_a_vie_se_regle_depuis_la_console_et_la_vitrine_suit(): void
+    public function test_l_abonnement_a_vie_se_regle_depuis_la_console_ngoni_et_la_vitrine_suit(): void
     {
-        $basic = Plan::parCode('basic');
-        $pro = Plan::parCode('pro');
-        $this->actingAs($this->exploitant);
-
-        Livewire::test(Plans::class)
-            ->assertSet("plans.{$pro->id}.prix_a_vie", '250000')
-            ->set("plans.{$pro->id}.prix_a_vie", '300000')
-            ->set("plans.{$pro->id}.texte_a_vie", 'Le Pro pour toujours.')
-            ->set("plans.{$pro->id}.a_vie_debut", today()->subDay()->toDateString())
-            ->set("plans.{$pro->id}.a_vie_fin", today()->addMonth()->toDateString())
-            // Basic : plus proposé à vie.
-            ->set("plans.{$basic->id}.prix_a_vie", '')
-            ->call('enregistrer')
-            ->assertHasNoErrors();
+        $this->patchJson('/api/console/v1/formules/pro', [
+            'tarifs' => [['mois' => 0, 'montant' => 300000]],
+            'champs' => ['texte_a_vie' => 'Le Pro pour toujours.', 'a_vie_debut' => today()->subDay()->toDateString(), 'a_vie_fin' => today()->addMonth()->toDateString()],
+        ], $this->cle)->assertOk();
+        // Basic : plus proposé à vie.
+        $this->patchJson('/api/console/v1/formules/basic', ['tarifs' => [['mois' => 0, 'montant' => null]]], $this->cle)->assertOk();
 
         $this->assertSame(300000, Plan::parCode('pro')->prix_a_vie);
         $this->assertNull(Plan::parCode('basic')->prix_a_vie);
 
         // La vitrine (aperçu de l'exploitant) et les conditions affichent le même prix.
-        $this->get('/?apercu=1')->assertOk()->assertSee('300 000')->assertSee('Le Pro pour toujours.')->assertDontSee('Basic à vie');
+        $this->actingAs($this->exploitant)->get('/?apercu=1')->assertOk()->assertSee('300 000')->assertSee('Le Pro pour toujours.')->assertDontSee('Basic à vie');
         $this->get('/conditions')->assertOk()->assertSee('Pro à vie (300 000 F CFA)', false);
 
         // Une fin avant le début est refusée.
-        Livewire::test(Plans::class)
-            ->set("plans.{$pro->id}.a_vie_fin", today()->subMonth()->toDateString())
-            ->call('enregistrer')
-            ->assertHasErrors("plans.{$pro->id}.a_vie_fin");
+        $this->patchJson('/api/console/v1/formules/pro', ['champs' => ['a_vie_fin' => today()->subMonth()->toDateString()]], $this->cle)->assertStatus(422);
     }
 
     public function test_hors_periode_l_abonnement_a_vie_disparait_de_la_vitrine(): void
@@ -216,82 +164,18 @@ class ConsolePlateformeTest extends TestCase
         $this->get('/conditions')->assertOk()->assertSee('n’est plus proposé à la souscription', false);
     }
 
-    public function test_la_console_coche_les_fonctions_d_un_plan(): void
+    public function test_la_console_ngoni_coche_les_fonctions_d_un_plan(): void
     {
         $basic = Plan::parCode('basic');
         $pro = Plan::parCode('pro');
-        $this->actingAs($this->exploitant);
+        $this->assertTrue($pro->inclut(Plan::SEANCES_CAISSE));
 
-        Livewire::test(Plans::class)
-            ->assertSet("plans.{$pro->id}.fonctionnalites.seances_caisse", true)
-            ->set("plans.{$basic->id}.fonctionnalites.seances_caisse", true)
-            ->set("plans.{$pro->id}.fonctionnalites.seances_caisse", false)
-            ->call('enregistrer')
-            ->assertHasNoErrors();
+        $this->patchJson('/api/console/v1/formules/basic', ['champs' => ['fonctionnalites' => [...$basic->fonctionnalites, Plan::SEANCES_CAISSE]]], $this->cle)->assertOk();
+        $this->patchJson('/api/console/v1/formules/pro', ['champs' => ['fonctionnalites' => array_values(array_diff($pro->fonctionnalites, [Plan::SEANCES_CAISSE]))]], $this->cle)->assertOk();
 
         $this->assertTrue(Plan::parCode('basic')->inclut(Plan::SEANCES_CAISSE));
         $this->assertFalse(Plan::parCode('pro')->inclut(Plan::SEANCES_CAISSE));
         $this->assertTrue(Plan::parCode('essai')->inclut(Plan::SEANCES_CAISSE));
-    }
-
-    public function test_l_application_lit_et_enregistre_les_plans_comme_la_console_web(): void
-    {
-        $basic = Plan::parCode('basic');
-        $essai = Plan::parCode('essai');
-        $jeton = $this->exploitant->createToken('app')->plainTextToken;
-
-        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->assertOk()->json('plans');
-        $this->assertSame(['essai', 'basic', 'pro'], array_column($plans, 'code'));
-        $this->assertSame([], $plans[0]['tarifs'], 'l’essai n’a pas de tarif');
-        $this->assertCount(4, $plans[1]['tarifs']);
-
-        $plans[1]['tarifs'][0]['montant'] = '5000';
-        $plans[1]['max_membres'] = '';
-        $plans[1]['fonctionnalites'] = [Plan::SEANCES_CAISSE];
-        $plans[0]['jours_essai'] = '14';
-        // L'essai reste proposé, même si l'on envoie le contraire.
-        $plans[0]['est_actif'] = false;
-
-        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertOk()
-            ->assertJsonPath('plans.1.tarifs.0.montant', '5000');
-
-        $basic = Plan::parCode('basic');
-        $this->assertSame(5000, $basic->tarif(CycleFacturation::Mensuel)->montant);
-        $this->assertNull($basic->max_membres);
-        $this->assertTrue($basic->inclut(Plan::SEANCES_CAISSE));
-        $this->assertSame(14, Plan::parCode('essai')->jours_essai);
-        $this->assertTrue((bool) Plan::parCode('essai')->est_actif);
-    }
-
-    public function test_l_application_regle_l_abonnement_a_vie_sans_que_l_ancienne_l_efface(): void
-    {
-        $jeton = $this->exploitant->createToken('app')->plainTextToken;
-        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->assertOk()->json('plans');
-        $this->assertSame('250000', $plans[2]['prix_a_vie']);
-
-        $plans[2]['prix_a_vie'] = '200000';
-        $plans[2]['a_vie_fin'] = '2027-06-30';
-        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertOk()
-            ->assertJsonPath('plans.2.prix_a_vie', '200000');
-        $this->assertSame(200000, Plan::parCode('pro')->prix_a_vie);
-        $this->assertSame('2027-06-30', Plan::parCode('pro')->a_vie_fin->toDateString());
-
-        // Une application plus ancienne n'envoie pas ces champs : rien n'est effacé.
-        $anciens = array_map(fn (array $p) => array_diff_key($p, array_flip(['prix_a_vie', 'texte_a_vie', 'a_vie_debut', 'a_vie_fin'])), $plans);
-        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $anciens])->assertOk();
-        $this->assertSame(200000, Plan::parCode('pro')->prix_a_vie);
-    }
-
-    public function test_les_plans_de_l_api_refusent_un_montant_negatif_et_un_non_exploitant(): void
-    {
-        $jeton = $this->exploitant->createToken('app')->plainTextToken;
-        $plans = $this->withToken($jeton)->getJson('/api/plateforme/plans')->json('plans');
-        $plans[1]['tarifs'][0]['montant'] = '-10';
-        $this->withToken($jeton)->putJson('/api/plateforme/plans', ['plans' => $plans])->assertStatus(422);
-
-        $this->app['auth']->forgetGuards();
-        $this->flushHeaders();
-        $this->withToken($this->awa->createToken('t')->plainTextToken)->getJson('/api/plateforme/plans')->assertForbidden();
     }
 
     public function test_l_api_donne_aux_comptes_et_utilisateurs_les_details_de_la_console_web(): void
@@ -345,23 +229,16 @@ class ConsolePlateformeTest extends TestCase
         $basic = Plan::parCode('basic');
         $hors = collect(array_keys(Plan::FONCTIONNALITES))->first(fn (string $f) => ! $basic->inclut($f));
         $dedans = collect(array_keys(Plan::FONCTIONNALITES))->first(fn (string $f) => $basic->inclut($f));
-        $this->actingAs($this->exploitant);
+        $service = app(AbonnementService::class);
 
-        Livewire::test(Comptes::class)
-            ->call('gerer', $this->awa->id)
-            ->set('plan', 'basic')
-            ->assertSee('dans la formule')
-            ->set('fin', now()->addMonth()->toDateString())
-            // Une fonction de la formule cochée en plus n'est pas gardée en double.
-            ->set('accordees', array_values(array_filter([$hors, $dedans])))
-            ->call('accorder')
-            ->assertHasNoErrors()
-            ->assertSee('+ 1 fonction accordée');
+        // Une fonction de la formule cochée en plus n'est pas gardée en double.
+        $service->accorder($this->awa, 'basic', now()->addMonth(), $this->exploitant, fonctions: array_values(array_filter([$hors, $dedans])));
 
         $abonnement = $this->awa->abonnement()->first();
         $this->assertSame([$hors], $abonnement->fonctionsAccordees());
-        $this->assertTrue(app(AbonnementService::class)->permet($this->boutique, $hors));
+        $this->assertTrue($service->permet($this->boutique, $hors));
         $this->assertContains($hors, $abonnement->fonctionnalites());
+        $this->actingAs($this->exploitant)->get('/plateforme/comptes')->assertOk()->assertSee('+ 1 fonction accordée');
 
         // L'application la voit incluse.
         $this->app['auth']->forgetGuards();
@@ -371,14 +248,10 @@ class ConsolePlateformeTest extends TestCase
             ->assertJsonFragment([$hors]);
 
         // Retirée : fermée de nouveau ; celles de la formule restent.
-        $this->actingAs($this->exploitant);
-        Livewire::test(Comptes::class)->call('gerer', $this->awa->id)
-            ->assertSet('accordees', [$hors])
-            ->set('accordees', [])
-            ->call('accorder');
-        $this->assertFalse(app(AbonnementService::class)->permet($this->boutique->fresh(), $hors));
+        $service->reglerFonctions($this->awa, []);
+        $this->assertFalse($service->permet($this->boutique->fresh(), $hors));
         if ($dedans !== null) {
-            $this->assertTrue(app(AbonnementService::class)->permet($this->boutique->fresh(), $dedans));
+            $this->assertTrue($service->permet($this->boutique->fresh(), $dedans));
         }
     }
 }
