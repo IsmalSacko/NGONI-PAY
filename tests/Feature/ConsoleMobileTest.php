@@ -66,8 +66,10 @@ class ConsoleMobileTest extends TestCase
         $this->withToken($jetonAwa)->getJson('/api/plateforme/comptes')->assertForbidden();
 
         // L'exploitant voit toute la plateforme, pas seulement sa boutique.
+        // Abonnements comptés, pas gérés : pas de demandes à traiter ici.
         $this->console()->getJson('/api/plateforme/tableau')->assertOk()->assertJsonPath('boutiques', 2)
-            ->assertJsonMissingPath('demandes')->assertJsonMissingPath('actifs');
+            ->assertJsonPath('essais', 2)->assertJsonPath('payants', 0)->assertJsonPath('expires', 0)
+            ->assertJsonPath('actifs', 2)->assertJsonMissingPath('demandes');
         $this->console()->getJson('/api/plateforme/comptes?recherche=pressing')->assertOk()
             ->assertJsonPath('data.0.nom', 'Awa')->assertJsonPath('data.0.boutiques.0', 'Pressing Awa');
         $this->console()->getJson('/api/moi')->assertOk()->assertJsonPath('user.est_admin_plateforme', true);

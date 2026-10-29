@@ -33,13 +33,24 @@ use Illuminate\Validation\Rule;
  */
 class PlateformeController extends Controller
 {
-    /** Chiffres de la plateforme ; les abonnements se suivent dans la Console Ngoni. */
-    public function tableau(): JsonResponse
+    /**
+     * Chiffres de la plateforme. Les abonnements y sont comptés (lecture
+     * seule, mêmes statuts que la page Comptes) ; ils se gèrent dans la
+     * Console Ngoni.
+     */
+    public function tableau(ComptesConsole $console): JsonResponse
     {
         $ventesDuJour = Vente::withoutBoutiqueScope()->valides()->whereDate('created_at', today());
+        $compteurs = $console->compteurs();
 
         return response()->json([
             'comptes' => Abonnement::avecCompte()->count(),
+            'essais' => $compteurs['essai'],
+            'payants' => $compteurs['payants'],
+            'fin_proche' => $compteurs['fin_proche'],
+            'expires' => $compteurs['expires'],
+            // Lu par les applications installées avant la page Comptes par statut.
+            'actifs' => $compteurs['essai'] + $compteurs['payants'],
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),
             'inscriptions_7j' => User::where('created_at', '>=', now()->subDays(7))->whereNotNull('boutique_id')->count(),
