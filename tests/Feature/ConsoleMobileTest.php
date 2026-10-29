@@ -75,6 +75,30 @@ class ConsoleMobileTest extends TestCase
         $this->console()->getJson('/api/moi')->assertOk()->assertJsonPath('user.est_admin_plateforme', true);
     }
 
+    public function test_le_tableau_et_les_comptes_disent_qui_relancer_avec_un_message_whatsapp_pret(): void
+    {
+        // L'exploitant vend, Awa jamais ; cinq jours plus tard, les deux essais finissent sous 3 jours.
+        $boutique = Boutique::withoutGlobalScopes()->where('proprietaire_id', $this->exploitant->id)->firstOrFail();
+        Vente::factory()->create(['boutique_id' => $boutique->id, 'user_id' => $this->exploitant->id, 'total' => 1000]);
+        $this->travel(5)->days();
+
+        $this->console()->getJson('/api/plateforme/tableau')->assertOk()
+            ->assertJsonPath('essais_fin_proche', 2)->assertJsonPath('a_activer', 1);
+
+        // Awa n'a jamais vendu : on l'aide à faire sa première vente.
+        $awa = $this->console()->getJson('/api/plateforme/comptes?usage=a_activer')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.nom', 'Awa')->json('data.0.relance');
+        $this->assertSame('premiere_vente', $awa['motif']);
+        $this->assertStringStartsWith('https://wa.me/22376008201?text=', $awa['whatsapp']);
+        $this->assertStringContainsString('premi%C3%A8re%20vente', $awa['whatsapp']);
+
+        // L'exploitant vend déjà : on lui parle de la fin de son essai.
+        $ismaila = collect($this->console()->getJson('/api/plateforme/comptes?statut=essai_fin_proche')->assertOk()->json('data'))
+            ->firstWhere('nom', 'Ismaila')['relance'];
+        $this->assertSame('fin_essai', $ismaila['motif']);
+        $this->assertStringContainsString('dans%202%20jours', $ismaila['whatsapp']);
+    }
+
     public function test_les_abonnements_ne_se_gerent_plus_depuis_l_application(): void
     {
         // Demandes, paiements, formules, accords : dans la Console Ngoni seulement.

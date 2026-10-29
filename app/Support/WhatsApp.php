@@ -8,9 +8,10 @@ class WhatsApp
      * Lien wa.me pour un numéro, ou null si l'indicatif pays manque.
      * Beaucoup de numéros sont saisis au format local (« 0758071816 ») :
      * on ne devine pas le pays, un lien vers le mauvais numéro serait pire
-     * que pas de lien.
+     * que pas de lien. Avec un message, la conversation s'ouvre avec ce
+     * texte déjà tapé.
      */
-    public static function link(?string $phone): ?string
+    public static function link(?string $phone, ?string $message = null): ?string
     {
         if ($phone === null || trim($phone) === '') {
             return null;
@@ -28,6 +29,10 @@ class WhatsApp
             return null; // format local, pays inconnu
         }
 
-        return strlen($digits) >= 8 ? 'https://wa.me/'.$digits : null;
+        if (strlen($digits) < 8) {
+            return null;
+        }
+
+        return 'https://wa.me/'.$digits.($message === null ? '' : '?text='.rawurlencode($message));
     }
 }

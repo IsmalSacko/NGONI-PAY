@@ -8,6 +8,7 @@ use App\Enums\Country;
 use App\Models\Abonnement;
 use App\Models\Boutique;
 use App\Models\User;
+use App\Support\WhatsApp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +21,7 @@ class ComptesConsole
     public const STATUTS = [
         '' => 'Tous',
         'essai' => 'Essais en cours',
+        'essai_fin_proche' => 'Essais : fin sous 3 jours',
         'payants' => 'Abonnés payants',
         'fin_proche' => 'Fin sous 7 jours',
         'expires' => 'Expirés',
@@ -29,6 +31,7 @@ class ComptesConsole
         '' => 'Tout usage',
         'vend' => 'Ont vendu cette semaine',
         'jamais_vendu' => 'Jamais vendu',
+        'a_activer' => 'Inscrits depuis 2 jours, jamais vendu',
         'dormants' => 'App non ouverte depuis 14 jours',
     ];
 
@@ -72,6 +75,7 @@ class ComptesConsole
             // « actifs » : l'ancien filtre des applications déjà installées.
             'actifs' => $enCours($q),
             'essai' => $enCours($q->where('plan', 'essai')),
+            'essai_fin_proche' => $enCours($q->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3)),
             'payants' => $enCours($q->where('plan', '!=', 'essai')),
             'fin_proche' => $enCours($q)->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(7)),
             'expires' => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())),
@@ -90,6 +94,8 @@ class ComptesConsole
         match ($f['usage'] ?? '') {
             'vend' => $q->whereExists($ventes()->where('created_at', '>=', now()->subDays(7))->selectRaw('1')),
             'jamais_vendu' => $q->whereNotExists($ventes()->selectRaw('1')),
+            'a_activer' => $q->whereNotExists($ventes()->selectRaw('1'))
+                ->whereIn('user_id', User::where('created_at', '<=', now()->subDays(2))->select('id')),
             'dormants' => $q->whereNotExists($jetons()->where('last_used_at', '>=', now()->subDays(14))->selectRaw('1')),
             default => null,
         };
@@ -116,10 +122,60 @@ class ComptesConsole
         return [
             '' => $base()->count(),
             'essai' => $enCours($base()->where('plan', 'essai'))->count(),
+            'essai_fin_proche' => $enCours($base()->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3))->count(),
             'payants' => $enCours($base()->where('plan', '!=', 'essai'))->count(),
             'fin_proche' => $enCours($base())->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(7))->count(),
             'expires' => $base()->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today()))->count(),
         ];
+    }
+
+    /**
+     * Comptes à relancer, pour le tableau de bord : essais qui finissent
+     * bientôt, inscrits qui n'ont pas encore vendu.
+     *
+     * @return array{essais_fin_proche: int, a_activer: int}
+     */
+    public function aRelancer(): array
+    {
+        return [
+            'essais_fin_proche' => $this->requete(['statut' => 'essai_fin_proche'])->count(),
+            'a_activer' => $this->requete(['usage' => 'a_activer'])->count(),
+        ];
+    }
+
+    /**
+     * Relance WhatsApp d'un compte de la liste (`nb_ventes` chargé par
+     * requete()) : d'abord la première vente, puis la fin de l'essai.
+     *
+     * @return array{motif: string, whatsapp: string}|null
+     */
+    public function relance(Abonnement $a): ?array
+    {
+        $proprietaire = $a->proprietaire;
+        $prenom = trim(explode(' ', trim((string) $proprietaire?->name))[0] ?? '');
+        $bonjour = $prenom === '' ? 'Bonjour' : "Bonjour {$prenom}";
+
+        if ((int) $a->nb_ventes === 0 && $proprietaire?->created_at?->lte(now()->subDays(2))) {
+            $motif = 'premiere_vente';
+            $message = "{$bonjour}, bienvenue sur Ngoni Caisse ! Avez-vous pu faire votre première vente ? "
+                .'Si vous voulez, je vous montre en 5 minutes comment ajouter vos articles et encaisser. — L’équipe Ngoni Caisse';
+        } elseif ($a->plan === 'essai' && $a->estEnCours() && $a->fin !== null && $a->fin->lte(today()->addDays(3))) {
+            $jours = (int) today()->diffInDays($a->fin);
+            $quand = match ($jours) {
+                0 => 'aujourd’hui',
+                1 => 'demain',
+                default => "dans {$jours} jours",
+            };
+            $motif = 'fin_essai';
+            $message = "{$bonjour}, votre essai gratuit de Ngoni Caisse se termine {$quand}. "
+                .'Avez-vous des questions ? Je peux vous aider à continuer avec la formule qui vous convient. — L’équipe Ngoni Caisse';
+        } else {
+            return null;
+        }
+
+        $lien = WhatsApp::link($proprietaire?->phone, $message);
+
+        return $lien === null ? null : ['motif' => $motif, 'whatsapp' => $lien];
     }
 
     /** Pays où il y a des boutiques, le plus fréquent d'abord. @return array<string, string> code => libellé */

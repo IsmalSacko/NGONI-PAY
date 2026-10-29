@@ -51,6 +51,7 @@ class PlateformeController extends Controller
             'expires' => $compteurs['expires'],
             // Lu par les applications installées avant la page Comptes par statut.
             'actifs' => $compteurs['essai'] + $compteurs['payants'],
+            ...$console->aRelancer(),
             'boutiques' => Boutique::count(),
             'utilisateurs' => User::count(),
             'inscriptions_7j' => User::where('created_at', '>=', now()->subDays(7))->whereNotNull('boutique_id')->count(),
@@ -112,6 +113,7 @@ class PlateformeController extends Controller
                 'ventes' => (int) $a->nb_ventes,
                 'ca_30j' => (int) $a->ca_30j,
                 'abonnement' => $this->abonnement($a),
+                'relance' => $console->relance($a),
             ]),
             'total' => $page?->total() ?? $abonnements->count(),
             'page' => $page?->currentPage() ?? 1,
