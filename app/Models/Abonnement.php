@@ -102,6 +102,29 @@ class Abonnement extends Model
         return array_values(array_unique([...($this->planModele()?->fonctionnalitesIncluses() ?? []), ...$this->fonctionsAccordees()]));
     }
 
+    /** Jours où la caisse vend encore après l'échéance, avant de se bloquer. */
+    public const GRACE_JOURS = 3;
+
+    /**
+     * Le dernier moment où la caisse vend encore : la fin plus trois jours.
+     * Aucun pour un abonnement sans échéance, ni pour un essai refusé dès
+     * l'inscription (téléphone ou compte déjà utilisé : fin avant le début).
+     */
+    public function finDeGrace(): ?Carbon
+    {
+        if ($this->fin === null || ($this->debut !== null && Carbon::parse($this->fin)->lt(Carbon::parse($this->debut)))) {
+            return null;
+        }
+
+        return Carbon::parse($this->fin)->addDays(self::GRACE_JOURS)->endOfDay();
+    }
+
+    /** Échu, mais dans les trois jours où la caisse vend encore. */
+    public function estEnGrace(): bool
+    {
+        return ! $this->estEnCours() && $this->est_actif && ($this->finDeGrace()?->greaterThanOrEqualTo(now()) ?? false);
+    }
+
     /** Fin immédiate (révocation) : « hier », car `fin` est incluse. */
     public function expirerMaintenant(): void
     {

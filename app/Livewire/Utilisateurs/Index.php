@@ -80,6 +80,10 @@ class Index extends Component
 
     public function enregistrerDroits(EquipeService $equipe): void
     {
+        // Comme l'API : sans abonnement, l'équipe se consulte, elle ne change plus.
+        if (! $this->abonnementActif()) {
+            return;
+        }
         Auth::user()->can('utilisateurs.update') || abort(403);
         $boutique = $this->boutique();
         $membre = $equipe->membre($boutique, (string) $this->droitsDe);
@@ -140,6 +144,10 @@ class Index extends Component
 
     public function changerRole(EquipeService $equipe, string $userId, string $role): void
     {
+        // Comme l'API : sans abonnement, l'équipe se consulte, elle ne change plus.
+        if (! $this->abonnementActif()) {
+            return;
+        }
         Auth::user()->can('utilisateurs.update') || abort(403);
         $this->reset(['info', 'alerte', 'motDePasseProvisoire', 'lienWhatsApp']);
 
@@ -167,6 +175,10 @@ class Index extends Component
 
     public function basculerActivation(EquipeService $equipe, string $userId): void
     {
+        // Comme l'API : sans abonnement, l'équipe se consulte, elle ne change plus.
+        if (! $this->abonnementActif()) {
+            return;
+        }
         Auth::user()->can('utilisateurs.update') || abort(403);
         $this->reset(['info', 'alerte', 'motDePasseProvisoire', 'lienWhatsApp']);
 

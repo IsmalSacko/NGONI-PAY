@@ -116,9 +116,9 @@ class BoutiqueRegistrationService
             // Après le parrainage, qui rallonge l'essai : un téléphone déjà
             // utilisé n'en a aucun, parrainé ou non.
             $dejaVus = [];
-            if (! $test && EssaisAppareils::dejaUtilise($data['empreinte'] ?? null)) {
+            if (! $test && (EssaisAppareils::dejaUtilise($data['empreinte'] ?? null) || EssaisAppareils::numeroDejaUtilise($user->phone))) {
                 $essai->update(['fin' => now()->subDay()->toDateString()]);
-                $dejaVus = EssaisAppareils::autresComptes($data['empreinte'], $user);
+                $dejaVus = EssaisAppareils::autresComptes($data['empreinte'] ?? null, $user);
             }
 
             // Deux articles d'exemple avec photo : la caisse n'est pas vide au premier lancement.
@@ -219,11 +219,17 @@ class BoutiqueRegistrationService
             ], 403));
         }
 
+        // Un salarié (déjà membre d'une boutique, sans abonnement à lui) qui ouvre
+        // sa boutique n'a pas d'essai : un employé admin d'une boutique échue en
+        // ouvrait une neuve, y rattachait son patron, et l'essai repartait à zéro.
+        $sansEssai = ! $proprietaire->abonnement()->exists()
+            && ($proprietaire->boutiqueIds() !== [] || EssaisAppareils::numeroDejaUtilise($proprietaire->phone));
+
         $equipePrecedente = app(PermissionRegistrar::class)->getPermissionsTeamId();
         $tenantPrecedent = $this->tenant->boutiqueId();
 
         try {
-            $boutique = DB::transaction(function () use ($proprietaire, $data): Boutique {
+            $boutique = DB::transaction(function () use ($proprietaire, $data, $sansEssai): Boutique {
                 $pays = Country::tryFrom(strtoupper((string) ($data['pays'] ?? ''))) ?? Country::default();
 
                 $boutique = Boutique::create([
@@ -244,9 +250,10 @@ class BoutiqueRegistrationService
                 $this->provisionnerRoles($boutique);
                 $proprietaire->unsetRelation('roles')->assignRole('admin');
 
-                // Premier compte propriétaire (un salarié qui ouvre sa boutique) :
-                // son essai démarre ici.
-                app(AbonnementService::class)->demarrerEssai($proprietaire);
+                $abonnement = app(AbonnementService::class)->demarrerEssai($proprietaire);
+                if ($sansEssai) {
+                    $abonnement->update(['fin' => now()->subDay()->toDateString()]);
+                }
 
                 return $boutique;
             }, attempts: 3);

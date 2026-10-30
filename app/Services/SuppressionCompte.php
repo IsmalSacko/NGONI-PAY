@@ -88,7 +88,11 @@ class SuppressionCompte
         $sauvegarde = $sauvegarder ? $this->sauvegarder($compte, $plan, $exploitant) : '';
         $fichiers = $this->fichiers($plan);
 
-        DB::transaction(function () use ($plan): void {
+        // Lus avant d'effacer quoi que ce soit : ceux qui ont eu un abonnement.
+        $numerosProprietaires = DB::table('users')->whereIn('id', $plan['supprimes'])
+            ->whereIn('id', DB::table('abonnements')->select('user_id'))->pluck('phone')->all();
+
+        DB::transaction(function () use ($plan, $numerosProprietaires): void {
             // Employés conservés : ils quittent ces boutiques pour leur autre boutique.
             foreach ($plan['conserves'] as $id => $autreBoutique) {
                 DB::table('users')->where('id', $id)->whereIn('boutique_id', $plan['boutiques'])->update(['boutique_id' => $autreBoutique]);
@@ -113,6 +117,10 @@ class SuppressionCompte
 
             // Les boutiques, et avec elles tout leur contenu (cascade de la base).
             DB::table('boutiques')->whereIn('id', $plan['boutiques'])->delete();
+
+            // Les propriétaires : leur numéro est gardé, haché, pour qu'une
+            // réinscription ne redonne pas d'essai.
+            EssaisAppareils::garderNumeros($numerosProprietaires);
 
             // Les comptes, leurs connexions, et ce qui leur est rattaché (cascade).
             DB::table('personal_access_tokens')->where('tokenable_type', (new User)->getMorphClass())->whereIn('tokenable_id', $plan['supprimes'])->delete();

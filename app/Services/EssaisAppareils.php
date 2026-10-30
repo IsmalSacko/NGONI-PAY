@@ -24,8 +24,31 @@ class EssaisAppareils
     {
         return $empreinte !== null && DB::table('essais_appareils')
             ->where('empreinte', $empreinte)
-            ->when($sauf !== null, fn ($q) => $q->where('user_id', '!=', $sauf->id))
+            // Sans compte : un propriétaire supprimé, dont le téléphone reste noté.
+            ->when($sauf !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('user_id')->orWhere('user_id', '!=', $sauf->id)))
             ->exists();
+    }
+
+    /** Ce numéro est celui d'un propriétaire qui a supprimé son compte. */
+    public static function numeroDejaUtilise(?string $telephone): bool
+    {
+        return $telephone !== null && $telephone !== ''
+            && DB::table('numeros_essai_utilises')->where('numero', hash('sha256', $telephone))->exists();
+    }
+
+    /**
+     * Garde, hachés, les numéros des propriétaires supprimés : se réinscrire
+     * avec le même numéro ne redonne pas d'essai.
+     *
+     * @param  iterable<string|null>  $telephones
+     */
+    public static function garderNumeros(iterable $telephones): void
+    {
+        $lignes = collect($telephones)->filter()->unique()
+            ->map(fn (string $t) => ['numero' => hash('sha256', $t), 'created_at' => now()])->values()->all();
+        if ($lignes !== []) {
+            DB::table('numeros_essai_utilises')->insertOrIgnore($lignes);
+        }
     }
 
     /**

@@ -45,14 +45,30 @@ class ExigeAbonnementActif
         }
 
         if ($abonnement === null || ! $abonnement->estEnCours()) {
-            if ($sauf === 'caisse' && ! $this->aDesLignesLibres($request)) {
+            // Ce que les clients doivent s'encaisse toujours : l'argent est déjà dû.
+            if ($sauf === 'dettes') {
                 return $next($request);
+            }
+
+            $fin = $abonnement?->estEssai() ? 'Votre essai gratuit est terminé' : 'Votre abonnement a expiré';
+
+            // Trois jours de grâce : la caisse vend encore le catalogue. Sans fin,
+            // un stock saisi large, un restaurant ou un pressing (sans stock)
+            // vendaient gratuitement pour toujours.
+            if ($sauf === 'caisse' && $abonnement?->estEnGrace()) {
+                if (! $this->aDesLignesLibres($request, $boutique)) {
+                    return $next($request);
+                }
+
+                return response()->json([
+                    'message' => $fin.' : jusqu’au '.$abonnement->finDeGrace()->format('d/m').', la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.',
+                    'code' => 'ABONNEMENT_EXPIRE',
+                ], 403);
             }
 
             if ($sauf === 'caisse') {
                 return response()->json([
-                    'message' => ($abonnement?->estEssai() ? 'Votre essai gratuit est terminé' : 'Votre abonnement a expiré')
-                        .' : la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.',
+                    'message' => $fin.' : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.',
                     'code' => 'ABONNEMENT_EXPIRE',
                 ], 403);
             }
@@ -68,12 +84,18 @@ class ExigeAbonnementActif
         return $next($request);
     }
 
-    private function aDesLignesLibres(Request $request): bool
+    /**
+     * Une ligne tapée à la main (nom et prix, sans article). Pas une liste
+     * d'identifiants (l'addition d'un restaurant payée en partie), ni les frais
+     * d'enlèvement d'une facture « distributeur » : ils suivent les articles.
+     */
+    private function aDesLignesLibres(Request $request, ?Boutique $boutique): bool
     {
         $lignes = $request->input('lignes');
+        $distributeur = $boutique?->modele_facture === 'distributeur';
 
         return is_array($lignes) && collect($lignes)->contains(
-            fn ($ligne): bool => ! is_array($ligne) || empty($ligne['produit_id'])
+            fn ($ligne): bool => is_array($ligne) && empty($ligne['produit_id']) && ! ($distributeur && ($ligne['frais'] ?? false))
         );
     }
 }

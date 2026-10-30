@@ -33,9 +33,9 @@ use App\Http\Controllers\Api\ProfilController;
 use App\Http\Controllers\Api\PublicationPlayController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\ServicePressingController;
-use App\Http\Controllers\Api\TransfertController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\StatistiqueController;
+use App\Http\Controllers\Api\TransfertController;
 use App\Http\Controllers\Api\TutorielController;
 use App\Http\Controllers\Api\UniteController;
 use App\Http\Controllers\Api\VenteController;
@@ -166,7 +166,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('boutiques', [BoutiqueController::class, 'store']);
     Route::put('boutique', [BoutiqueController::class, 'update'])->middleware('permission:boutique.update');
     Route::put('boutique/objectif', [BoutiqueController::class, 'objectif'])->middleware(['permission:boutique.update', 'fonctionnalite:objectif_mois']);
-    Route::put('boutique/activite', [BoutiqueController::class, 'activite'])->middleware('permission:boutique.update');
+    // Changer d'activité : abonnement en cours (un commerce échu passait en restaurant pour vendre sans stock).
+    Route::put('boutique/activite', [BoutiqueController::class, 'activite'])->middleware(['permission:boutique.update', 'abonnement']);
     Route::put('boutique/commandes', [BoutiqueController::class, 'recoitCommandes'])->middleware('permission:boutique.update');
     Route::post('boutique/demarrage', [BoutiqueController::class, 'demarrage'])->middleware('permission:boutique.update');
     Route::put('boutique/ventes', [BoutiqueController::class, 'ventes'])->middleware('permission:boutique.update');
@@ -262,7 +263,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('clients', [ClientController::class, 'store'])->middleware(['permission:clients.create', 'abonnement']);
     Route::put('clients/{client}', [ClientController::class, 'update'])->middleware(['permission:clients.update', 'abonnement']);
     Route::get('clients/{client}/credit', [ClientController::class, 'credit'])->middleware('permission:clients.view');
-    Route::post('clients/{client}/reglements', [ClientController::class, 'reglement'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    Route::post('clients/{client}/reglements', [ClientController::class, 'reglement'])->middleware(['permission:ventes.create', 'abonnement:dettes']);
     Route::get('clients/{client}/releve-compte', [ClientController::class, 'releveCompte'])->middleware('permission:clients.view');
     // Rendre l'argent gardé (avoir) : comme un versement, en sens inverse.
     Route::post('clients/{client}/restitution', [ClientController::class, 'restitution'])->middleware(['permission:ventes.create']);
@@ -305,7 +306,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::post('commandes-recues/{commande}/livrer', [CommandeFournisseurController::class, 'livrer'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
     // Le revendeur paie : le grossiste confirme, le crédit de son client baisse.
     Route::get('clients/{client}/paiements-declares', [CommandeFournisseurController::class, 'paiementsDeclares'])->middleware('permission:clients.view');
-    Route::post('paiements-declares/{paiement}/confirmer', [CommandeFournisseurController::class, 'confirmerPaiement'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    Route::post('paiements-declares/{paiement}/confirmer', [CommandeFournisseurController::class, 'confirmerPaiement'])->middleware(['permission:ventes.create', 'abonnement:dettes']);
     Route::post('paiements-declares/{paiement}/refuser', [CommandeFournisseurController::class, 'refuserPaiement'])->middleware('permission:ventes.create');
 
     Route::get('ventes', [VenteController::class, 'index'])->middleware('permission:ventes.view');
@@ -336,7 +337,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('pressing/fournitures/{fourniture}', [GestionPressingController::class, 'supprimerFourniture'])->middleware('permission:produits.delete');
     Route::post('pressing/fournitures/{fourniture}/mouvement', [GestionPressingController::class, 'mouvement'])->middleware(['permission:produits.view', 'abonnement']);
     Route::get('pressing/forfaits', [GestionPressingController::class, 'forfaits'])->middleware('permission:ventes.view');
-    Route::post('pressing/forfaits', [GestionPressingController::class, 'vendreForfait'])->middleware(['permission:ventes.create', 'abonnement:caisse']);
+    Route::post('pressing/forfaits', [GestionPressingController::class, 'vendreForfait'])->middleware(['permission:ventes.create', 'abonnement']);
     Route::get('pressing/releve/{client}', [GestionPressingController::class, 'releve'])->middleware('permission:clients.view');
     // Restaurant (activité restaurant seulement) : commandes, cuisine, addition ; salle, carte, ingrédients.
     Route::get('restaurant/commandes', [CommandeRestaurantController::class, 'index'])->middleware('permission:ventes.view');

@@ -91,6 +91,8 @@ class AbonnementController extends Controller
                 'plan_nom' => $plan?->nom,
                 'est_essai' => $abonnement?->estEssai() ?? false,
                 'est_en_cours' => $abonnement?->estEnCours() ?? false,
+                // Échu : jusqu'à quand la caisse vend encore (trois jours de grâce), ou rien.
+                'caisse_jusqu_au' => $abonnement?->estEnGrace() ? $abonnement->finDeGrace()->toDateString() : null,
                 'debut' => $abonnement?->debut?->toDateString(),
                 'fin' => $abonnement?->fin?->toDateString(),
                 'max_boutiques' => $plan?->max_boutiques,

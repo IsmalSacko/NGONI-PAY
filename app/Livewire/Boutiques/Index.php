@@ -60,6 +60,9 @@ class Index extends Component
     /** Activité : « pharmacie » adapte la caisse et le back-office (mots, détail, lots, ordonnance). */
     public function choisirActivite(string $activite): void
     {
+        if (! $this->abonnementActif()) {
+            return;
+        }
         Auth::user()->can('boutique.update') || abort(403);
         in_array($activite, Boutique::ACTIVITES, true) || abort(422);
         $boutique = Boutique::findOrFail($this->boutiqueActiveId());

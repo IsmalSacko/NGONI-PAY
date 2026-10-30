@@ -136,6 +136,11 @@ class BoutiqueController extends Controller
     {
         $data = $request->validate(['activite' => ['required', Rule::in([...Boutique::ACTIVITES, 'grossiste'])]]);
         $boutique = Boutique::findOrFail(app(TenantContext::class)->boutiqueId());
+        // Le premier choix du métier reste libre (un essai refusé à l'inscription
+        // doit pouvoir ouvrir l'application) ; le changer ensuite demande un abonnement.
+        if ($boutique->activite_choisie_le !== null && ! (app(AbonnementService::class)->pourBoutique($boutique)?->estEnCours() ?? false)) {
+            return response()->json(['message' => 'Votre abonnement est terminé : abonnez-vous pour changer d’activité.', 'code' => 'ABONNEMENT_EXPIRE'], 403);
+        }
         $grossiste = $data['activite'] === 'grossiste';
         $boutique->forceFill([
             'activite' => $grossiste ? 'commerce' : $data['activite'],
