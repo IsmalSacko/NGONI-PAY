@@ -67,7 +67,15 @@
                     <span class="text-muted text-xs">{{ \App\Models\Tutoriel::CATEGORIES[$t->categorie] ?? $t->categorie }}@if ($t->sous_titre) · {{ $t->sous_titre }}@endif</span>
                 </div>
                 <x-plateforme.pastille :ton="$t->actif ? 'succes' : 'neutre'">{{ $t->actif ? 'visible' : 'masquée' }}</x-plateforme.pastille>
+                @if ($t->annonce_le)
+                    <span class="text-xs text-muted shrink-0">annoncée le {{ $t->annonce_le->format('d/m') }}</span>
+                @elseif ($t->a_annoncer)
+                    <span class="text-xs text-muted shrink-0">annonce lundi</span>
+                @endif
                 <div class="flex gap-1 ml-auto shrink-0">
+                    @if ($t->actif)
+                        <button wire:click="annoncer({{ $t->id }})" wire:confirm="Prévenir maintenant les commerçants de « {{ $t->titre }} » ?" class="h-9 px-2.5 rounded-lg text-xs font-bold text-white bg-accent hover:bg-accent-dark">Annoncer maintenant</button>
+                    @endif
                     <button wire:click="editer({{ $t->id }})" class="h-9 px-2.5 rounded-lg text-xs font-bold text-accent hover:bg-accent-soft">Modifier</button>
                     <button wire:click="basculer({{ $t->id }})" class="h-9 px-2.5 rounded-lg text-xs font-bold text-accent hover:bg-accent-soft">{{ $t->actif ? 'Masquer' : 'Montrer' }}</button>
                     <button wire:click="supprimer({{ $t->id }})" wire:confirm="Supprimer « {{ $t->titre }} » ?" class="h-9 px-2.5 rounded-lg text-xs font-bold text-danger-fg hover:bg-danger-bg">Supprimer</button>

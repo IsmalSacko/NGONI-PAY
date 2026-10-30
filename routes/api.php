@@ -126,6 +126,7 @@ Route::middleware(['auth:sanctum', 'conditions', 'plateforme'])->prefix('platefo
     Route::get('tutoriels', 'liste');
     Route::post('tutoriels', 'enregistrer');
     Route::put('tutoriels/{tutoriel}', 'modifier');
+    Route::post('tutoriels/{tutoriel}/annoncer', 'annoncer');
     Route::delete('tutoriels/{tutoriel}', 'supprimer');
 });
 

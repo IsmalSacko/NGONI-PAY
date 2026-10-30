@@ -142,4 +142,56 @@ class TutorielsTest extends TestCase
         $this->artisan('ecaisse:resume-videos')->assertSuccessful();
         $this->assertSame($avant, NotificationApp::whereNotNull('annonce_id')->count());
     }
+
+    public function test_annoncer_maintenant_previent_sans_attendre_le_lundi(): void
+    {
+        $restaurant = app(BoutiqueRegistrationService::class)->register([
+            'nom' => 'Maquis Chez Awa', 'pays' => 'ML', 'telephone' => '76008202', 'password' => 'password123', 'nom_utilisateur' => 'Fanta',
+        ]);
+        $restaurant['boutique']->forceFill(['activite' => 'restaurant'])->save();
+        User::query()->update(['vu_le' => now()]);
+
+        $id = $this->withToken($this->exploitant)->postJson('/api/plateforme/tutoriels', [
+            'titre' => 'Transfert d’argent', 'sous_titre' => 'Activer et noter un dépôt', 'categorie' => 'ventes', 'url' => 'https://youtu.be/aaaaaaaaaaa',
+        ])->assertCreated()->assertJsonPath('data.en_attente', true)->json('data.id');
+
+        $reponse = $this->withToken($this->exploitant)->postJson("/api/plateforme/tutoriels/{$id}/annoncer")->assertOk()
+            ->assertJsonPath('data.en_attente', false)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'annoncée à'));
+        $notifiees = NotificationApp::where('titre', '🎬 Nouvelle vidéo : Transfert d’argent')->get();
+        $this->assertSame($reponse->json('destinataires'), $notifiees->count());
+        $this->assertContains($restaurant['user']->id, $notifiees->pluck('user_id'), 'une vidéo générale va aussi au restaurant');
+        $this->assertSame('https://youtu.be/aaaaaaaaaaa', $notifiees->first()->lien);
+
+        // Déjà annoncée : le résumé du lundi ne la renvoie pas.
+        $avant = NotificationApp::whereNotNull('annonce_id')->count();
+        $this->artisan('ecaisse:resume-videos')->assertSuccessful();
+        $this->assertSame($avant, NotificationApp::whereNotNull('annonce_id')->count());
+
+        // Une vidéo d'un module ne part qu'aux boutiques de cette activité.
+        $tables = Tutoriel::create(['titre' => 'Gérer les tables', 'categorie' => 'restaurant', 'url' => 'https://youtu.be/ccccccccccc', 'actif' => true]);
+        $this->travel(21)->hours();
+        $this->withToken($this->exploitant)->postJson("/api/plateforme/tutoriels/{$tables->id}/annoncer")->assertOk()->assertJsonPath('destinataires', 1);
+        $this->assertSame([$restaurant['user']->id], NotificationApp::where('titre', '🎬 Nouvelle vidéo : Gérer les tables')->pluck('user_id')->all());
+
+        // Masquée : rien ne part ; et seul l'exploitant annonce.
+        $tables->update(['actif' => false]);
+        $this->withToken($this->exploitant)->postJson("/api/plateforme/tutoriels/{$tables->id}/annoncer")->assertUnprocessable();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->commercant)->postJson("/api/plateforme/tutoriels/{$id}/annoncer")->assertForbidden();
+    }
+
+    public function test_la_console_web_annonce_une_video_maintenant(): void
+    {
+        User::query()->update(['vu_le' => now()]);
+        $admin = User::where('est_admin_plateforme', true)->firstOrFail();
+        $t = Tutoriel::create(['titre' => 'Transfert d’argent', 'categorie' => 'ventes', 'url' => 'https://youtu.be/aaaaaaaaaaa', 'actif' => true]);
+
+        Livewire::actingAs($admin)->test(Tutoriels::class)
+            ->assertSee('Annoncer maintenant')
+            ->call('annoncer', $t->id)
+            ->assertSee('annoncée à')
+            ->assertSee('annoncée le '.now()->format('d/m'));
+        $this->assertGreaterThan(0, NotificationApp::where('titre', '🎬 Nouvelle vidéo : Transfert d’argent')->count());
+    }
 }

@@ -54,6 +54,21 @@ class TutorielController extends Controller
         return response()->json(['message' => "« {$tutoriel->titre} » enregistré.", 'data' => $tutoriel->versApplication()]);
     }
 
+    /** Prévenir les commerçants tout de suite, sans attendre le résumé du lundi. */
+    public function annoncer(Request $request, Tutoriel $tutoriel, AnnonceTutoriel $annonces): JsonResponse
+    {
+        $resultat = $annonces->annoncerMaintenant($tutoriel, $request->user());
+        if ($resultat === null) {
+            return response()->json(['message' => 'Montrez d’abord la vidéo : masquée, elle n’est pas dans l’aide des commerçants.'], 422);
+        }
+
+        return response()->json([
+            'message' => Tutoriel::messageAnnonce($tutoriel, $resultat['destinataires']),
+            'destinataires' => $resultat['destinataires'],
+            'data' => $tutoriel->fresh()->versApplication(),
+        ]);
+    }
+
     public function supprimer(Tutoriel $tutoriel): JsonResponse
     {
         $tutoriel->delete();

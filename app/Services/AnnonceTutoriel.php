@@ -18,8 +18,9 @@ use Illuminate\Support\Collection;
  * Cocher « Prévenir les commerçants » met la vidéo en attente ; le lundi, une
  * annonce reprend les vidéos de la semaine (une vidéo : elle s'ouvre
  * directement sur YouTube ; plusieurs : l'écran Aide et tutoriels). Une vidéo
- * d'un module (restaurant, pressing, pharmacie) ne part qu'aux boutiques de
- * cette activité.
+ * d'un module (restaurant, pressing, pharmacie, transfert) ne part qu'aux
+ * boutiques de cette activité. « Annoncer maintenant » envoie une vidéo tout
+ * de suite, sans attendre le lundi.
  */
 class AnnonceTutoriel
 {
@@ -49,8 +50,36 @@ class AnnonceTutoriel
     {
         $enAttente = Tutoriel::where('a_annoncer', true)->whereNull('annonce_le')->where('actif', true)
             ->orderBy('ordre')->orderBy('id')->get();
+
+        return $this->annoncer($enAttente, $auteur)['annonces'];
+    }
+
+    /**
+     * Une vidéo annoncée tout de suite, sans attendre le lundi (elle ne repart
+     * pas dans le résumé). Null si elle est masquée.
+     *
+     * @return array{annonces: list<Annonce>, destinataires: int}|null
+     */
+    public function annoncerMaintenant(Tutoriel $tutoriel, User $auteur): ?array
+    {
+        if (! $tutoriel->actif) {
+            return null;
+        }
+
+        return $this->annoncer(collect([$tutoriel]), $auteur);
+    }
+
+    /**
+     * Une annonce par public (chaque module, puis tous les autres), et les
+     * vidéos marquées comme annoncées.
+     *
+     * @param  Collection<int, Tutoriel>  $enAttente
+     * @return array{annonces: list<Annonce>, destinataires: int}
+     */
+    private function annoncer(Collection $enAttente, User $auteur): array
+    {
         if ($enAttente->isEmpty()) {
-            return [];
+            return ['annonces' => [], 'destinataires' => 0];
         }
         $estModule = fn (Tutoriel $t) => in_array($t->categorie, self::MODULES, true);
         $generales = $enAttente->reject($estModule)->values();
@@ -79,12 +108,13 @@ class AnnonceTutoriel
             }
             if ($donnees !== null) {
                 $creees[] = $this->annonces->creer($donnees, $auteur)['annonce'];
+                $tous = $servis === [] ? app(DiffusionAnnonces::class)->destinataires($creees[array_key_last($creees)])->count() : count($cibles);
             }
         }
 
-        Tutoriel::whereIn('id', $enAttente->pluck('id'))->update(['annonce_le' => now()]);
+        Tutoriel::whereIn('id', $enAttente->pluck('id'))->update(['a_annoncer' => true, 'annonce_le' => now()]);
 
-        return $creees;
+        return ['annonces' => $creees, 'destinataires' => count($servis) + ($tous ?? 0)];
     }
 
     /**

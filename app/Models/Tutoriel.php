@@ -78,6 +78,18 @@ class Tutoriel extends Model
             'miniature' => $id === null ? null : "https://img.youtube.com/vi/{$id}/mqdefault.jpg",
             'ordre' => $this->ordre,
             'actif' => $this->actif,
+            // Console : déjà annoncée (date), ou en attente du résumé du lundi.
+            'annonce_le' => $this->annonce_le?->toIso8601String(),
+            'en_attente' => (bool) $this->a_annoncer && $this->annonce_le === null,
         ];
+    }
+
+    /** Ce que dit la console une fois la vidéo annoncée. */
+    public static function messageAnnonce(self $tutoriel, int $destinataires): string
+    {
+        return $destinataires === 0
+            ? "« {$tutoriel->titre} » : aucun commerçant actif à prévenir."
+            : "« {$tutoriel->titre} » annoncée à {$destinataires} commerçant".($destinataires > 1 ? 's' : '')
+                .'. Ceux qui ont déjà reçu une annonce aujourd’hui la recevront demain.';
     }
 }

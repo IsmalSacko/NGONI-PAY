@@ -79,6 +79,16 @@ class Tutoriels extends Component
         $t->update(['actif' => ! $t->actif]);
     }
 
+    /** Prévenir les commerçants tout de suite, sans attendre le résumé du lundi. */
+    public function annoncer(int $id): void
+    {
+        $t = Tutoriel::findOrFail($id);
+        $resultat = app(AnnonceTutoriel::class)->annoncerMaintenant($t, Auth::user());
+        $this->info = $resultat === null
+            ? 'Montrez d’abord la vidéo : masquée, elle n’est pas dans l’aide des commerçants.'
+            : Tutoriel::messageAnnonce($t, $resultat['destinataires']);
+    }
+
     public function supprimer(int $id): void
     {
         $t = Tutoriel::findOrFail($id);
