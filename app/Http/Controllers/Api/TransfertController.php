@@ -37,7 +37,7 @@ class TransfertController extends Controller
     {
         $f = $request->validate([
             'du' => ['nullable', 'date'], 'au' => ['nullable', 'date'],
-            'operateur_id' => ['nullable', 'string'], 'type' => ['nullable', 'string'],
+            'operateur_id' => ['nullable', 'string'], 'type' => ['nullable', 'string'], 'especes' => ['nullable', 'boolean'],
             'recherche' => ['nullable', 'string', 'max:80'], 'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
@@ -45,6 +45,8 @@ class TransfertController extends Controller
             ->when($f['du'] ?? null, fn ($q, $d) => $q->whereDate('jour', '>=', $d))
             ->when($f['au'] ?? null, fn ($q, $d) => $q->whereDate('jour', '<=', $d))
             ->when($f['operateur_id'] ?? null, fn ($q, $id) => $q->where('operateur_id', $id))
+            // Les opérations qui ont fait bouger les espèces des transferts.
+            ->when((bool) ($f['especes'] ?? false), fn ($q) => $q->where('effet_especes', '<>', 0))
             ->when($f['type'] ?? null, fn ($q, $t) => $q->where('type', $t))
             ->when(filled($f['recherche'] ?? null), function ($q) use ($f): void {
                 $mot = trim((string) $f['recherche']);
