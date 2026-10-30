@@ -384,18 +384,20 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('restaurant/ingredients/{ingredient}', [GestionRestaurantController::class, 'modifierIngredient'])->middleware(['permission:produits.update', 'fonctionnalite:restaurant_avance']);
     Route::delete('restaurant/ingredients/{ingredient}', [GestionRestaurantController::class, 'supprimerIngredient'])->middleware(['permission:produits.delete', 'fonctionnalite:restaurant_avance']);
     Route::post('restaurant/ingredients/{ingredient}/mouvement', [GestionRestaurantController::class, 'mouvement'])->middleware(['permission:produits.view', 'abonnement', 'fonctionnalite:restaurant_avance']);
-    // Transfert d'argent (cabine Orange Money, Moov Money, Wave…) : soldes, opérations, arrêté, rapport.
+    // Transfert d'argent (cabine Orange Money, Moov Money, Wave…) : soldes, opérations, comptes, rapport.
+    // Abonnement terminé : tout se consulte, plus rien ne se note (pas d'exception « caisse » :
+    // une cabine s'en servirait gratuitement pour toujours).
     Route::middleware('activite:transfert')->prefix('transferts')->controller(TransfertController::class)->group(function (): void {
         Route::get('/', 'index')->middleware('permission:ventes.view');
         Route::get('operations', 'operations')->middleware('permission:ventes.view');
         Route::get('clients', 'clients')->middleware('permission:ventes.view');
-        Route::post('operations', 'store')->middleware(['permission:ventes.create', 'abonnement:caisse']);
-        Route::put('operations/{operation}', 'update')->middleware(['permission:ventes.create', 'abonnement:caisse']);
-        Route::post('operations/{operation}/annuler', 'annuler')->middleware('permission:ventes.delete');
+        Route::post('operations', 'store')->middleware(['permission:ventes.create', 'abonnement']);
+        Route::put('operations/{operation}', 'update')->middleware(['permission:ventes.create', 'abonnement']);
+        Route::post('operations/{operation}/annuler', 'annuler')->middleware(['permission:ventes.delete', 'abonnement']);
         Route::post('operateurs', 'creerOperateur')->middleware(['permission:produits.create', 'abonnement']);
-        Route::put('operateurs/{operateur}', 'modifierOperateur')->middleware('permission:produits.update');
-        Route::delete('operateurs/{operateur}', 'supprimerOperateur')->middleware('permission:produits.update');
-        Route::post('arrete', 'arreter')->middleware('permission:ventes.create');
+        Route::put('operateurs/{operateur}', 'modifierOperateur')->middleware(['permission:produits.update', 'abonnement']);
+        Route::delete('operateurs/{operateur}', 'supprimerOperateur')->middleware(['permission:produits.update', 'abonnement']);
+        Route::post('arrete', 'arreter')->middleware(['permission:ventes.create', 'abonnement']);
         Route::get('arretes', 'arretes')->middleware('permission:ventes.view');
         Route::get('rapport', 'rapport')->middleware('permission:rapports.view');
     });

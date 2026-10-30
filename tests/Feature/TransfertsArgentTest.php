@@ -240,4 +240,28 @@ class TransfertsArgentTest extends TestCase
         $this->assertSame(['nombre' => 1, 'montant' => 4_000], $rapport[0]['types']['retrait']);
         $this->assertSame(['nombre' => 1, 'montant' => 2_000], $rapport[1]['types']['retrait']);
     }
+
+    public function test_essai_termine_tout_se_consulte_plus_rien_ne_se_note(): void
+    {
+        $op = $this->demarrer();
+        $id = $this->api()->postJson('/api/transferts/operations', ['type' => 'depot', 'operateur_id' => $op['Wave'], 'montant' => 1_000])->json('data.id');
+
+        // Deux mois plus tard, l'essai est fini : une cabine ne transfère pas gratuitement pour toujours.
+        $this->travel(60)->days();
+        $this->api()->getJson('/api/transferts')->assertOk();
+        $this->api()->getJson('/api/transferts/operations')->assertOk()->assertJsonCount(1, 'data');
+        $jour = today()->toDateString();
+        $this->api()->getJson("/api/transferts/rapport?du={$jour}&au={$jour}")->assertOk();
+
+        foreach ([
+            fn () => $this->api()->postJson('/api/transferts/operations', ['type' => 'depot', 'operateur_id' => $op['Wave'], 'montant' => 1_000]),
+            fn () => $this->api()->putJson("/api/transferts/operations/{$id}", ['type' => 'depot', 'operateur_id' => $op['Wave'], 'montant' => 2_000]),
+            fn () => $this->api()->postJson("/api/transferts/operations/{$id}/annuler"),
+            fn () => $this->api()->postJson('/api/transferts/arrete', ['especes' => 0, 'puces' => []]),
+            fn () => $this->api()->postJson('/api/transferts/operateurs', ['nom' => 'Sama Money']),
+            fn () => $this->api()->putJson("/api/transferts/operateurs/{$op['Wave']}", ['nom' => 'Wave Mali']),
+        ] as $ecriture) {
+            $ecriture()->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
+        }
+    }
 }
