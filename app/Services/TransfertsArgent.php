@@ -128,6 +128,8 @@ class TransfertsArgent
     public function arreter(int $especes, array $puces, User $auteur): ArreteTransfert
     {
         return DB::transaction(function () use ($especes, $puces, $auteur): ArreteTransfert {
+            // Les premiers comptes, sans aucune opération avant : ce sont les soldes de départ.
+            $depart = ! OperationTransfert::exists();
             $soldes = $this->soldes();
             $operateurs = OperateurTransfert::withTrashed()->get()->keyBy('id');
             $inconnus = array_diff(array_keys($puces), $operateurs->keys()->all());
@@ -153,7 +155,7 @@ class TransfertsArgent
             ]);
 
             $jour = $this->journee->courante()->toDateString();
-            $ajuster = function (?string $operateurId, ?string $nom, int $puce, int $tiroir) use ($arrete, $auteur, $jour): void {
+            $ajuster = function (?string $operateurId, ?string $nom, int $puce, int $tiroir) use ($arrete, $auteur, $jour, $depart): void {
                 if ($puce === 0 && $tiroir === 0) {
                     return;
                 }
@@ -161,7 +163,7 @@ class TransfertsArgent
                     'user_id' => $auteur->id, 'operateur_id' => $operateurId, 'operateur_nom' => $nom,
                     'type' => OperationTransfert::AJUSTEMENT, 'montant' => abs($puce !== 0 ? $puce : $tiroir),
                     'effet_puce' => $puce, 'effet_especes' => $tiroir, 'jour' => $jour, 'arrete_id' => $arrete->id,
-                    'note' => 'Écart trouvé en faisant les comptes',
+                    'note' => $depart ? 'Solde de départ' : 'Écart trouvé en faisant les comptes',
                 ]);
             };
             $ajuster(null, null, 0, $especes - $soldes['especes']);

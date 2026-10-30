@@ -174,6 +174,9 @@ class TransfertsArgentTest extends TestCase
 
         $this->assertSame(['especes' => 24_500, 'puces' => ['Orange Money' => 45_200, 'Moov Money' => 0, 'Wave' => 10_000]], $this->soldes());
         $this->api()->getJson('/api/transferts/operations?type=ajustement')->assertJsonCount(5, 'data');
+        // Les premiers comptes sont les soldes de départ ; les suivants, des écarts.
+        $notes = collect($this->api()->getJson('/api/transferts/operations?type=ajustement')->json('data'))->pluck('note')->countBy()->all();
+        $this->assertSame(['Écart trouvé en faisant les comptes' => 2, 'Solde de départ' => 3], $notes);
         $this->api()->getJson('/api/transferts/arretes')->assertJsonCount(2, 'data')->assertJsonPath('data.0.par', 'Moussa');
         $this->api()->getJson('/api/transferts')->assertJsonPath('data.dernier_arrete.especes_compte', 24_500)->assertJsonPath('data.a_demarrer', false);
     }
