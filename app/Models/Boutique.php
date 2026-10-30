@@ -36,9 +36,10 @@ class Boutique extends Model
 
     /**
      * Activité choisie dans les réglages : la pharmacie, le pressing et le
-     * restaurant adaptent la caisse.
+     * restaurant adaptent la caisse ; le transfert d'argent ajoute son écran
+     * (la caisse reste, pour ce qui se vend à côté).
      */
-    public const ACTIVITES = ['commerce', 'pharmacie', 'pressing', 'restaurant'];
+    public const ACTIVITES = ['commerce', 'pharmacie', 'pressing', 'restaurant', 'transfert'];
 
     /** Vos ventes : au détail, au détail et en gros, en gros uniquement. */
     public const MODES_VENTE = ['detail', 'detail_gros', 'gros'];
@@ -61,6 +62,11 @@ class Boutique extends Model
     public function estRestaurant(): bool
     {
         return $this->activite === 'restaurant';
+    }
+
+    public function estTransfert(): bool
+    {
+        return $this->activite === 'transfert';
     }
 
     /**

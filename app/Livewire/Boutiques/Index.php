@@ -12,15 +12,17 @@ use App\Models\Plan;
 use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Services\Fidelite;
-use App\Services\Images;
 use App\Services\Ia\LectureFacture;
 use App\Services\Ia\QuotaLectureFacture;
+use App\Services\Images;
 use App\Services\NumerotationFactures;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
+use App\Services\TransfertsArgent;
 use App\Support\Money\Currencies;
 use App\Support\Tenancy\BoutiqueActive;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -64,10 +66,12 @@ class Index extends Component
         $boutique->forceFill(['activite' => $activite])->save();
         $boutique->preparerPressing();
         $boutique->preparerRestaurant();
+        app(TransfertsArgent::class)->preparer($boutique);
         session()->flash('info', match ($activite) {
             'pharmacie' => 'Mode pharmacie activé : la caisse parle le langage de l’officine.',
             'pressing' => 'Mode pressing activé : la caisse parle de vêtements et de prestations, sans stock à compter.',
             'restaurant' => 'Mode restaurant activé : commandes à table ou à emporter, cuisine, addition, réservations.',
+            'transfert' => 'Transfert d’argent activé : opérations Orange Money, Moov, Wave… dans l’application, avec les soldes et l’arrêté du soir.',
             default => 'Mode commerce : la caisse reprend ses réglages habituels.',
         });
     }
@@ -200,7 +204,7 @@ class Index extends Component
             $this->addError('facture', $etat['par_mois'] === 0
                 ? 'L’import de facture n’est pas compris dans votre offre actuelle.'
                 : 'Vous avez déjà importé '.($etat['par_mois'] === 1 ? 'votre facture' : "vos {$etat['par_mois']} factures").' ce mois-ci. '
-                    .'Vous pourrez recommencer le '.\Illuminate\Support\Carbon::parse($etat['renouvellement'])->translatedFormat('j F').'.');
+                    .'Vous pourrez recommencer le '.Carbon::parse($etat['renouvellement'])->translatedFormat('j F').'.');
             $this->reset('facture');
 
             return;

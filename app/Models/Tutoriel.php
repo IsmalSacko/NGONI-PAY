@@ -18,6 +18,7 @@ class Tutoriel extends Model
         'abonnement' => 'Abonnement',
         'restaurant' => 'Restaurant',
         'pressing' => 'Pressing',
+        'transfert' => 'Transfert d’argent',
         'pharmacie' => 'Pharmacie',
         'autre' => 'Autre',
     ];

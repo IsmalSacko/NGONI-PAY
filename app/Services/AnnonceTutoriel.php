@@ -23,7 +23,7 @@ use Illuminate\Support\Collection;
  */
 class AnnonceTutoriel
 {
-    private const MODULES = ['restaurant', 'pressing', 'pharmacie'];
+    private const MODULES = ['restaurant', 'pressing', 'pharmacie', 'transfert'];
 
     public function __construct(private readonly GestionAnnonces $annonces) {}
 

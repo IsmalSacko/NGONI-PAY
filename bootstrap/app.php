@@ -6,6 +6,7 @@ use App\Http\Middleware\AccesBackOffice;
 use App\Http\Middleware\CleConsole;
 use App\Http\Middleware\EstAdminPlateforme;
 use App\Http\Middleware\ExigeAbonnementActif;
+use App\Http\Middleware\ExigeActivite;
 use App\Http\Middleware\ExigeAppPourLesFractions;
 use App\Http\Middleware\ExigeConditions;
 use App\Http\Middleware\ExigeFonctionnalite;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => SetTenantContext::class,
             'abonnement' => ExigeAbonnementActif::class,
             'fonctionnalite' => ExigeFonctionnalite::class,
+            'activite' => ExigeActivite::class,
             'plateforme' => EstAdminPlateforme::class,
             'cle-console' => CleConsole::class,
             'backoffice' => AccesBackOffice::class,

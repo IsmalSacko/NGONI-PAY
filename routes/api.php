@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\ProfilController;
 use App\Http\Controllers\Api\PublicationPlayController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\ServicePressingController;
+use App\Http\Controllers\Api\TransfertController;
 use App\Http\Controllers\Api\SessionCaisseController;
 use App\Http\Controllers\Api\StatistiqueController;
 use App\Http\Controllers\Api\TutorielController;
@@ -383,6 +384,21 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::put('restaurant/ingredients/{ingredient}', [GestionRestaurantController::class, 'modifierIngredient'])->middleware(['permission:produits.update', 'fonctionnalite:restaurant_avance']);
     Route::delete('restaurant/ingredients/{ingredient}', [GestionRestaurantController::class, 'supprimerIngredient'])->middleware(['permission:produits.delete', 'fonctionnalite:restaurant_avance']);
     Route::post('restaurant/ingredients/{ingredient}/mouvement', [GestionRestaurantController::class, 'mouvement'])->middleware(['permission:produits.view', 'abonnement', 'fonctionnalite:restaurant_avance']);
+    // Transfert d'argent (cabine Orange Money, Moov Money, Wave…) : soldes, opérations, arrêté, rapport.
+    Route::middleware('activite:transfert')->prefix('transferts')->controller(TransfertController::class)->group(function (): void {
+        Route::get('/', 'index')->middleware('permission:ventes.view');
+        Route::get('operations', 'operations')->middleware('permission:ventes.view');
+        Route::post('operations', 'store')->middleware(['permission:ventes.create', 'abonnement:caisse']);
+        Route::put('operations/{operation}', 'update')->middleware(['permission:ventes.create', 'abonnement:caisse']);
+        Route::post('operations/{operation}/annuler', 'annuler')->middleware('permission:ventes.delete');
+        Route::post('operateurs', 'creerOperateur')->middleware(['permission:produits.create', 'abonnement']);
+        Route::put('operateurs/{operateur}', 'modifierOperateur')->middleware('permission:produits.update');
+        Route::delete('operateurs/{operateur}', 'supprimerOperateur')->middleware('permission:produits.update');
+        Route::post('arrete', 'arreter')->middleware('permission:ventes.create');
+        Route::get('arretes', 'arretes')->middleware('permission:ventes.view');
+        Route::get('rapport', 'rapport')->middleware('permission:rapports.view');
+    });
+
     Route::get('commandes-pressing/reglages', [CommandePressingController::class, 'reglages'])->middleware('permission:ventes.view');
     Route::put('commandes-pressing/reglages', [CommandePressingController::class, 'majReglages'])->middleware('permission:boutique.update');
     Route::get('commandes-pressing/compteurs', [CommandePressingController::class, 'compteurs'])->middleware('permission:ventes.view');

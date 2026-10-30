@@ -18,6 +18,7 @@ use App\Services\Images;
 use App\Services\ModeLibre;
 use App\Services\ReglagesBoutique;
 use App\Services\ReinitialisationBoutique;
+use App\Services\TransfertsArgent;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -121,6 +122,7 @@ class BoutiqueController extends Controller
         $boutique->forceFill(['activite' => $data['activite'], 'activite_choisie_le' => $boutique->activite_choisie_le ?? now()])->save();
         $boutique->preparerPressing();
         $boutique->preparerRestaurant();
+        app(TransfertsArgent::class)->preparer($boutique);
 
         return response()->json(['data' => $boutique->fresh()]);
     }
@@ -142,6 +144,7 @@ class BoutiqueController extends Controller
         ])->save();
         $boutique->preparerPressing();
         $boutique->preparerRestaurant();
+        app(TransfertsArgent::class)->preparer($boutique);
         if (! in_array($boutique->activite, ['commerce'], true)) {
             $depart->retirer();
         }
