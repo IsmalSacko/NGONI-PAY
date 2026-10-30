@@ -44,6 +44,56 @@
         @endforeach
     </div>
 
+    {{-- Abonnements et comptes à relancer : les mêmes chiffres que la console de l'application.
+         Chacun ouvre la page Comptes déjà filtrée ; ils ne dépendent pas de la période. --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <section class="lg:col-span-2 {{ $carte }} p-4 md:p-5 min-w-0 flex flex-col">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h2 class="font-display font-extrabold text-lg">Abonnements</h2>
+                <p class="text-xs text-muted">{{ number_format($abonnements[''], 0, ',', ' ') }} comptes · {{ $inscriptions7j }} inscription{{ $inscriptions7j > 1 ? 's' : '' }} sur 7 jours</p>
+            </div>
+            <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                @foreach ([
+                    ['essai', 'fin', 'Essais en cours', 'horloge', 'jaune'],
+                    ['payants', 'recents', $abonnements['payants'] > 1 ? 'Abonnés payants' : 'Abonné payant', 'ok', 'succes'],
+                    ['fin_proche', 'fin', 'Fin sous 7 jours', 'alerte', 'jaune'],
+                    ['expires', 'recents', 'Expirés', 'stop', 'danger'],
+                ] as [$statut, $tri, $libelle, $picto, $ton])
+                    <a href="{{ route('plateforme.comptes', array_filter(['statut' => $statut, 'tri' => $tri === 'recents' ? null : $tri])) }}" wire:navigate
+                       class="group rounded-xl bg-fond-tableau hover:bg-accent-soft p-3 flex items-center gap-3 min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30">
+                        <x-plateforme.icone-chip :nom="$picto" :ton="$ton" taille="w-9 h-9" />
+                        <span class="min-w-0">
+                            <span class="block font-display font-extrabold text-xl tabular-nums leading-tight">{{ number_format($abonnements[$statut] ?? 0, 0, ',', ' ') }}</span>
+                            <span class="block text-xs leading-snug text-muted group-hover:text-ink">{{ $libelle }}</span>
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+            <p class="mt-auto pt-3 text-xs text-muted">Lecture seule : demandes, paiements et formules se gèrent dans la
+                <a href="{{ \App\Support\ConsoleNgoni::demandes() }}" target="_blank" rel="noopener" class="font-bold text-accent hover:underline">Console Ngoni ↗</a></p>
+        </section>
+
+        <section class="{{ $carte }} p-4 md:p-5 min-w-0">
+            <h2 class="font-display font-extrabold text-lg">À relancer</h2>
+            <p class="text-xs text-muted">Chaque compte a son message WhatsApp prêt</p>
+            <ul class="mt-2 divide-y divide-separateur">
+                @foreach ([
+                    [route('plateforme.comptes', ['statut' => 'essai_fin_proche', 'tri' => 'fin']), $aRelancer['essais_fin_proche'], 'essais finissent sous 3 jours', 'horloge', 'jaune'],
+                    [route('plateforme.comptes', ['usage' => 'a_activer']), $aRelancer['a_activer'], 'inscrits n’ont jamais vendu', 'boutique', 'danger'],
+                ] as [$lien, $nombre, $libelle, $picto, $ton])
+                    <li>
+                        <a href="{{ $lien }}" wire:navigate class="py-2.5 flex items-center gap-3 text-sm rounded-lg hover:bg-fond-tableau/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30">
+                            <x-plateforme.icone-chip :nom="$picto" :ton="$ton" taille="w-9 h-9" />
+                            <span class="font-display font-extrabold text-xl tabular-nums">{{ $nombre }}</span>
+                            <span class="grow min-w-0">{{ $libelle }}</span>
+                            <span class="text-muted" aria-hidden="true">›</span>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <livewire:plateforme.en-ligne />
 

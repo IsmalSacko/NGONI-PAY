@@ -13,6 +13,7 @@ use App\Support\ConsoleNgoni;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -28,7 +29,11 @@ class Comptes extends Component
 
     public string $recherche = '';
 
-    /** Voir ComptesConsole::STATUTS. */
+    /**
+     * Voir ComptesConsole::STATUTS. Dans l'adresse, comme l'usage et le tri :
+     * les chiffres du tableau de bord ouvrent la liste déjà filtrée.
+     */
+    #[Url(as: 'statut')]
     public string $filtre = '';
 
     public string $planFiltre = '';
@@ -38,9 +43,11 @@ class Comptes extends Component
     public string $activite = '';
 
     /** Voir ComptesConsole::USAGES. */
+    #[Url]
     public string $usage = '';
 
     /** Voir ComptesConsole::TRIS. */
+    #[Url]
     public string $tri = 'recents';
 
     public ?string $info = null;
@@ -133,6 +140,7 @@ class Comptes extends Component
         return view('livewire.plateforme.comptes', [
             'abonnements' => $abonnements,
             'compteurs' => $console->compteurs(),
+            'console' => $console,
             'listePays' => $console->pays(),
             'plans' => Plan::ordonnes()->get(),
             'lienConsole' => ConsoleNgoni::demandes(),

@@ -120,6 +120,15 @@
                     </div>
                 </div>
 
+                {{-- À relancer : première vente, ou fin d'essai ; le message WhatsApp est déjà écrit. --}}
+                @if ($relance = $console->relance($abonnement))
+                    <a href="{{ $relance['whatsapp'] }}" target="_blank" rel="noopener"
+                       class="mt-3 ml-14 h-10 px-4 rounded-xl bg-succes text-white text-sm font-bold inline-flex items-center gap-2 hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-succes/40">
+                        <x-plateforme.picto nom="envoyer" class="w-4 h-4" />
+                        {{ $relance['motif'] === 'fin_essai' ? 'Relancer : fin de l’essai' : 'Aider à la première vente' }}
+                    </a>
+                @endif
+
                 {{-- Les boutiques du propriétaire, chacune avec son pictogramme. --}}
                 <ul class="mt-3 flex flex-col gap-1.5 text-sm">
                     @forelse ($proprietaire?->boutiquesPossedees ?? [] as $b)

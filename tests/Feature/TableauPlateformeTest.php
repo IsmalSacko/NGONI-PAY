@@ -243,6 +243,35 @@ class TableauPlateformeTest extends TestCase
             ->set('periode', 'inconnue')->assertSet('periode', '7j');
     }
 
+    public function test_le_tableau_compte_les_abonnements_et_ouvre_les_comptes_a_relancer(): void
+    {
+        // Awa est en essai et n'a jamais vendu ; cinq jours plus tard, son
+        // essai finit sous 3 jours et elle est inscrite depuis plus de 2 jours.
+        $this->travel(5)->days();
+
+        $this->actingAs($this->exploitant)->get('/plateforme')->assertOk()
+            ->assertSee('Abonnements')
+            ->assertSee('Essais en cours')
+            ->assertSee('Expirés')
+            ->assertSee('À relancer')
+            ->assertSee('essais finissent sous 3 jours')
+            ->assertSee('inscrits n’ont jamais vendu', false)
+            ->assertSee(route('plateforme.comptes', ['usage' => 'a_activer']), false)
+            ->assertSee(route('plateforme.comptes', ['statut' => 'essai_fin_proche', 'tri' => 'fin']));
+
+        // Le lien du tableau ouvre la liste filtrée, avec le message WhatsApp prêt.
+        $this->actingAs($this->exploitant)->get(route('plateforme.comptes', ['usage' => 'a_activer']))->assertOk()
+            ->assertSee('Pressing Awa')
+            ->assertSee('Aider à la première vente')
+            ->assertSee('https://wa.me/22376008201?text=', false);
+
+        // Une fois qu'elle a vendu, la relance parle de la fin de son essai.
+        $this->vente($this->pressing, 5_000);
+        $this->actingAs($this->exploitant)->get(route('plateforme.comptes', ['statut' => 'essai_fin_proche', 'tri' => 'fin']))->assertOk()
+            ->assertSee('Pressing Awa')
+            ->assertSee('Relancer : fin de l’essai', false);
+    }
+
     public function test_le_tableau_reste_reserve_a_l_exploitant(): void
     {
         $this->actingAs($this->awa)->get('/plateforme')->assertForbidden();

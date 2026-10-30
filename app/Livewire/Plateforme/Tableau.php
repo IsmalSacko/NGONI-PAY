@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Plateforme;
 
 use App\Models\Boutique;
+use App\Models\User;
+use App\Services\Console\ComptesConsole;
 use App\Services\Plateforme\Encaissements;
 use App\Services\Plateforme\Presences;
 use App\Support\CouleursGraphiques;
@@ -16,8 +18,9 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Vue d'ensemble de l'exploitant : qui utilise l'application, quelles
- * boutiques encaissent le plus, d'où et sur quels appareils.
+ * Vue d'ensemble de l'exploitant : où en sont les abonnements, qui relancer,
+ * qui utilise l'application, quelles boutiques encaissent le plus, d'où et sur
+ * quels appareils. Mêmes chiffres que la console de l'application.
  */
 #[Layout('layouts.plateforme', ['title' => 'Tableau de bord'])]
 class Tableau extends Component
@@ -25,7 +28,7 @@ class Tableau extends Component
     #[Url(as: 'periode')]
     public string $periode = '7j';
 
-    public function render(Encaissements $encaissements, Presences $presences)
+    public function render(Encaissements $encaissements, Presences $presences, ComptesConsole $comptes)
     {
         $periode = Periode::depuis($this->periode);
         $this->periode = $periode->code;
@@ -38,6 +41,10 @@ class Tableau extends Component
         $nouvellesAvant = Boutique::whereBetween('created_at', [$precedente->debut, $precedente->fin])->count();
 
         return view('livewire.plateforme.tableau', [
+            // Abonnements comptés (lecture seule) ; ils se gèrent dans la Console Ngoni.
+            'abonnements' => $comptes->compteurs(),
+            'aRelancer' => $comptes->aRelancer(),
+            'inscriptions7j' => User::where('created_at', '>=', now()->subDays(7))->whereNotNull('boutique_id')->count(),
             'choix' => Periode::CHOIX,
             'periodeLibelle' => $periode->libelle(),
             'indicateurs' => [
