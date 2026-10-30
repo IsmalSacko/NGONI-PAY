@@ -6,8 +6,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArreteTransfert;
+use App\Models\Boutique;
 use App\Models\OperateurTransfert;
 use App\Models\OperationTransfert;
+use App\Models\Plan;
+use App\Services\AbonnementService;
 use App\Services\TransfertsArgent;
 use App\Support\Tenancy\TenantContext;
 use Carbon\Carbon;
@@ -24,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  */
 class TransfertController extends Controller
 {
-    public function __construct(private readonly TransfertsArgent $transferts) {}
+    public function __construct(private readonly TransfertsArgent $transferts, private readonly AbonnementService $abonnements) {}
 
     /** Les soldes (tiroir et chaque puce), les opérateurs, et le dernier arrêté. */
     public function index(): JsonResponse
@@ -200,7 +203,10 @@ class TransfertController extends Controller
             'a_demarrer' => ! OperationTransfert::exists(),
             'aujourdhui' => [
                 'nombre' => OperationTransfert::valides()->whereIn('type', OperationTransfert::CLIENT)->whereDate('jour', $jour)->count(),
-                'commission' => (int) OperationTransfert::valides()->whereDate('jour', $jour)->sum('commission'),
+                // Les commissions gagnées : l'offre Pro (rapport des transferts).
+                'commission' => $this->abonnements->planInclut(Boutique::find(app(TenantContext::class)->boutiqueId()), Plan::TRANSFERT_AVANCE)
+                    ? (int) OperationTransfert::valides()->whereDate('jour', $jour)->sum('commission')
+                    : null,
             ],
         ];
     }

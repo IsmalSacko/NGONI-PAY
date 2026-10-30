@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Boutique;
 use App\Models\OperateurTransfert;
 use App\Models\User;
+use App\Services\AbonnementService;
 use App\Services\BoutiqueRegistrationService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -263,5 +264,25 @@ class TransfertsArgentTest extends TestCase
         ] as $ecriture) {
             $ecriture()->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
         }
+    }
+
+    public function test_basic_note_et_compte_pro_a_le_rapport_et_l_historique(): void
+    {
+        $op = $this->demarrer();
+        $jour = today()->toDateString();
+
+        // Basic : noter, voir les soldes, faire ses comptes ; pas le rapport ni l'historique des comptes.
+        app(AbonnementService::class)->accorder($this->moussa, 'basic', now()->addMonth(), $this->moussa);
+        $this->api()->postJson('/api/transferts/operations', ['type' => 'depot', 'operateur_id' => $op['Wave'], 'montant' => 1_000, 'commission' => 50])->assertCreated();
+        $this->api()->postJson('/api/transferts/arrete', ['especes' => 1_000, 'puces' => []])->assertCreated();
+        $this->api()->getJson('/api/transferts')->assertOk()->assertJsonPath('data.aujourdhui.nombre', 1)->assertJsonPath('data.aujourdhui.commission', null);
+        $this->api()->getJson("/api/transferts/rapport?du={$jour}&au={$jour}")->assertForbidden()->assertJsonPath('code', 'FONCTIONNALITE_NON_INCLUSE');
+        $this->api()->getJson('/api/transferts/arretes')->assertForbidden();
+
+        // Pro : tout.
+        app(AbonnementService::class)->accorder($this->moussa, 'pro', now()->addMonth(), $this->moussa);
+        $this->api()->getJson('/api/transferts')->assertJsonPath('data.aujourdhui.commission', 50);
+        $this->api()->getJson("/api/transferts/rapport?du={$jour}&au={$jour}")->assertOk()->assertJsonPath('data.commission', 50);
+        $this->api()->getJson('/api/transferts/arretes')->assertOk()->assertJsonCount(1, 'data');
     }
 }

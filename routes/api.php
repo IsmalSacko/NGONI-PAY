@@ -398,8 +398,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
         Route::put('operateurs/{operateur}', 'modifierOperateur')->middleware(['permission:produits.update', 'abonnement']);
         Route::delete('operateurs/{operateur}', 'supprimerOperateur')->middleware(['permission:produits.update', 'abonnement']);
         Route::post('arrete', 'arreter')->middleware(['permission:ventes.create', 'abonnement']);
-        Route::get('arretes', 'arretes')->middleware('permission:ventes.view');
-        Route::get('rapport', 'rapport')->middleware('permission:rapports.view');
+        // Offre Pro : le rapport des commissions et l'historique des comptes.
+        Route::get('arretes', 'arretes')->middleware(['permission:ventes.view', 'fonctionnalite:transfert_avance']);
+        Route::get('rapport', 'rapport')->middleware(['permission:rapports.view', 'fonctionnalite:transfert_avance']);
     });
 
     Route::get('commandes-pressing/reglages', [CommandePressingController::class, 'reglages'])->middleware('permission:ventes.view');

@@ -347,11 +347,11 @@ class AbonnementTest extends TestCase
 
         app(AbonnementService::class)->revoquer($this->awa);
 
-        // Les cadenas reviennent dans l'application ; le back-office et les
-        // achats restent consultables.
+        // Les cadenas reviennent dans l'application ; le back-office, les
+        // achats et le rapport des transferts restent consultables.
         $this->api()->getJson('/api/abonnement')
             ->assertJsonPath('data.est_en_cours', false)
-            ->assertJsonPath('data.fonctionnalites', ['backoffice_web', 'achats_fournisseurs']);
+            ->assertJsonPath('data.fonctionnalites', ['backoffice_web', 'achats_fournisseurs', 'transfert_avance']);
     }
 
     public function test_les_seances_de_caisse_sont_reservees_au_pro(): void

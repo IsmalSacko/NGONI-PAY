@@ -37,7 +37,7 @@ class Plan extends Model
      * back-office et les achats (fournisseurs, historique, liste à commander).
      * Consulter seulement : enregistrer demande toujours un abonnement en cours.
      */
-    public const CONSULTABLES_APRES_ECHEANCE = [self::BACKOFFICE_WEB, self::ACHATS_FOURNISSEURS];
+    public const CONSULTABLES_APRES_ECHEANCE = [self::BACKOFFICE_WEB, self::ACHATS_FOURNISSEURS, self::TRANSFERT_AVANCE];
 
     /** Programme de fidélité : points et remise automatique. */
     public const FIDELITE = 'fidelite';
@@ -81,6 +81,13 @@ class Plan extends Model
     public const COFFRE = 'coffre';
 
     /**
+     * Transfert d'argent : le rapport des commissions (par opérateur, par
+     * période) et l'historique des comptes du soir avec leurs écarts. Noter
+     * les opérations, voir les soldes et faire ses comptes est pour tous.
+     */
+    public const TRANSFERT_AVANCE = 'transfert_avance';
+
+    /**
      * Fonctions qu'un plan inclut ou non, cochées dans la console. Le reste
      * (caisse, catalogue, stocks, clients, tickets…) est dans tous les plans.
      */
@@ -102,6 +109,7 @@ class Plan extends Model
         self::MODE_LIBRE => 'Mode libre : supprimer, corriger, renuméroter ses factures',
         self::CONTROLE_STOCK => 'Contrôle du stock : inventaire et pertes',
         self::COFFRE => 'Coffre : mettre de côté chaque jour',
+        self::TRANSFERT_AVANCE => 'Transferts : rapport des commissions, historique des comptes',
     ];
 
     /** Dans tous les plans, sans case dans la console : la base de la caisse. */
