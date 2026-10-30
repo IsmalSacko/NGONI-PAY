@@ -388,6 +388,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::middleware('activite:transfert')->prefix('transferts')->controller(TransfertController::class)->group(function (): void {
         Route::get('/', 'index')->middleware('permission:ventes.view');
         Route::get('operations', 'operations')->middleware('permission:ventes.view');
+        Route::get('clients', 'clients')->middleware('permission:ventes.view');
         Route::post('operations', 'store')->middleware(['permission:ventes.create', 'abonnement:caisse']);
         Route::put('operations/{operation}', 'update')->middleware(['permission:ventes.create', 'abonnement:caisse']);
         Route::post('operations/{operation}/annuler', 'annuler')->middleware('permission:ventes.delete');

@@ -64,6 +64,26 @@ class TransfertController extends Controller
         ]);
     }
 
+    /**
+     * Les clients déjà vus en transfert, le plus récent d'abord : on tape
+     * quelques chiffres du numéro (ou du nom), on choisit, sans tout retaper.
+     */
+    public function clients(Request $request): JsonResponse
+    {
+        $mot = trim((string) $request->validate(['recherche' => ['required', 'string', 'min:2', 'max:80']])['recherche']);
+        $chiffres = preg_replace('/\D+/', '', $mot);
+
+        $clients = OperationTransfert::whereNotNull('client_telephone')
+            ->where(fn ($w) => $w->whereLike('client_nom', "%{$mot}%")
+                ->when($chiffres !== '', fn ($c) => $c->orWhereLike('client_telephone', "%{$chiffres}%")))
+            ->selectRaw('client_telephone, MAX(client_nom) AS nom, MAX(created_at) AS derniere, COUNT(*) AS nombre')
+            ->groupBy('client_telephone')->orderByDesc('derniere')->limit(8)->get();
+
+        return response()->json(['data' => $clients->map(fn ($c) => [
+            'telephone' => $c->client_telephone, 'nom' => $c->nom, 'nombre' => (int) $c->nombre,
+        ])->values()]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $operation = $this->transferts->enregistrer($this->valider($request), $request->user());

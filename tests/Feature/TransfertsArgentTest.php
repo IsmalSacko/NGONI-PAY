@@ -210,18 +210,29 @@ class TransfertsArgentTest extends TestCase
         $annulee = $this->api()->postJson('/api/transferts/operations', ['type' => 'depot', 'operateur_id' => $op['Wave'], 'montant' => 9_000, 'commission' => 90])->json('data.id');
         $this->api()->postJson("/api/transferts/operations/{$annulee}/annuler")->assertOk();
 
+        // Un client qui revient : quelques chiffres de son numéro, ou son nom, le retrouvent.
+        $this->api()->postJson('/api/transferts/operations', ['type' => 'retrait', 'operateur_id' => $op['Wave'], 'montant' => 2_000, 'client_nom' => 'Awa Traoré', 'client_telephone' => '76008201'])->assertCreated();
+        $this->api()->getJson('/api/transferts/clients?recherche=7600')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.telephone', '76008201')
+            ->assertJsonPath('data.0.nom', 'Awa Traoré')
+            ->assertJsonPath('data.0.nombre', 2);
+        $this->api()->getJson('/api/transferts/clients?recherche=awa')->assertJsonCount(1, 'data');
+        $this->api()->getJson('/api/transferts/clients?recherche=9')->assertUnprocessable();
+
         // Le numéro tapé sans espaces retrouve celui noté avec.
-        $this->api()->getJson('/api/transferts/operations?recherche=76008201')->assertJsonCount(1, 'data')->assertJsonPath('data.0.montant', 10_000);
+        $this->api()->getJson('/api/transferts/operations?recherche=76008201')->assertJsonCount(2, 'data')->assertJsonPath('data.1.montant', 10_000);
         $this->api()->getJson('/api/transferts/operations?recherche=fanta')->assertJsonCount(1, 'data');
 
         $jour = today()->toDateString();
         $rapport = $this->api()->getJson("/api/transferts/rapport?du={$jour}&au={$jour}")->assertOk()
-            ->assertJsonPath('data.nombre', 3)
+            ->assertJsonPath('data.nombre', 4)
             ->assertJsonPath('data.commission', 190)
             ->assertJsonPath('data.commission_especes', 60)
             ->assertJsonPath('data.par_type.depot.montant', 13_000)
             ->json('data.par_operateur');
         $this->assertSame(['Orange Money', 'Wave'], array_column($rapport, 'nom'));
         $this->assertSame(['nombre' => 1, 'montant' => 4_000], $rapport[0]['types']['retrait']);
+        $this->assertSame(['nombre' => 1, 'montant' => 2_000], $rapport[1]['types']['retrait']);
     }
 }
