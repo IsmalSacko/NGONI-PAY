@@ -12,10 +12,11 @@
         </button>
     </div>
 
-    @if ($info)<p class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>@endif
+    {{-- Les boutons de la liste sont loin en bas : le message et le formulaire viennent à l'écran. --}}
+    @if ($info)<p wire:key="info-{{ md5($info) }}" x-data x-init="$el.scrollIntoView({ block: 'center', behavior: 'smooth' })" style="scroll-margin-top: 10rem" class="rounded-xl bg-accent-soft text-accent-dark px-4 py-3 text-sm font-semibold">{{ $info }}</p>@endif
 
     @if ($formulaire)
-        <form wire:submit="enregistrer" class="bg-white rounded-2xl shadow-carte flex flex-col">
+        <form wire:submit="enregistrer" wire:key="formulaire-{{ $edite ?? 'nouveau' }}" x-data x-init="$el.scrollIntoView({ block: 'start', behavior: 'smooth' })" style="scroll-margin-top: 10rem" class="bg-white rounded-2xl shadow-carte flex flex-col">
             <div class="px-4 md:px-5 py-3.5 rounded-t-2xl bg-linear-to-r from-accent-soft to-white border-b border-separateur">
                 <h2 class="font-display font-extrabold text-xl">{{ $edite ? 'Modifier la vidéo' : 'Nouvelle vidéo' }}</h2>
             </div>
