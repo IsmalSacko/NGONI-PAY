@@ -118,7 +118,7 @@ class TransfertController extends Controller
         $solde = $this->transferts->soldes()['puces'][$operateur->id] ?? 0;
         if ($solde !== 0) {
             throw ValidationException::withMessages([
-                'operateur' => "La puce {$operateur->nom} n’est pas à zéro : videz-la ou comptez-la à l’arrêté avant de la retirer.",
+                'operateur' => "La puce {$operateur->nom} n’est pas à zéro : videz-la, ou indiquez son solde en faisant vos comptes, avant de la retirer.",
             ]);
         }
         $operateur->delete();

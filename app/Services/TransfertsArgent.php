@@ -161,7 +161,7 @@ class TransfertsArgent
                     'user_id' => $auteur->id, 'operateur_id' => $operateurId, 'operateur_nom' => $nom,
                     'type' => OperationTransfert::AJUSTEMENT, 'montant' => abs($puce !== 0 ? $puce : $tiroir),
                     'effet_puce' => $puce, 'effet_especes' => $tiroir, 'jour' => $jour, 'arrete_id' => $arrete->id,
-                    'note' => 'Écart compté à l’arrêté',
+                    'note' => 'Écart trouvé en faisant les comptes',
                 ]);
             };
             $ajuster(null, null, 0, $especes - $soldes['especes']);
@@ -254,10 +254,10 @@ class TransfertsArgent
             throw ValidationException::withMessages(['operation' => 'Cette opération est déjà annulée.']);
         }
         if ($operation->type === OperationTransfert::AJUSTEMENT) {
-            throw ValidationException::withMessages(['operation' => 'Un écart d’arrêté ne se modifie pas : comptez de nouveau.']);
+            throw ValidationException::withMessages(['operation' => 'Un écart des comptes ne se modifie pas : refaites vos comptes.']);
         }
         if ($operation->arrete_id !== null) {
-            throw ValidationException::withMessages(['operation' => 'Cette opération a déjà été comptée à un arrêté : enregistrez plutôt une correction.']);
+            throw ValidationException::withMessages(['operation' => 'Cette opération a déjà été comptée (vos comptes du jour) : enregistrez plutôt une correction.']);
         }
     }
 }
