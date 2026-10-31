@@ -155,9 +155,13 @@
                     </a>
                     {{-- Versions ordinateur : affichées seulement si l'installateur est sur le serveur. --}}
                     @foreach ($bureau as $b)
-                        <a href="{{ route('telecharger.bureau', $b['systeme']) }}" title="{{ $b['requis'] }} · {{ $b['mo'] }} Mo" class="inline-flex items-center gap-3 h-14 pl-4 pr-6 rounded-2xl bg-ink text-white hover:bg-black">
+                        <a href="{{ $b['store'] ?? route('telecharger.bureau', $b['systeme']) }}" @if ($b['store']) rel="noopener" @endif title="{{ $b['requis'] }}@if ($b['mo']) · {{ $b['mo'] }} Mo @endif" class="inline-flex items-center gap-3 h-14 pl-4 pr-6 rounded-2xl bg-ink text-white hover:bg-black">
                             <svg viewBox="0 0 24 24" class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
-                            <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">Télécharger pour</span><span class="font-bold text-lg">{{ $b['nom'] }}</span></span>
+                            @if ($b['store'])
+                                <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">{{ $b['nom'] }} · disponible sur</span><span class="font-bold text-lg">Microsoft Store</span></span>
+                            @else
+                                <span class="flex flex-col leading-tight"><span class="text-[11px] opacity-80">Télécharger pour</span><span class="font-bold text-lg">{{ $b['nom'] }}</span></span>
+                            @endif
                         </a>
                     @endforeach
                     <a href="#tarifs" class="inline-flex items-center h-14 px-6 rounded-2xl border-2 border-ink/80 font-bold hover:bg-white">Essai gratuit {{ $essaiJours }} jours</a>
@@ -417,7 +421,7 @@
             <div class="relative flex flex-wrap gap-3">
                 <a href="{{ $storeUrl }}" rel="noopener" class="inline-flex h-12 px-6 items-center rounded-xl bg-white text-accent-dark font-bold hover:bg-accent-soft">Télécharger l’application</a>
                 @foreach ($bureau as $b)
-                    <a href="{{ route('telecharger.bureau', $b['systeme']) }}" class="inline-flex h-12 px-6 items-center rounded-xl border-2 border-white/80 text-white font-bold hover:bg-white/10">{{ $b['nom'] }}</a>
+                    <a href="{{ $b['store'] ?? route('telecharger.bureau', $b['systeme']) }}" class="inline-flex h-12 px-6 items-center rounded-xl border-2 border-white/80 text-white font-bold hover:bg-white/10">{{ $b['store'] ? $b['nom'].' (Microsoft Store)' : $b['nom'] }}</a>
                 @endforeach
             </div>
         </div>

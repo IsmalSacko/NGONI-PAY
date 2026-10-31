@@ -66,6 +66,21 @@ final class InstallateursBureau
         $manifeste = self::manifeste();
         $liste = [];
         foreach (array_keys((array) config('bureau.systemes')) as $systeme) {
+            // Sur la boutique du système : le bouton y mène, fichier ou non.
+            if (filled($store = config("bureau.systemes.{$systeme}.store"))) {
+                $liste[] = [
+                    'systeme' => $systeme,
+                    'nom' => (string) config("bureau.systemes.{$systeme}.nom"),
+                    'version' => null,
+                    'requis' => (string) config("bureau.systemes.{$systeme}.requis"),
+                    'mo' => null,
+                    'store' => (string) $store,
+                    'depose_le' => null,
+                    'par' => null,
+                ];
+
+                continue;
+            }
             $chemin = self::chemin($systeme);
             if ($chemin === null || ! Storage::disk('local')->exists($chemin)) {
                 continue;
@@ -76,6 +91,7 @@ final class InstallateursBureau
                 'version' => self::version($systeme),
                 'requis' => (string) config("bureau.systemes.{$systeme}.requis"),
                 'mo' => (int) max(1, round(Storage::disk('local')->size($chemin) / 1048576)),
+                'store' => null,
                 'depose_le' => $manifeste[$systeme]['depose_le'] ?? null,
                 'par' => $manifeste[$systeme]['par'] ?? null,
             ];

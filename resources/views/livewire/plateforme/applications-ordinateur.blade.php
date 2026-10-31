@@ -16,7 +16,9 @@
                     <span class="text-xs text-muted">{{ $s['requis'] }}</span>
                 </div>
                 <div class="p-4 md:p-5 flex flex-col gap-4">
-                    @if ($s['enLigne'])
+                    @if ($s['enLigne']['store'] ?? null)
+                        <p class="rounded-xl bg-paper px-4 py-3 text-sm">Le bouton {{ $s['nom'] }} de la vitrine mène au <a href="{{ $s['enLigne']['store'] }}" target="_blank" rel="noopener" class="font-semibold text-accent hover:underline">Microsoft Store</a> : les mises à jour s’y déposent (Partner Center). Un fichier déposé ici n’est pas proposé.</p>
+                    @elseif ($s['enLigne'])
                         <div class="rounded-xl bg-paper px-4 py-3 text-sm flex flex-wrap items-center justify-between gap-2">
                             <span>
                                 <span class="font-bold">En ligne : version {{ $s['enLigne']['version'] }}</span> · {{ $s['enLigne']['mo'] }} Mo

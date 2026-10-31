@@ -44,9 +44,9 @@
     @if (($bureau ?? []) !== [])
         <p style="margin-top: 22px;">Sur ordinateur :</p>
         @foreach ($bureau as $b)
-            <a class="bouton bureau" href="{{ route('telecharger.bureau', $b['systeme']) }}">{{ $b['nom'] }} <small>· {{ $b['mo'] }} Mo</small></a>
+            <a class="bouton bureau" href="{{ $b['store'] ?? route('telecharger.bureau', $b['systeme']) }}">{{ $b['nom'] }} <small>· {{ $b['store'] ? 'Microsoft Store' : $b['mo'].' Mo' }}</small></a>
         @endforeach
-        <p style="font-size: 13px;">Windows 10 ou 11 · macOS 10.15 et plus. Au premier lancement, si l’ordinateur demande une confirmation, choisissez « Exécuter quand même » (Windows) ou « Ouvrir quand même » dans Réglages › Confidentialité et sécurité (Mac).</p>
+        <p style="font-size: 13px;">Windows 10 ou 11 : depuis le Microsoft Store, mises à jour automatiques. macOS 10.15 et plus : au premier lancement, si le Mac demande une confirmation, choisissez « Ouvrir quand même » dans Réglages › Confidentialité et sécurité.</p>
     @endif
 </main>
 </body>

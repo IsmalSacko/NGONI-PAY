@@ -91,6 +91,10 @@ Route::get('telecharger', fn () => view('telecharger', [
 
 // Installateurs Windows et macOS (config/bureau.php), déposés dans storage.
 Route::get('telecharger/{systeme}', function (string $systeme) {
+    // Windows : sur le Microsoft Store (les anciens liens y mènent aussi).
+    if (filled($store = config("bureau.systemes.{$systeme}.store"))) {
+        return redirect()->away($store);
+    }
     $chemin = InstallateursBureau::chemin($systeme);
     abort_if($chemin === null || ! Storage::disk('local')->exists($chemin), 404);
 

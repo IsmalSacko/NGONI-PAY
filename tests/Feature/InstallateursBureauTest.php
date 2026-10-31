@@ -17,6 +17,25 @@ class InstallateursBureauTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Les installateurs déposés ; le Microsoft Store a son propre test.
+        config(['bureau.systemes.windows.store' => null]);
+    }
+
+    public function test_windows_mene_au_microsoft_store(): void
+    {
+        Storage::fake('local');
+        config(['bureau.systemes.windows.store' => 'https://apps.microsoft.com/detail/9NV8LH4Q6S3S']);
+
+        $this->get('/')->assertOk()->assertSee('Microsoft Store')->assertSee('https://apps.microsoft.com/detail/9NV8LH4Q6S3S');
+        $this->get('/telecharger')->assertOk()->assertSee('Microsoft Store');
+        $this->get('/telecharger/windows')->assertRedirect('https://apps.microsoft.com/detail/9NV8LH4Q6S3S');
+        // Sans fichier, pas de bouton Mac.
+        $this->get('/telecharger/mac')->assertNotFound();
+    }
+
     public function test_sans_installateur_pas_de_bouton_et_rien_a_telecharger(): void
     {
         Storage::fake('local');
