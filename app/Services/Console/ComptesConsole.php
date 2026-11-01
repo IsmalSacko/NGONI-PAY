@@ -52,7 +52,7 @@ class ComptesConsole
     {
         $boutiques = fn () => Boutique::withoutGlobalScopes()->select('id')->whereColumn('proprietaire_id', 'abonnements.user_id');
         $ventes = fn () => DB::table('ventes')->where('statut', 'validee')->whereIn('boutique_id', $boutiques());
-        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', Abonnement::premierJourEnCours()));
         // Le type de compte d'abord : l'index des jetons commence par lui. Sans
         // lui, MySQL relisait toute la table pour chaque compte (0,9 s la page).
         $jetons = fn () => DB::table('personal_access_tokens')->where('tokenable_type', (new User)->getMorphClass())->whereColumn('tokenable_id', 'abonnements.user_id');
@@ -78,7 +78,7 @@ class ComptesConsole
             'essai_fin_proche' => $enCours($q->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3)),
             'payants' => $enCours($q->where('plan', '!=', 'essai')),
             'fin_proche' => $enCours($q)->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(7)),
-            'expires' => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())),
+            'expires' => $q->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours())),
             default => null,
         };
 
@@ -117,7 +117,7 @@ class ComptesConsole
     public function compteurs(): array
     {
         $base = fn () => Abonnement::query()->avecCompte();
-        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', Abonnement::premierJourEnCours()));
 
         return [
             '' => $base()->count(),
@@ -125,7 +125,7 @@ class ComptesConsole
             'essai_fin_proche' => $enCours($base()->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3))->count(),
             'payants' => $enCours($base()->where('plan', '!=', 'essai'))->count(),
             'fin_proche' => $enCours($base())->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(7))->count(),
-            'expires' => $base()->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today()))->count(),
+            'expires' => $base()->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours()))->count(),
         ];
     }
 

@@ -61,7 +61,7 @@ class ConsoleController extends Controller
 
     public function resume(): JsonResponse
     {
-        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        $enCours = fn (Builder $q) => $q->where('est_actif', true)->where(fn ($w) => $w->whereNull('fin')->orWhereDate('fin', '>=', Abonnement::premierJourEnCours()));
         $base = fn () => Abonnement::query()->avecCompte()->whereHas('proprietaire', fn ($u) => self::clients($u));
         $comptes = $base()->count();
         $actifs = $enCours($base())->count();
@@ -244,7 +244,7 @@ class ConsoleController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $filtre = (string) $request->query('filtre', '');
-        $enCours = fn ($w) => $w->where('est_actif', true)->where(fn ($x) => $x->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        $enCours = fn ($w) => $w->where('est_actif', true)->where(fn ($x) => $x->whereNull('fin')->orWhereDate('fin', '>=', Abonnement::premierJourEnCours()));
 
         $abonnements = Abonnement::query()->avecCompte()
             ->with(['proprietaire.boutiquesPossedees' => fn ($b) => $b->withoutGlobalScopes()->select('id', 'proprietaire_id', 'nom', 'pays', 'activite', 'created_at')])
@@ -256,7 +256,7 @@ class ConsoleController extends Controller
                 fn ($r) => $r->whereHas('proprietaire', fn ($u) => self::clients($u)))
             ->when($filtre === 'essai', fn ($r) => $enCours($r->where('plan', 'essai')))
             ->when($filtre === 'abonne', fn ($r) => $enCours($r->where('plan', '!=', 'essai')))
-            ->when($filtre === 'echu', fn ($r) => $r->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', today())))
+            ->when($filtre === 'echu', fn ($r) => $r->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours())))
             ->latest()->limit(500)->get();
 
         $membres = $this->membres($abonnements->pluck('user_id'));

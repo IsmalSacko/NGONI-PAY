@@ -59,8 +59,25 @@ class Abonnement extends Model
             return false;
         }
 
-        return $this->fin === null
-            || Carbon::parse($this->fin)->endOfDay()->greaterThanOrEqualTo(now());
+        return $this->fin === null || self::finA($this->fin)->isFuture();
+    }
+
+    /** L'heure où un abonnement ou un essai s'arrête, le jour de sa fin. */
+    public const HEURE_FIN = 16;
+
+    /** Le moment exact de la fin : le jour [fin], à 16 h (heure de Bamako, celle du serveur). */
+    public static function finA(mixed $fin): Carbon
+    {
+        return Carbon::parse($fin)->setTime(self::HEURE_FIN, 0);
+    }
+
+    /**
+     * Le premier jour de fin encore en cours, pour les requêtes : aujourd'hui
+     * avant 16 h, demain ensuite (`fin >= ce jour`).
+     */
+    public static function premierJourEnCours(): Carbon
+    {
+        return now()->lt(today()->setTime(self::HEURE_FIN, 0)) ? today() : today()->addDay();
     }
 
     public function estEssai(): bool
@@ -100,29 +117,6 @@ class Abonnement extends Model
     public function fonctionnalites(): array
     {
         return array_values(array_unique([...($this->planModele()?->fonctionnalitesIncluses() ?? []), ...$this->fonctionsAccordees()]));
-    }
-
-    /** Jours où la caisse vend encore après l'échéance, avant de se bloquer. */
-    public const GRACE_JOURS = 3;
-
-    /**
-     * Le dernier moment où la caisse vend encore : la fin plus trois jours,
-     * pour un abonné qui tarde à renouveler. Aucun après un essai : la caisse
-     * se ferme le jour même. Aucun non plus sans échéance.
-     */
-    public function finDeGrace(): ?Carbon
-    {
-        if ($this->fin === null || $this->estEssai()) {
-            return null;
-        }
-
-        return Carbon::parse($this->fin)->addDays(self::GRACE_JOURS)->endOfDay();
-    }
-
-    /** Échu, mais dans les trois jours où la caisse vend encore. */
-    public function estEnGrace(): bool
-    {
-        return ! $this->estEnCours() && $this->est_actif && ($this->finDeGrace()?->greaterThanOrEqualTo(now()) ?? false);
     }
 
     /** Fin immédiate (révocation) : « hier », car `fin` est incluse. */

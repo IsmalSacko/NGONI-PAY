@@ -165,7 +165,7 @@ class PaiementJeko
                 'Abonnement payé par Mobile Money',
                 ($demande->boutique?->nom ?? 'Une boutique').' · '.$plan.' · '.number_format($demande->montant + $demande->frais_mobile, 0, ',', ' ').' F par '.$moyen
                     .($demande->frais_mobile > 0 ? ' (dont '.number_format($demande->frais_mobile, 0, ',', ' ').' F de frais)' : '')
-                    .($abonnement->fin ? ' · jusqu’au '.$abonnement->fin->format('d/m/Y') : ''),
+                    .($abonnement->fin ? ' · jusqu’au '.$abonnement->fin->format('d/m/Y').' à 16 h' : ''),
                 ConsoleNgoni::demandes(),
             );
 

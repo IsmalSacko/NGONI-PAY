@@ -126,53 +126,15 @@ class AbonnementTest extends TestCase
         ]);
     }
 
-    public function test_pendant_la_grace_la_caisse_vend_le_catalogue_jusqu_a_epuisement(): void
+    public function test_apres_l_echeance_la_caisse_ne_vend_plus_rien(): void
     {
-        $riz = $this->produit(stock: 2);
-        $this->finiDepuis(2);
-
-        $vente = fn (int $quantite): array => [
-            'lignes' => [['produit_id' => $riz->id, 'quantite' => $quantite]],
-            'moyen_paiement' => 'especes',
-        ];
-
-        $this->api()->postJson('/api/ventes', $vente(2))->assertCreated();
-        $this->assertSame(0, $riz->fresh()->stock);
-
-        // Stock vide, et plus moyen de le remonter : c'est là que l'abonnement se décide.
-        $this->api()->postJson('/api/ventes', $vente(1))->assertUnprocessable();
-        $this->api()->postJson("/api/produits/{$riz->id}/ajuster-stock", ['stock' => 10, 'motif' => 'Arrivage'])
-            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
-    }
-
-    public function test_apres_la_grace_la_caisse_ne_vend_plus(): void
-    {
-        $riz = $this->produit(stock: 2);
-        $this->finiDepuis(4);
+        $riz = $this->produit(stock: 5);
+        $this->finiDepuis(1);
 
         $this->api()->postJson('/api/ventes', ['lignes' => [['produit_id' => $riz->id, 'quantite' => 1]], 'moyen_paiement' => 'especes'])
             ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
             ->assertJsonFragment(['message' => 'Votre abonnement a expiré : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
-        $this->assertSame(2, $riz->fresh()->stock);
-        $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.caisse_jusqu_au', null);
-    }
-
-    public function test_pendant_la_grace_les_lignes_libres_sont_refusees(): void
-    {
-        $riz = $this->produit(stock: 5);
-        $this->finiDepuis(1);
-        $jusquAu = now()->addDays(2);
-
-        $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.caisse_jusqu_au', $jusquAu->toDateString());
-        $this->api()->postJson('/api/ventes', $this->vente())
-            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
-            ->assertJsonFragment(['message' => 'Votre abonnement a expiré : jusqu’au '.$jusquAu->format('d/m').', la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.']);
-
-        // Mêlée au catalogue, la ligne libre fait refuser toute la vente.
-        $this->api()->postJson('/api/ventes', [
-            'lignes' => [['produit_id' => $riz->id, 'quantite' => 1], ['libelle' => 'Livraison', 'prix_unitaire' => 500, 'quantite' => 1]],
-            'moyen_paiement' => 'especes',
-        ])->assertForbidden();
+        $this->api()->postJson('/api/ventes', $this->vente())->assertForbidden();
 
         $this->assertSame(0, Vente::withoutBoutiqueScope()->count());
         $this->assertSame(5, $riz->fresh()->stock);
@@ -204,11 +166,14 @@ class AbonnementTest extends TestCase
         $this->assertSame(1, Vente::withoutBoutiqueScope()->count());
     }
 
-    public function test_actif_jusqu_a_la_fin_du_dernier_jour(): void
+    public function test_actif_jusqu_a_16_h_le_dernier_jour(): void
     {
-        $this->awa->abonnement()->update(['fin' => now()->toDateString()]);
+        $this->awa->abonnement()->update(['fin' => today()->toDateString()]);
 
+        $this->travelTo(today()->setTime(15, 59));
         $this->api()->postJson('/api/ventes', $this->vente())->assertCreated();
+        $this->travelTo(today()->setTime(16, 0));
+        $this->api()->postJson('/api/ventes', $this->vente())->assertForbidden();
     }
 
     public function test_l_essai_ne_couvre_qu_une_boutique_et_ne_se_relance_pas(): void

@@ -81,24 +81,24 @@ class FaillesAbonnementTest extends TestCase
 
         $this->vendre($riz)->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
             ->assertJsonFragment(['message' => 'Votre essai gratuit est terminé : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.caisse_jusqu_au', null);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.est_en_cours', false);
     }
 
-    public function test_la_caisse_vend_trois_jours_apres_l_echeance_puis_plus_du_tout(): void
+    public function test_la_caisse_s_arrete_a_16_h_le_dernier_jour_sans_grace(): void
     {
         $riz = $this->produit(9999);
+        $this->awa->abonnement()->update(['plan' => 'basic', 'debut' => now()->subMonth()->toDateString(), 'fin' => today()->toDateString()]);
 
-        // Fin hier : dans la grâce, le catalogue se vend, pas le hors-catalogue.
-        $this->finiDepuis(1);
+        // Le dernier jour, jusqu'à 16 h : tout marche.
+        $this->travelTo(today()->setTime(15, 59));
         $this->vendre($riz)->assertCreated();
-        $this->api()->postJson('/api/ventes', ['lignes' => [['libelle' => 'Divers', 'prix_unitaire' => 5000, 'quantite' => 1]], 'moyen_paiement' => 'especes'])
-            ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
-        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.caisse_jusqu_au', now()->addDays(2)->toDateString());
 
-        // Quatre jours après : la caisse ne vend plus, même avec un gros stock.
-        $this->finiDepuis(4);
-        $this->vendre($riz)->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE');
+        // À 16 h : la caisse ne vend plus, ni le catalogue ni hors catalogue.
+        $this->travelTo(today()->setTime(16, 0));
+        $this->vendre($riz)->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
+            ->assertJsonFragment(['message' => 'Votre abonnement a expiré : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
         $this->api()->getJson('/api/ventes')->assertOk();
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.est_en_cours', false);
 
         // Ce que les clients doivent s'encaisse toujours.
         app(TenantContext::class)->setBoutique($this->boutique->id);
@@ -106,7 +106,7 @@ class FaillesAbonnementTest extends TestCase
         $this->api()->postJson("/api/clients/{$client->id}/reglements", ['montant' => 1000, 'moyen_paiement' => 'especes'])->assertSuccessful();
     }
 
-    public function test_un_restaurant_ou_un_pressing_sans_stock_ne_vend_plus_apres_la_grace(): void
+    public function test_un_restaurant_sans_stock_ne_vend_plus_apres_l_echeance(): void
     {
         $plat = $this->produit(0);
         $this->api()->putJson('/api/boutique/activite', ['activite' => 'restaurant'])->assertOk();
@@ -114,9 +114,8 @@ class FaillesAbonnementTest extends TestCase
             'type' => 'emporter', 'lignes' => [['produit_id' => $plat->id, 'quantite' => 10]], 'paiement' => ['moyen_paiement' => 'especes'],
         ]);
 
-        $this->finiDepuis(1);
         $commande()->assertCreated();
-        $this->finiDepuis(4);
+        $this->finiDepuis(1);
         $commande()->assertForbidden();
         $this->assertSame(1, Vente::withoutBoutiqueScope()->count());
     }
@@ -156,9 +155,8 @@ class FaillesAbonnementTest extends TestCase
         $nouvelle = $this->api($bakary)->postJson('/api/boutiques', ['nom' => 'Boutique Awa 2'])->assertCreated()->json('id');
         $essai = Abonnement::where('user_id', $bakary->id)->firstOrFail();
         $this->assertFalse($essai->estEnCours());
-        $this->assertFalse($essai->estEnGrace());
 
-        // Pas de vente dans la nouvelle boutique : ni hors catalogue, ni grâce.
+        // Pas de vente dans la nouvelle boutique.
         $this->api($bakary, $nouvelle)->postJson('/api/ventes', [
             'lignes' => [['libelle' => 'Divers', 'prix_unitaire' => 5000, 'quantite' => 1]], 'moyen_paiement' => 'especes',
         ])->assertForbidden();
@@ -181,7 +179,7 @@ class FaillesAbonnementTest extends TestCase
         $this->flushHeaders();
         $second = $inscrire(['X-Appareil-Plateforme' => 'windows'])->assertCreated()->json();
         $this->assertFalse($second['essai_offert']);
-        $this->assertFalse(Abonnement::where('user_id', $second['user']['id'])->firstOrFail()->estEnGrace());
+        $this->assertFalse(Abonnement::where('user_id', $second['user']['id'])->firstOrFail()->estEnCours());
     }
 
     public function test_le_telephone_d_un_compte_supprime_reste_note(): void
@@ -198,39 +196,5 @@ class FaillesAbonnementTest extends TestCase
         $this->withHeaders($telephone)->postJson('/api/inscription', [
             'nom_boutique' => 'Boutique Fanta 2', 'pays' => 'ML', 'telephone' => '76000013', 'password' => 'password123', 'nom_utilisateur' => 'Fanta',
         ])->assertCreated()->assertJsonPath('essai_offert', false);
-    }
-
-    public function test_dans_la_grace_l_addition_payee_en_partie_passe(): void
-    {
-        // Payer une partie de l'addition : des identifiants de lignes, pas une ligne libre.
-        $plat = $this->produit(0);
-        $this->api()->putJson('/api/boutique/activite', ['activite' => 'restaurant'])->assertOk();
-        $commande = $this->api()->postJson('/api/restaurant/commandes', [
-            'type' => 'emporter', 'lignes' => [['produit_id' => $plat->id, 'quantite' => 1], ['produit_id' => $plat->id, 'quantite' => 2]],
-        ])->assertCreated()->json();
-        $donnees = $commande['data'] ?? $commande;
-        $ligne = collect($donnees['lignes'] ?? [])->first()['id'];
-        $this->finiDepuis(1);
-        $paye = $this->api()->postJson("/api/restaurant/commandes/{$donnees['id']}/payer", [
-            'lignes' => [$ligne], 'moyen_paiement' => 'especes',
-        ]);
-        $this->assertNotSame(403, $paye->status(), (string) $paye->getContent());
-
-    }
-
-    public function test_dans_la_grace_les_frais_d_enlevement_d_une_facture_distributeur_passent(): void
-    {
-        // Les frais d'enlèvement suivent les articles : ce ne sont pas des lignes libres.
-        $this->boutique->forceFill(['modele_facture' => 'distributeur'])->save();
-        $this->finiDepuis(1);
-        app(TenantContext::class)->setBoutique($this->boutique->id);
-        $biere = Produit::create(['nom' => 'Bière 65 cl', 'frais_enlevement' => 250, 'prix_vente' => 10000, 'taux_tva' => 0, 'stock' => 50]);
-        $this->api()->postJson('/api/ventes', [
-            'lignes' => [
-                ['produit_id' => $biere->id, 'quantite' => 2],
-                ['libelle' => 'Frais d’enlèvement', 'prix_unitaire' => 500, 'taux_tva' => 0, 'quantite' => 1, 'frais' => true],
-            ],
-            'moyen_paiement' => 'especes',
-        ])->assertCreated();
     }
 }

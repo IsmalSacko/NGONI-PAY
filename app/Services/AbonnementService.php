@@ -307,7 +307,7 @@ class AbonnementService
             return;
         }
 
-        $jusqua = $abonnement->fin === null ? 'sans échéance' : 'jusqu’au '.$abonnement->fin->format('d/m/Y');
+        $jusqua = $abonnement->fin === null ? 'sans échéance' : 'jusqu’au '.$abonnement->fin->format('d/m/Y').' à 16 h';
         [$titre, $message] = $abonnement->estEssai()
             ? ['Votre essai gratuit est prolongé', "Bonne nouvelle : votre essai gratuit est prolongé {$jusqua}. Toutes les fonctions restent ouvertes."]
             : ["Votre abonnement {$plan?->nom} est activé", "Merci pour votre confiance ! Votre abonnement {$plan?->nom} est actif {$jusqua}. Toutes ses fonctions sont ouvertes."

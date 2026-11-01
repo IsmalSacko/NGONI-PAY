@@ -51,12 +51,12 @@ class DiffusionAnnonces
         }
 
         $abonnes = fn (callable $filtre) => $requete->whereIn('id', Abonnement::query()->tap($filtre)->select('user_id'));
-        $enCours = fn ($q) => $q->where('est_actif', true)->where(fn ($d) => $d->whereNull('fin')->orWhereDate('fin', '>=', today()));
+        $enCours = fn ($q) => $q->where('est_actif', true)->where(fn ($d) => $d->whereNull('fin')->orWhereDate('fin', '>=', Abonnement::premierJourEnCours()));
 
         return match ($annonce->audience) {
             'selection' => $requete->whereIn('id', $annonce->cibles()->select('users.id')),
             'essai', 'basic', 'pro' => $abonnes(fn ($q) => $enCours($q->where('plan', $annonce->audience))),
-            'expires' => $abonnes(fn ($q) => $q->where(fn ($e) => $e->where('est_actif', false)->orWhereDate('fin', '<', today()))),
+            'expires' => $abonnes(fn ($q) => $q->where(fn ($e) => $e->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours()))),
             default => $requete,
         };
     }
