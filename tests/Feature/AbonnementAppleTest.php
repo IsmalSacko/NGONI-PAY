@@ -244,6 +244,7 @@ class AbonnementAppleTest extends TestCase
         config(['ecaisse.boutique_ventes_abonnements' => $caisse->id]);
         // Le soir, un « mois » de Sandbox (cinq minutes) : fini après 16 h, il court jusqu'au lendemain.
         $this->travelTo(now()->setTime(19, 0));
+        $this->awa->abonnement()->update(['fin' => today()->subDay()->toDateString()]);
 
         $this->acheter(['environment' => 'Sandbox', 'productId' => 'ngonicaisse.basic.annuel', 'expiresDate' => now()->addMinutes(5)->getTimestampMs()])
             ->assertOk()
@@ -321,6 +322,23 @@ class AbonnementAppleTest extends TestCase
         $this->assertSame(JournalAbonnement::REVOCATION, $journal->type);
         $this->assertSame('App Store', $journal->par);
         $this->api()->getJson('/api/abonnement')->assertJsonPath('data.est_en_cours', false);
+    }
+
+    public function test_un_achat_de_test_ne_raccourcit_pas_l_essai_et_sa_fin_ne_coupe_rien(): void
+    {
+        // Le compte démo, en essai jusqu'à dans 4 jours.
+        $this->awa->abonnement()->update(['fin' => today()->addDays(4)->toDateString()]);
+        $sandbox = ['environment' => 'Sandbox', 'productId' => 'ngonicaisse.basic.mensuel', 'expiresDate' => now()->addMinutes(5)->getTimestampMs()];
+
+        $this->acheter($sandbox)->assertOk();
+        $this->assertSame(today()->addDays(4)->toDateString(), $this->abonnement()->fin->toDateString());
+        $this->assertSame('basic', $this->abonnement()->plan);
+
+        // L'abonnement de test s'arrête chez Apple : le compte garde son accès.
+        foreach (['EXPIRED', 'REFUND'] as $type) {
+            $this->notifier($type, $this->transaction($sandbox))->assertOk();
+            $this->assertTrue($this->abonnement()->estEnCours());
+        }
     }
 
     public function test_un_abonnement_paye_ensuite_par_mobile_money_n_est_pas_coupe_par_apple(): void

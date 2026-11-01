@@ -257,6 +257,12 @@ class AchatsApple
                 if ($courant !== null && $courant->apple_transaction_originale === $originale && $courant->fin !== null && $courant->fin->gt($fin)) {
                     $fin = $courant->fin->copy();
                 }
+                // Achat de test (TestFlight, vérification d'Apple) : jamais moins que
+                // la période déjà ouverte. Sinon le compte démo, en essai, finissait
+                // avec l'abonnement de test, au bout de quelques minutes.
+                if ($test && $courant !== null && $courant->estEnCours() && $courant->fin !== null && $courant->fin->gt($fin)) {
+                    $fin = $courant->fin->copy();
+                }
 
                 // Le prix de la formule, comme toute demande : ce qu'Apple a
                 // facturé (autre devise, sa commission retenue) est noté à côté.
@@ -315,6 +321,12 @@ class AchatsApple
      */
     private function arreter(array $t, string $type): string
     {
+        // Un abonnement de test (Sandbox) s'arrête tout seul en quelques minutes :
+        // rien n'est coupé (le compte démo des vérifications d'Apple garde son accès).
+        if (($t['environment'] ?? null) === 'Sandbox') {
+            return 'test, sans effet';
+        }
+
         $finTransaction = self::finPour(self::date($t['expiresDate']));
         $motif = match ($type) {
             'EXPIRED' => 'Abonnement App Store terminé (non renouvelé).',
