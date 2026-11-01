@@ -20,6 +20,8 @@ class Abonnement extends Model
 {
     protected $fillable = [
         'user_id', 'plan', 'debut', 'fin', 'est_actif', 'est_manuel', 'accorde_par', 'note_admin', 'rappel_fin_pour', 'jours_offerts', 'fonctions_accordees',
+        // L'abonnement Apple qui le paie (originalTransactionId) : seule sa fin chez Apple l'arrête.
+        'apple_transaction_originale',
     ];
 
     protected function casts(): array

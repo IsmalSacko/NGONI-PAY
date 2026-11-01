@@ -239,12 +239,25 @@ class AbonnementService
     /**
      * L'exploitant a constaté le paiement : le plan s'active pour la durée
      * payée, ou sans échéance quand le commerçant a payé un accès à vie.
+     *
+     * Achat Apple (voir AchatsApple) : `$finApple` est l'échéance vendue par
+     * Apple, prise telle quelle (Apple renouvelle à sa date : pas de durée
+     * projetée, et les jours offerts du parrainage restent de côté), et
+     * `$appleOriginale` l'abonnement Apple qui porte désormais celui-ci. Tout
+     * autre paiement l'efface : une fin chez Apple ne coupe pas une période
+     * payée autrement.
      */
-    public function approuver(DemandeAbonnement $demande, ?User $exploitant, ?string $note = null, bool $sansEcheance = false): Abonnement
-    {
+    public function approuver(
+        DemandeAbonnement $demande,
+        ?User $exploitant,
+        ?string $note = null,
+        bool $sansEcheance = false,
+        ?Carbon $finApple = null,
+        ?string $appleOriginale = null,
+    ): Abonnement {
         $this->exigerEnAttente($demande);
 
-        $abonnement = DB::transaction(function () use ($demande, $exploitant, $note, $sansEcheance): Abonnement {
+        $abonnement = DB::transaction(function () use ($demande, $exploitant, $note, $sansEcheance, $finApple, $appleOriginale): Abonnement {
             // Le paiement prolonge la même offre en cours à partir de son échéance, sinon commence aujourd'hui.
             $courant = Abonnement::where('user_id', $demande->user_id)->first();
             $prolonge = $courant !== null && $courant->estEnCours() && $courant->plan === $demande->plan && $courant->fin !== null && $courant->fin->isFuture();
@@ -255,11 +268,13 @@ class AbonnementService
                 [
                     'plan' => $demande->plan,
                     'debut' => now()->toDateString(),
-                    'fin' => $sansEcheance ? null : $this->finProjetee($demande->user_id, $demande->plan, $demande->mois)?->toDateString(),
+                    'fin' => $finApple?->toDateString()
+                        ?? ($sansEcheance ? null : $this->finProjetee($demande->user_id, $demande->plan, $demande->mois)?->toDateString()),
                     'est_actif' => true,
                     'est_manuel' => false,
                     'accorde_par' => null,
                     'note_admin' => null,
+                    'apple_transaction_originale' => $appleOriginale,
                 ],
             );
 
@@ -273,11 +288,16 @@ class AbonnementService
 
             // Un vrai paiement vient d'être constaté : les jours gagnés en
             // parrainant s'ajoutent, et le parrain de ce compte est récompensé.
-            $parrainage = app(Parrainage::class);
-            $parrainage->appliquerJoursOfferts($abonnement);
-            $parrain = $parrainage->recompenser($demande->user_id);
-            if ($parrain !== null) {
-                $demande->update(['parrain_recompense_id' => $parrain->id]);
+            // Un achat de test d'Apple (Sandbox, montant nul) n'en est pas un.
+            if ((int) $demande->montant > 0) {
+                $parrainage = app(Parrainage::class);
+                if ($finApple === null) {
+                    $parrainage->appliquerJoursOfferts($abonnement);
+                }
+                $parrain = $parrainage->recompenser($demande->user_id);
+                if ($parrain !== null) {
+                    $demande->update(['parrain_recompense_id' => $parrain->id]);
+                }
             }
 
             $abonnement = $abonnement->fresh();
@@ -446,6 +466,8 @@ class AbonnementService
                     'est_manuel' => true,
                     'accorde_par' => $exploitant->id,
                     'note_admin' => $note,
+                    // Décision de l'exploitant : une fin chez Apple ne la défait pas.
+                    'apple_transaction_originale' => null,
                     ...($accordees === null ? [] : ['fonctions_accordees' => $accordees]),
                 ],
             );

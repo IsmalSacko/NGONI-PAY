@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AbonnementController;
 use App\Http\Controllers\Api\AchatController;
 use App\Http\Controllers\Api\AppareilController;
+use App\Http\Controllers\Api\AppleNotificationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\CategorieProduitController;
@@ -67,6 +68,8 @@ Route::post('publication-play', PublicationPlayController::class)->middleware('t
 Route::post('webhooks/jeko', JekoWebhookController::class)->middleware('throttle:120,1');
 Route::post('webhooks/fedapay', FedapayWebhookController::class)->middleware('throttle:120,1');
 Route::post('webhooks/pawapay', PawapayWebhookController::class)->middleware('throttle:120,1');
+// App Store Server Notifications V2 : achats, renouvellements, fins et remboursements Apple (JWS vérifié dans le contrôleur).
+Route::post('apple/notifications', AppleNotificationController::class)->middleware('throttle:120,1');
 
 // Catalogue public des plans : l'écran d'abonnement s'affiche même abonnement expiré.
 Route::get('plans', [AbonnementController::class, 'plans']);
@@ -198,6 +201,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'conditions', 'app-a-jour'])->group
     Route::delete('abonnement/demandes/{demande}', [AbonnementController::class, 'annuler'])->middleware('permission:abonnement.manage');
     Route::post('abonnement/paiement-mobile', [AbonnementController::class, 'payerMobile'])->middleware(['permission:abonnement.manage', 'throttle:10,1']);
     Route::get('abonnement/paiement-mobile/{demande}', [AbonnementController::class, 'statutPaiementMobile'])->middleware('permission:abonnement.manage');
+    // Achat intégré de l'iPhone : la transaction signée par Apple.
+    Route::post('abonnement/apple', [AbonnementController::class, 'apple'])->middleware(['permission:abonnement.manage', 'throttle:20,1']);
     Route::get('abonnement/recus/{demande}', [AbonnementController::class, 'recu'])->middleware('permission:abonnement.manage');
     // Code du propriétaire, ses filleuls et ce qu'ils lui ont rapporté.
     Route::get('parrainage', fn (Request $request) => response()->json(['data' => app(Parrainage::class)->resume($request->user())]))

@@ -20,7 +20,7 @@ class DemandeAbonnement extends Model
 
     protected $fillable = [
         'user_id', 'demande_par', 'boutique_id', 'plan', 'cycle', 'mois', 'montant', 'devise',
-        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'pawapay_deposit_id', 'reference', 'frais_mobile',
+        'moyen', 'note', 'telephone_contact', 'preuve_chemin', 'preuve_note', 'jeko_paiement_id', 'jeko_transaction_id', 'fedapay_transaction_id', 'pawapay_deposit_id', 'apple_transaction_id', 'reference', 'frais_mobile',
         'statut', 'decide_le', 'decide_par', 'decide_par_nom', 'note_decision', 'parrain_recompense_id', 'recu_numero', 'periode_debut', 'periode_fin',
     ];
 
@@ -115,11 +115,11 @@ class DemandeAbonnement extends Model
 
     /**
      * Référence du paiement : celle saisie à la validation, sinon le numéro
-     * de transaction du prestataire en ligne.
+     * de transaction du prestataire en ligne (ou de l'App Store).
      */
     public function referencePaiement(): ?string
     {
-        return $this->reference ?? $this->jeko_transaction_id ?? $this->jeko_paiement_id ?? $this->fedapay_transaction_id ?? $this->pawapay_deposit_id;
+        return $this->reference ?? $this->jeko_transaction_id ?? $this->jeko_paiement_id ?? $this->fedapay_transaction_id ?? $this->pawapay_deposit_id ?? $this->apple_transaction_id;
     }
 
     /** Qui a tranché : « Console · Ismaila », l'exploitant, ou personne (paiement en ligne). */
@@ -135,9 +135,13 @@ class DemandeAbonnement extends Model
         return $this->jeko_paiement_id !== null || $this->fedapay_transaction_id !== null || $this->pawapay_deposit_id !== null;
     }
 
-    /** « Wave via Jèko », « Airtel Money via FedaPay », ou null. */
+    /** « Wave via Jèko », « Airtel Money via FedaPay », « App Store », ou null. */
     public function libellePaiementEnLigne(): ?string
     {
+        // Achat intégré de l'application iPhone, encaissé par Apple.
+        if ($this->apple_transaction_id !== null) {
+            return 'App Store';
+        }
         if ($this->jeko_paiement_id !== null) {
             return (config('jeko.moyens')[substr((string) $this->moyen, 5)] ?? 'Mobile Money').' via Jèko';
         }

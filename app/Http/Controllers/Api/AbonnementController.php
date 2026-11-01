@@ -12,6 +12,7 @@ use App\Models\DemandeAbonnement;
 use App\Models\Plan;
 use App\Models\PlanTarif;
 use App\Services\AbonnementService;
+use App\Services\Apple\AchatsApple;
 use App\Services\PaiementMobile;
 use App\Services\RecuAbonnement;
 use App\Support\Tenancy\TenantContext;
@@ -48,6 +49,8 @@ class AbonnementController extends Controller
                     'mois' => $t->cycle->mois(),
                     'montant' => $t->montant,
                     'devise' => $t->devise,
+                    // Achat intégré de l'iPhone : le produit App Store de cette durée (mensuel, annuel), sinon null.
+                    'apple_produit' => AchatsApple::produitPour($plan->code, $t->cycle),
                 ])->values(),
         ]);
 
@@ -140,6 +143,20 @@ class AbonnementController extends Controller
         );
 
         return response()->json(['data' => $this->demandeJson($resultat['demande']), 'redirect_url' => $resultat['redirect_url']], 201);
+    }
+
+    /**
+     * Achat intégré de l'iPhone (StoreKit 2) : la transaction signée par Apple
+     * est vérifiée, puis l'abonnement accordé jusqu'à la fin vendue par Apple.
+     * Rejouer la même transaction ne change rien. Répond l'état de l'abonnement.
+     */
+    public function apple(Request $request, AchatsApple $apple): JsonResponse
+    {
+        $data = $request->validate(['signed_transaction' => ['required', 'string', 'max:20000']]);
+
+        $apple->acheter(Boutique::findOrFail(app(TenantContext::class)->boutiqueId()), $request->user(), $data['signed_transaction']);
+
+        return $this->show($request);
     }
 
     /** Au retour du commerçant : le paiement relu chez Jèko, l'abonnement activé s'il est payé. */
