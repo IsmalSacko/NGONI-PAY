@@ -63,6 +63,7 @@ class ConsoleNgoniTest extends TestCase
         $compte = $this->getJson('/api/console/v1/comptes?filtre=essai', $this->cle)->assertOk()->json('data.0');
         $this->assertSame((string) $this->awa->id, $compte['id']);
         $this->assertSame('Pressing Awa', $compte['nom']);
+        $this->assertSame('16:00', $compte['fin_heure'], 'l’essai s’arrête à 16 h le dernier jour');
 
         $pro = collect($this->getJson('/api/console/v1/formules', $this->cle)->assertOk()->json('data'))->firstWhere('code', 'pro');
         $this->assertSame(10000, collect($pro['tarifs'])->firstWhere('mois', 1)['montant']);

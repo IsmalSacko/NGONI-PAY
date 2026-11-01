@@ -304,6 +304,8 @@ class ConsoleController extends Controller
             'formule' => $a->plan,
             'formule_nom' => $noms[$a->plan] ?? $a->plan,
             'fin' => $a->fin?->toDateString(),
+            // L'abonnement s'arrête le jour « fin » à 16 h (contrat : facultatif).
+            'fin_heure' => $a->fin === null ? null : sprintf('%02d:00', Abonnement::HEURE_FIN),
             'en_cours' => $a->estEnCours(),
             'manuel' => (bool) $a->est_manuel,
             'essai_prolongeable' => $a->estEssai(),
