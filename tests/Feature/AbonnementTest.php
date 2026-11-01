@@ -116,10 +116,11 @@ class AbonnementTest extends TestCase
         $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.est_en_cours', false);
     }
 
-    /** Essai fini depuis [$jours] jours, après quinze jours d'essai. */
+    /** Abonnement Basic fini depuis [$jours] jours (pas de grâce après un essai). */
     private function finiDepuis(int $jours): void
     {
         $this->awa->abonnement()->update([
+            'plan' => 'basic',
             'debut' => now()->subDays($jours + 15)->toDateString(),
             'fin' => now()->subDays($jours)->toDateString(),
         ]);
@@ -151,7 +152,7 @@ class AbonnementTest extends TestCase
 
         $this->api()->postJson('/api/ventes', ['lignes' => [['produit_id' => $riz->id, 'quantite' => 1]], 'moyen_paiement' => 'especes'])
             ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
-            ->assertJsonFragment(['message' => 'Votre essai gratuit est terminé : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
+            ->assertJsonFragment(['message' => 'Votre abonnement a expiré : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
         $this->assertSame(2, $riz->fresh()->stock);
         $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.caisse_jusqu_au', null);
     }
@@ -165,7 +166,7 @@ class AbonnementTest extends TestCase
         $this->api()->getJson('/api/abonnement')->assertOk()->assertJsonPath('data.caisse_jusqu_au', $jusquAu->toDateString());
         $this->api()->postJson('/api/ventes', $this->vente())
             ->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
-            ->assertJsonFragment(['message' => 'Votre essai gratuit est terminé : jusqu’au '.$jusquAu->format('d/m').', la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.']);
+            ->assertJsonFragment(['message' => 'Votre abonnement a expiré : jusqu’au '.$jusquAu->format('d/m').', la caisse vend encore les articles du catalogue, mais plus hors catalogue. Abonnez-vous pour continuer.']);
 
         // Mêlée au catalogue, la ligne libre fait refuser toute la vente.
         $this->api()->postJson('/api/ventes', [

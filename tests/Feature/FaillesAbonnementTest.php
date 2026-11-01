@@ -52,12 +52,12 @@ class FaillesAbonnementTest extends TestCase
         return $boutique === null ? $req : $req->withHeader('X-Boutique', $boutique);
     }
 
-    /** L'essai a fini il y a [jours] jours. */
+    /** Un abonnement Basic a fini il y a [jours] jours (la grâce ne suit pas un essai). */
     private function finiDepuis(int $jours, ?User $u = null): void
     {
-        // Un essai de sept jours, commencé avant : comme dans la réalité.
         ($u ?? $this->awa)->abonnement()->update([
-            'debut' => now()->subDays($jours + 7)->toDateString(),
+            'plan' => 'basic',
+            'debut' => now()->subDays($jours + 30)->toDateString(),
             'fin' => now()->subDays($jours)->toDateString(),
         ]);
     }
@@ -72,6 +72,16 @@ class FaillesAbonnementTest extends TestCase
     private function vendre(Produit $p)
     {
         return $this->api()->postJson('/api/ventes', ['lignes' => [['produit_id' => $p->id, 'quantite' => 1]], 'moyen_paiement' => 'especes']);
+    }
+
+    public function test_un_essai_fini_ferme_la_caisse_le_jour_meme(): void
+    {
+        $riz = $this->produit(9999);
+        $this->awa->abonnement()->update(['debut' => now()->subDays(8)->toDateString(), 'fin' => now()->subDay()->toDateString()]);
+
+        $this->vendre($riz)->assertForbidden()->assertJsonPath('code', 'ABONNEMENT_EXPIRE')
+            ->assertJsonFragment(['message' => 'Votre essai gratuit est terminé : la caisse ne vend plus. Vos ventes, vos clients et votre stock restent consultables. Abonnez-vous pour continuer.']);
+        $this->api()->getJson('/api/abonnement')->assertJsonPath('data.caisse_jusqu_au', null);
     }
 
     public function test_la_caisse_vend_trois_jours_apres_l_echeance_puis_plus_du_tout(): void

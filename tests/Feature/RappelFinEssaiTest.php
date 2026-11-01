@@ -61,8 +61,8 @@ class RappelFinEssaiTest extends TestCase
 
         $rappel = $this->rappels()->sole();
         $this->assertSame('Votre essai gratuit se termine dans 2 jours', $rappel->titre);
-        $this->assertStringContainsString('la caisse continue', $rappel->message);
-        $this->assertStringContainsString('ne pourrez plus ajouter ni modifier vos articles', $rappel->message);
+        $this->assertStringContainsString('la caisse ne pourra plus encaisser', $rappel->message);
+        $this->assertStringContainsString('restent consultables', $rappel->message);
         $this->assertSame('/abonnement', $rappel->lien);
         Mail::assertSent(RappelFinEssaiMail::class, 1);
         Mail::assertSent(RappelFinEssaiMail::class, fn ($mail) => $mail->hasTo('awa@example.com'));

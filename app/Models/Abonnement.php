@@ -106,13 +106,13 @@ class Abonnement extends Model
     public const GRACE_JOURS = 3;
 
     /**
-     * Le dernier moment où la caisse vend encore : la fin plus trois jours.
-     * Aucun pour un abonnement sans échéance, ni pour un essai refusé dès
-     * l'inscription (téléphone ou compte déjà utilisé : fin avant le début).
+     * Le dernier moment où la caisse vend encore : la fin plus trois jours,
+     * pour un abonné qui tarde à renouveler. Aucun après un essai : la caisse
+     * se ferme le jour même. Aucun non plus sans échéance.
      */
     public function finDeGrace(): ?Carbon
     {
-        if ($this->fin === null || ($this->debut !== null && Carbon::parse($this->fin)->lt(Carbon::parse($this->debut)))) {
+        if ($this->fin === null || $this->estEssai()) {
             return null;
         }
 

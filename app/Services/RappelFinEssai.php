@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Mail;
  *
  * Sans ce rappel, le commerçant découvrait la fin de l'essai en voulant
  * modifier un article, parfois devant un client. Le message dit ce qui
- * continue (la caisse, sur les articles du catalogue) et ce qui s'arrête,
- * pour que rien ne le surprenne.
+ * s'arrête (la caisse, le soir même) et ce qui reste (les données, les
+ * dettes à encaisser), pour que rien ne le surprenne.
  *
  * Une fois par échéance : la date rappelée est notée sur l'abonnement. Un
  * passage manqué (serveur arrêté) se rattrape au suivant tant que l'essai
@@ -115,9 +115,8 @@ class RappelFinEssai
         return [
             'titre' => "Votre essai gratuit se termine {$quand}",
             'message' => "Votre essai gratuit de Ngoni Caisse se termine le {$date} au soir.\n\n"
-                .'Sans abonnement ensuite, la caisse continue : vous encaissez les articles de votre catalogue '
-                .'et imprimez vos tickets. Mais vous ne pourrez plus ajouter ni modifier vos articles, vos stocks, '
-                ."vos clients ou votre équipe, ni vendre hors catalogue : un article épuisé ne pourra plus être vendu.\n\n"
+                .'Sans abonnement ensuite, la caisse ne pourra plus encaisser. Vos ventes, vos clients et votre stock '
+                ."restent consultables, et l’argent que vos clients vous doivent s’encaisse toujours.\n\n"
                 .'Abonnez-vous depuis l’application (menu Abonnement) pour continuer sans interruption.',
         ];
     }
