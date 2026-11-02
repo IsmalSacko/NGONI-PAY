@@ -257,12 +257,31 @@ class ConsoleController extends Controller
             ->when($filtre === 'essai', fn ($r) => $enCours($r->where('plan', 'essai')))
             ->when($filtre === 'abonne', fn ($r) => $enCours($r->where('plan', '!=', 'essai')))
             ->when($filtre === 'echu', fn ($r) => $r->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours())))
-            ->latest()->limit(500)->get();
+            ->latest();
+
+        // Contrat v1.2 : une page et le total quand la console les demande ;
+        // sans `page`, la liste d'avant (500 au plus).
+        $meta = null;
+        if ($request->has('page')) {
+            [$page, $parPage] = self::pagination($request);
+            $total = (clone $abonnements)->count();
+            $abonnements = $abonnements->forPage($page, $parPage)->get();
+            $meta = ['total' => $total, 'page' => $page, 'par_page' => $parPage, 'pages' => max(1, (int) ceil($total / $parPage))];
+        } else {
+            $abonnements = $abonnements->limit(500)->get();
+        }
 
         $membres = $this->membres($abonnements->pluck('user_id'));
         $noms = Plan::pluck('nom', 'code');
 
-        return response()->json(['data' => $abonnements->map(fn (Abonnement $a) => $this->ligneCompte($a, $membres, $noms))->values()]);
+        return response()->json(['data' => $abonnements->map(fn (Abonnement $a) => $this->ligneCompte($a, $membres, $noms))->values()]
+            + ($meta ? ['meta' => $meta] : []));
+    }
+
+    /** @return array{0: int, 1: int} la page demandée et sa taille (50 par défaut, 200 au plus) */
+    private static function pagination(Request $request): array
+    {
+        return [max(1, (int) $request->query('page', 1)), min(200, max(1, (int) $request->query('par_page', 50)))];
     }
 
     /**

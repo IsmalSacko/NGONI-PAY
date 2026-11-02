@@ -123,6 +123,31 @@ class ConsoleNgoniTest extends TestCase
         $this->assertStringContainsString('Remise négociée', (string) $demande->note_decision);
     }
 
+    public function test_les_comptes_se_lisent_page_par_page_avec_le_total(): void
+    {
+        foreach (range(2, 4) as $i) {
+            app(BoutiqueRegistrationService::class)->register([
+                'nom' => "Boutique {$i}", 'pays' => 'ML', 'telephone' => "7600820{$i}",
+                'email' => null, 'password' => 'password123', 'nom_utilisateur' => "Gérant {$i}",
+            ]);
+        }
+
+        // 4 comptes, 3 par page : 2 pages, la seconde n'en a qu'un.
+        $this->getJson('/api/console/v1/comptes?page=1&par_page=3', $this->cle)->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('meta', ['total' => 4, 'page' => 1, 'par_page' => 3, 'pages' => 2]);
+        $this->getJson('/api/console/v1/comptes?page=2&par_page=3', $this->cle)->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.page', 2);
+        // Le total suit le filtre.
+        $this->getJson('/api/console/v1/comptes?filtre=abonne&page=1', $this->cle)->assertOk()
+            ->assertJsonPath('meta.total', 0);
+        // Sans page : la liste d'avant, sans meta (consoles d'avant le contrat v1.2).
+        $this->getJson('/api/console/v1/comptes', $this->cle)->assertOk()
+            ->assertJsonCount(4, 'data')
+            ->assertJsonMissingPath('meta');
+    }
+
     public function test_les_comptes_de_l_exploitant_sont_hors_des_chiffres(): void
     {
         $this->getJson('/api/console/v1/resume', $this->cle)->assertJsonPath('comptes', 1);
