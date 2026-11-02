@@ -147,7 +147,7 @@ class ImportNgoniPay
 
             $this->boutiques[(int) $b->id] = $boutique->id;
             $this->entrer($boutique->id);
-            $this->registration->provisionnerRoles($boutique);
+            $this->registration->provisionnerRoles();
 
             if ($proprietaire !== null) {
                 User::find($proprietaire)?->assignRole('admin');

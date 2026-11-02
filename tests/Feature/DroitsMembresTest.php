@@ -246,16 +246,16 @@ class DroitsMembresTest extends TestCase
 
     public function test_la_migration_garde_aux_gerants_existants_ce_qu_ils_avaient(): void
     {
-        // Comme avant : un gérant n'a que son rôle, et le rôle porte tout.
+        // Comme avant : un gérant n'a que son rôle (commun aux boutiques), et le rôle porte tout.
         app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutique->id);
         $gerant = User::create(['boutique_id' => $this->boutique->id, 'name' => 'Ancien gérant', 'phone' => '+22370000009', 'password' => 'password123']);
         $gerant->assignRole('gerant');
-        Role::where('name', 'gerant')->where('boutique_id', $this->boutique->id)->first()->givePermissionTo(Permissions::permissionsReglables());
+        Role::where('name', 'gerant')->whereNull('boutique_id')->first()->givePermissionTo(Permissions::permissionsReglables());
 
         (require database_path('migrations/2026_10_02_000100_droits_par_membre.php'))->up();
 
         app(PermissionRegistrar::class)->setPermissionsTeamId($this->boutique->id);
-        $role = Role::where('name', 'gerant')->where('boutique_id', $this->boutique->id)->first()->load('permissions');
+        $role = Role::where('name', 'gerant')->whereNull('boutique_id')->first()->load('permissions');
         $this->assertNotContains('dashboard.view', $role->permissions->pluck('name')->all(), 'sorti du rôle');
         $this->api($gerant)->getJson('/api/dashboard')->assertOk();
     }

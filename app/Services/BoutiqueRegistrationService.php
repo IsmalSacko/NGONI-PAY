@@ -10,7 +10,7 @@ use App\Mail\InscriptionMail;
 use App\Models\Boutique;
 use App\Models\User;
 use App\Support\Apres;
-use App\Support\Authorization\Permissions;
+use App\Support\Authorization\RolesCommuns;
 use App\Support\Phone\PhoneNumber;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -19,8 +19,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -88,7 +86,7 @@ class BoutiqueRegistrationService
             $this->tenant->setBoutique($boutique->id);
             app(PermissionRegistrar::class)->setPermissionsTeamId($boutique->id);
 
-            $this->provisionnerRoles($boutique);
+            $this->provisionnerRoles();
 
             $user = User::create([
                 'boutique_id' => $boutique->id,
@@ -247,7 +245,7 @@ class BoutiqueRegistrationService
                 $this->tenant->setBoutique($boutique->id);
                 app(PermissionRegistrar::class)->setPermissionsTeamId($boutique->id);
 
-                $this->provisionnerRoles($boutique);
+                $this->provisionnerRoles();
                 $proprietaire->unsetRelation('roles')->assignRole('admin');
 
                 $abonnement = app(AbonnementService::class)->demarrerEssai($proprietaire);
@@ -269,37 +267,13 @@ class BoutiqueRegistrationService
         return $boutique;
     }
 
-    public function provisionnerRoles(Boutique $boutique): void
+    /**
+     * Les rôles admin, gérant et caissier existent : communs à toutes les
+     * boutiques ({@see RolesCommuns}), rien n'est plus copié pour celle-ci.
+     */
+    public function provisionnerRoles(): void
     {
-        // Une boutique peut être la toute première du catalogue : les
-        // permissions elles-mêmes (globales, sans colonne d'équipe) doivent
-        // exister avant qu'un rôle ne tente de les lui rattacher.
-        foreach (Permissions::all() as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
-        }
-
-        // Rôle neuf : ses permissions sont ajoutées d'un seul INSERT, sans
-        // syncPermissions — qui commence par un DELETE : sur un rôle vide, ce
-        // DELETE verrouille quand même un intervalle de role_has_permissions, et
-        // deux inscriptions à la même seconde s'y bloquaient (deadlock, erreur
-        // 500, vu en prod les 8 et 9 octobre 2026).
-        $ids = Permission::where('guard_name', 'web')->pluck('id', 'name');
-        $lignes = [];
-        foreach (Permissions::roleMatrix() as $nom => $permissions) {
-            $role = Role::firstOrCreate(['name' => $nom, 'guard_name' => 'web', 'boutique_id' => $boutique->id]);
-            if (! $role->wasRecentlyCreated) {
-                $role->syncPermissions($permissions);
-
-                continue;
-            }
-            foreach ($permissions as $permission) {
-                $lignes[] = ['permission_id' => $ids[$permission], 'role_id' => $role->id];
-            }
-        }
-        if ($lignes !== []) {
-            DB::table(config('permission.table_names.role_has_permissions'))->insert($lignes);
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
-        }
+        RolesCommuns::assurer();
     }
 
     /**
