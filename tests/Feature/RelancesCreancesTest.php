@@ -90,7 +90,7 @@ class RelancesCreancesTest extends TestCase
         $this->credit('Awa', '+22376008201', 4000, 0);
 
         $this->postJson("/api/console/v1/comptes/{$this->awa->id}/relancer", [], $this->cle)->assertOk()
-            ->assertJsonPath('message', 'Relance envoyée à Awa (4 000 F).');
+            ->assertJsonPath('message', 'Rappel envoyé à Awa.');
 
         $notif = NotificationApp::where('user_id', $this->awa->id)->where('titre', 'Rappel automatique')->first();
         $this->assertNotNull($notif);
@@ -112,7 +112,7 @@ class RelancesCreancesTest extends TestCase
 
         $this->getJson('/api/console/v1/resume', $this->cle)->assertJsonPath('doivent', 0);
         $this->postJson("/api/console/v1/comptes/{$this->awa->id}/relancer", [], $this->cle)->assertStatus(422)
-            ->assertJsonPath('message', 'Ce compte ne doit rien : pas de relance.');
+            ->assertJsonPath('message', 'Rien à payer : pas de rappel à envoyer.');
     }
 
     public function test_la_fiche_client_se_relie_au_compte_par_le_numero_d_une_demande(): void

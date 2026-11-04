@@ -165,10 +165,10 @@ class CreancesAbonnements
     {
         $d = $this->de($u);
         if ($d === null) {
-            throw ValidationException::withMessages(['compte' => ['Ce compte ne doit rien : pas de relance.']]);
+            throw ValidationException::withMessages(['compte' => ['Rien à payer : pas de rappel à envoyer.']]);
         }
         if (! $u->is_active) {
-            throw ValidationException::withMessages(['compte' => ['Ce compte est désactivé : il ne recevrait pas la relance.']]);
+            throw ValidationException::withMessages(['compte' => ['Ce compte est désactivé : il ne recevrait pas le rappel.']]);
         }
 
         ['annonce' => $annonce] = $this->annonces->creer([
@@ -182,7 +182,7 @@ class CreancesAbonnements
         // La dette reste ; seule la date de la dernière relance change.
         $this->cache?->put((string) $u->id, ['derniere_relance' => now()->toIso8601String()] + $this->cache->get((string) $u->id));
 
-        return ['message' => "Relance envoyée à {$u->name} (".number_format($d['montant'], 0, ',', ' ').' F).', 'texte' => $d['message']];
+        return ['message' => "Rappel envoyé à {$u->name}.", 'texte' => $d['message']];
     }
 
     /**
