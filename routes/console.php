@@ -7,6 +7,7 @@ use App\Services\BilanDuSoir;
 use App\Services\BilanMensuel;
 use App\Services\Coffres;
 use App\Services\CommandesRestaurant;
+use App\Services\CreancesAbonnements;
 use App\Services\DiffusionAnnonces;
 use App\Services\NettoyageOrphelins;
 use App\Services\PaiementMobile;
@@ -122,6 +123,19 @@ Artisan::command('ecaisse:caisses-oubliees', function () {
     }
 })->purpose('Rappelle à 23 h les caisses encore ouvertes, les ferme sans comptage à 4 h (heure du pays)');
 Schedule::command('ecaisse:caisses-oubliees')->hourly()->withoutOverlapping();
+
+// Les commerçants qui doivent encore une part de leur abonnement : un rappel
+// par mois, le 1er à 10 h (Bamako, UTC), sauf s'ils ont été relancés depuis
+// moins de 7 jours depuis la Console Ngoni.
+Artisan::command('ecaisse:relancer-creances', function () {
+    $auteur = User::where('est_admin_plateforme', true)->orderBy('id')->first();
+    if ($auteur === null) {
+        return;
+    }
+    ['relances' => $n, 'ignores' => $i] = app(CreancesAbonnements::class)->relancerTous($auteur);
+    $this->info("Relances de paiement : {$n} envoyée(s), {$i} écartée(s).");
+})->purpose('Rappelle chaque mois aux commerçants ce qu’ils doivent encore sur leur abonnement');
+Schedule::command('ecaisse:relancer-creances')->monthlyOn(1, '10:00')->withoutOverlapping();
 
 // Faux comptes du robot de test de Google Play : effacés au bout d'un jour.
 Artisan::command('ecaisse:purger-comptes-test', function () {

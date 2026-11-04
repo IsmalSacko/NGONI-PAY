@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\CreancesAbonnements;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
         // la renseigne, le BoutiqueScope et les services la relisent plus
         // loin dans la même requête.
         $this->app->singleton(TenantContext::class);
+        // Les dettes des commerçants, calculées une fois par requête (liste des comptes de la console).
+        $this->app->scoped(CreancesAbonnements::class);
     }
 
     /**

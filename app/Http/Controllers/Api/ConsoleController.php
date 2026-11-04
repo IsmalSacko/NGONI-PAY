@@ -16,6 +16,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\Console\AbonnementsConsole;
+use App\Services\CreancesAbonnements;
 use App\Services\GestionPlans;
 use App\Services\PaiementMobile;
 use App\Services\Parrainage;
@@ -42,7 +43,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ConsoleController extends Controller
 {
     /** Ce que la console peut faire ici, en plus du contrat v1 (voir Ajouts v1.1). */
-    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai'];
+    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai', 'relancer_dette'];
 
     /** Moyens d'un paiement reçu hors de l'application (valider, accorder). */
     private const MOYENS = [MoyenPaiement::Especes, MoyenPaiement::OrangeMoney, MoyenPaiement::MoovMoney, MoyenPaiement::Wave, MoyenPaiement::Carte, MoyenPaiement::Virement];
@@ -82,6 +83,9 @@ class ConsoleController extends Controller
             'essais_bientot_finis' => $enCours($base()->where('plan', 'essai'))->whereNotNull('fin')->whereDate('fin', '<=', today()->addDays(3))->count(),
             'abonnes' => $actifs - $essais,
             'echus' => $comptes - $actifs,
+            // Contrat v1.4 : les comptes qui doivent encore une part de leur abonnement.
+            'doivent' => app(CreancesAbonnements::class)->parCompte()->count(),
+            'dettes' => [['devise' => 'XOF', 'total' => (int) app(CreancesAbonnements::class)->parCompte()->sum('montant')]],
             'demandes_en_attente' => DemandeAbonnement::enAttente()->whereHas('proprietaire', fn ($u) => self::clients($u))->count(),
             'encaisse_mois' => DemandeAbonnement::where('statut', StatutDemande::Approuvee)->where('decide_le', '>=', now()->startOfMonth())
                 ->whereHas('proprietaire', fn ($u) => self::clients($u))
@@ -253,9 +257,11 @@ class ConsoleController extends Controller
             ->when($filtre === 'a_valider', fn ($r) => $r->whereRaw('1 = 0'))
             ->when($filtre === 'interne',
                 fn ($r) => $r->whereHas('proprietaire', fn ($u) => $u->where(fn ($w) => $w->where('compte_interne', true)->orWhere('est_admin_plateforme', true)->orWhere('compte_test', true))),
-                fn ($r) => $r->whereHas('proprietaire', fn ($u) => self::clients($u)))
+                // Qui doit : client ou non, il est relancé.
+                fn ($r) => $filtre === 'doit' ? $r : $r->whereHas('proprietaire', fn ($u) => self::clients($u)))
             ->when($filtre === 'essai', fn ($r) => $enCours($r->where('plan', 'essai')))
             ->when($filtre === 'abonne', fn ($r) => $enCours($r->where('plan', '!=', 'essai')))
+            ->when($filtre === 'doit', fn ($r) => $r->whereIn('user_id', app(CreancesAbonnements::class)->parCompte()->keys()))
             ->when($filtre === 'echu', fn ($r) => $r->where(fn ($w) => $w->where('est_actif', false)->orWhereDate('fin', '<', Abonnement::premierJourEnCours())))
             ->latest();
 
@@ -330,6 +336,8 @@ class ConsoleController extends Controller
             'essai_prolongeable' => $a->estEssai(),
             'note' => $a->note_admin,
             'interne' => $u !== null && self::interne($u),
+            // Contrat v1.4 : ce qu'il doit encore (crédit sur son abonnement), et le rappel qui partirait.
+            'dette' => $u === null ? null : app(CreancesAbonnements::class)->de($u),
         ];
     }
 
@@ -614,6 +622,17 @@ class ConsoleController extends Controller
             'message' => "Essai de {$this->nomCompte($a->proprietaire)} prolongé jusqu’au {$fin->format('d/m/Y')}.",
             'compte' => $this->ligneCompte($a, $this->membres(collect([$user->id])), Plan::pluck('nom', 'code')),
         ]);
+    }
+
+    /** Rappel de paiement envoyé maintenant au commerçant qui doit encore (notification et push). */
+    public function relancer(User $user, Request $request, CreancesAbonnements $creances): JsonResponse
+    {
+        $r = null;
+        $this->refusMetier(function () use ($creances, $user, $request, &$r): void {
+            $r = $creances->relancer($user, $this->exploitant(), $this->par($request));
+        });
+
+        return response()->json($r);
     }
 
     public function formules(GestionPlans $gestion): JsonResponse
