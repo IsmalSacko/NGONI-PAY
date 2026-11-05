@@ -346,7 +346,7 @@ class ConsoleController extends Controller
      * Fiche d'un compte : la ligne de /comptes, ses boutiques et leur
      * activité, le parrainage, l'historique de l'abonnement et ses options.
      */
-    public function compte(User $user): JsonResponse
+    public function compte(User $user, Request $request): JsonResponse
     {
         $a = Abonnement::where('user_id', $user->id)->with(['proprietaire.parrain:id,name', 'proprietaire.boutiquesPossedees' => fn ($q) => $q->withoutGlobalScopes()
             ->withCount(['ventes as nb_ventes' => fn ($v) => $v->withoutGlobalScopes()->where('statut', 'validee')])
@@ -361,8 +361,8 @@ class ConsoleController extends Controller
             'details' => $this->details($a),
             'historique' => $this->historique($a, $noms),
             'options' => $this->options($a),
-            // Contrat v1.5 : chiffre d'affaires, ventes, courbe des 30 jours, meilleurs articles.
-            'suivi' => app(SuiviCompte::class)->pour($user),
+            // Contrats v1.5 et v1.6 : chiffre d'affaires, ventes, courbe et meilleurs articles de la période choisie.
+            'suivi' => app(SuiviCompte::class)->pour($user, $request->only(['periode', 'du', 'au'])),
         ]);
     }
 
