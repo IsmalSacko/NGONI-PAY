@@ -16,6 +16,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AbonnementService;
 use App\Services\Console\AbonnementsConsole;
+use App\Services\Console\SuiviCompte;
 use App\Services\CreancesAbonnements;
 use App\Services\GestionPlans;
 use App\Services\PaiementMobile;
@@ -43,7 +44,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ConsoleController extends Controller
 {
     /** Ce que la console peut faire ici, en plus du contrat v1 (voir Ajouts v1.1). */
-    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai', 'relancer_dette'];
+    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai', 'relancer_dette', 'suivi'];
 
     /** Moyens d'un paiement reçu hors de l'application (valider, accorder). */
     private const MOYENS = [MoyenPaiement::Especes, MoyenPaiement::OrangeMoney, MoyenPaiement::MoovMoney, MoyenPaiement::Wave, MoyenPaiement::Carte, MoyenPaiement::Virement];
@@ -360,6 +361,8 @@ class ConsoleController extends Controller
             'details' => $this->details($a),
             'historique' => $this->historique($a, $noms),
             'options' => $this->options($a),
+            // Contrat v1.5 : chiffre d'affaires, ventes, courbe des 30 jours, meilleurs articles.
+            'suivi' => app(SuiviCompte::class)->pour($user),
         ]);
     }
 
@@ -373,6 +376,9 @@ class ConsoleController extends Controller
             ['libelle' => 'Téléphone', 'valeur' => (string) $u?->phone],
             ['libelle' => 'E-mail', 'valeur' => (string) ($u?->email ?? '')],
             ['libelle' => 'Inscrit le', 'valeur' => (string) $u?->created_at?->format('d/m/Y')],
+            ['libelle' => 'Dernière visite', 'valeur' => $u?->vu_le ? $u->vu_le->format('d/m/Y à H:i') : 'jamais'],
+            ...($u?->vu_version ? [['libelle' => 'Version de l’application', 'valeur' => (string) $u->vu_version]] : []),
+            ['libelle' => 'Personnes dans l’équipe', 'valeur' => (string) (User::whereIn('boutique_id', $u?->boutiquesPossedees->pluck('id') ?? [])->count())],
         ];
         foreach ($u?->boutiquesPossedees ?? [] as $b) {
             $details[] = ['libelle' => 'Boutique '.$b->nom, 'valeur' => implode(' · ', array_filter([
