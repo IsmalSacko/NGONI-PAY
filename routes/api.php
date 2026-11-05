@@ -96,6 +96,7 @@ Route::middleware(['cle-console', 'throttle:120,1'])->prefix('console/v1')->cont
     Route::post('comptes/{user}/options', 'reglerOptions');
     Route::post('comptes/{user}/interne', 'marquerInterne');
     Route::post('comptes/{user}/relancer', 'relancer');
+    Route::post('comptes/{user}/restaurer', 'restaurer');
     Route::get('recettes', 'recettes');
     Route::get('formules', 'formules');
     Route::patch('formules/{code}', 'modifierFormule');

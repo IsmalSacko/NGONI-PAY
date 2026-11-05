@@ -22,6 +22,7 @@ use App\Services\GestionPlans;
 use App\Services\PaiementMobile;
 use App\Services\Parrainage;
 use App\Services\RechercheDemandes;
+use App\Services\RestaurationBoutique;
 use App\Services\VenteAbonnement;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,7 +45,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ConsoleController extends Controller
 {
     /** Ce que la console peut faire ici, en plus du contrat v1 (voir Ajouts v1.1). */
-    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai', 'relancer_dette', 'suivi'];
+    private const CAPACITES = ['preuve', 'revoquer', 'approuver_a_vie', 'options_compte', 'recettes', 'historique', 'verifier_paiement', 'prolonger_essai', 'relancer_dette', 'suivi', 'restaurer_boutique'];
 
     /** Moyens d'un paiement reçu hors de l'application (valider, accorder). */
     private const MOYENS = [MoyenPaiement::Especes, MoyenPaiement::OrangeMoney, MoyenPaiement::MoovMoney, MoyenPaiement::Wave, MoyenPaiement::Carte, MoyenPaiement::Virement];
@@ -363,7 +364,56 @@ class ConsoleController extends Controller
             'options' => $this->options($a),
             // Contrats v1.5 et v1.6 : chiffre d'affaires, ventes, courbe et meilleurs articles de la période choisie.
             'suivi' => app(SuiviCompte::class)->pour($user, $request->only(['periode', 'du', 'au'])),
+            // Contrat v1.7 : les copies gardées à chaque remise à zéro de ses boutiques (30 jours).
+            'restaurations' => $this->restaurations($user),
         ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function restaurations(User $user): array
+    {
+        $boutiques = Boutique::withoutGlobalScopes()->where('proprietaire_id', $user->id)->pluck('nom', 'id');
+        $service = app(RestaurationBoutique::class);
+        $liste = [];
+        foreach ($boutiques as $id => $nom) {
+            foreach ($service->sauvegardes((string) $id) as $i => $s) {
+                $liste[] = [
+                    'id' => basename((string) $s['chemin'], '.json'),
+                    'boutique' => (string) $nom,
+                    'le' => $s['le']->toIso8601String(),
+                    'par' => (string) $s['par'],
+                    'expire_le' => $s['expire_le']->toIso8601String(),
+                    'articles' => $s['articles'], 'ventes' => $s['ventes'], 'clients' => $s['clients'], 'achats' => $s['achats'],
+                    'plus_recente' => $i === 0,
+                ];
+            }
+        }
+
+        return $liste;
+    }
+
+    /**
+     * Remet dans la boutique ce qu'une remise à zéro avait effacé (articles,
+     * ventes, clients…, photos comprises) : rien de ce qui existe aujourd'hui
+     * n'est effacé. Une copie ne sert qu'une fois.
+     */
+    public function restaurer(User $user, Request $request, RestaurationBoutique $service): JsonResponse
+    {
+        $id = (string) $request->validate(['sauvegarde' => ['required', 'string', 'regex:/^\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f-]{36}$/']], [
+            'sauvegarde.required' => 'Choisissez la copie à restaurer.', 'sauvegarde.regex' => 'Copie introuvable.',
+        ])['sauvegarde'];
+        $boutique = substr($id, 18);
+        $chemin = RestaurationBoutique::DOSSIER.'/'.$id.'.json';
+        $aLui = Boutique::withoutGlobalScopes()->where('proprietaire_id', $user->id)->whereKey($boutique)->exists();
+        if (! $aLui || ! in_array($chemin, $service->sauvegardesParBoutique()[$boutique] ?? [], true)) {
+            throw new HttpResponseException(response()->json(['message' => 'Copie introuvable : elle a peut-être déjà été restaurée.'], 422));
+        }
+        $r = null;
+        $this->refusMetier(function () use ($service, $chemin, &$r): void {
+            $r = $service->restaurer($chemin, $this->exploitant());
+        });
+
+        return response()->json(['message' => "« {$r['boutique']} » est restaurée : {$r['lignes']} éléments sont revenus.", 'lignes' => $r['lignes']]);
     }
 
     /** @return list<array{libelle: string, valeur: string}> */
