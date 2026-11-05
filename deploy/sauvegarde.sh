@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sauvegarde de Ngoni Caisse : base « ecaisse » et fichiers envoyés (photos,
-# logos, preuves de paiement). Garde 30 jours sur le serveur, et copie chaque
+# logos, preuves de paiement). Garde 7 jours sur le serveur, et copie chaque
 # sauvegarde hors du serveur, sur Google Drive (rclone, distant « gdrive: »),
-# où elle est gardée 30 jours : une panne du serveur n'emporte pas tout.
+# où elle est gardée 15 jours : une panne du serveur n'emporte pas tout.
 #     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh        # base + fichiers (une fois par jour, 3 h 15)
 #     bash /var/www/NGONI-PAY-V2/deploy/sauvegarde.sh base   # la base seule (toutes les heures)
 #
@@ -14,7 +14,7 @@ APP=/var/www/NGONI-PAY-V2
 DEST=/home/ismael/backups/ngoni-caisse
 JOURNAL=/var/www/sauvegarde-ngonicaisse.log
 DATE=$(date +%Y%m%d-%H%M)
-GARDER_JOURS=30
+GARDER_JOURS=7
 
 journal() { echo "[$(date '+%F %T')] $*" >> "$JOURNAL"; }
 env_app() { grep "^$1=" "$APP/.env" | head -1 | cut -d= -f2- | tr -d '"'; }
@@ -49,7 +49,7 @@ DRIVE="gdrive:Sauvegardes Ngoni Caisse"
 DISTANT="non configuré"
 if [ -x "$RCLONE" ]; then
   if "$RCLONE" copy "$DEST" "$DRIVE" --max-age 20h --log-level ERROR 2>>"$JOURNAL" \
-     && "$RCLONE" delete "$DRIVE" --min-age 30d --log-level ERROR 2>>"$JOURNAL"; then
+     && "$RCLONE" delete "$DRIVE" --min-age 15d --log-level ERROR 2>>"$JOURNAL"; then
     DISTANT="copié sur Google Drive"
   else
     DISTANT="ÉCHEC de la copie sur Google Drive"
