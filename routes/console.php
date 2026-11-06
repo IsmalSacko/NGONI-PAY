@@ -58,22 +58,26 @@ Schedule::command('ecaisse:verifier-paiements-mobile')->everyTenMinutes()->witho
 // d'elle-même à tous les comptes, une seule fois par version.
 Schedule::command('ecaisse:annoncer-mise-a-jour')->everyFiveMinutes()->withoutOverlapping();
 
-// Fin d'essai dans deux jours : le propriétaire est prévenu (application,
-// push, e-mail), une fois par échéance. Neuf heures à Bamako (UTC).
+// Fin d'essai dans deux jours, fin d'abonnement payant dans trois jours puis
+// la veille : le propriétaire est prévenu (application, push, e-mail), une
+// fois par échéance. Neuf heures à Bamako (UTC).
 Artisan::command('ecaisse:rappeler-fin-essai {--simulation : Liste qui serait prévenu, sans rien envoyer}', function () {
     $rappel = app(RappelFinEssai::class);
     if ($this->option('simulation')) {
         foreach ($rappel->aPrevenir()->get() as $a) {
             $this->line("• {$a->proprietaire->name} — essai jusqu'au {$a->fin->format('d/m/Y')}");
         }
+        foreach ([...$rappel->abonnesAPrevenir()->get(), ...$rappel->abonnesAPrevenirLaVeille()->get()] as $a) {
+            $this->line("• {$a->proprietaire->name} — abonnement {$a->plan} jusqu'au {$a->fin->format('d/m/Y')}");
+        }
 
         return;
     }
     $n = $rappel->envoyerLesEcheances();
     if ($n > 0) {
-        $this->info("{$n} propriétaire(s) prévenu(s) de la fin de leur essai.");
+        $this->info("{$n} propriétaire(s) prévenu(s) de la fin de leur essai ou de leur abonnement.");
     }
-})->purpose('Prévient les propriétaires deux jours avant la fin de leur essai');
+})->purpose('Prévient les propriétaires avant la fin de leur essai (2 jours) ou de leur abonnement (3 jours, puis la veille)');
 
 Schedule::command('ecaisse:rappeler-fin-essai')->dailyAt('09:00')->withoutOverlapping();
 
