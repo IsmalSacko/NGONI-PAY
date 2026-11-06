@@ -15,8 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * back-office web renvoie vers la page d'acceptation.
  *
  * Restent ouverts : lire son compte, accepter, se déconnecter. Une
- * application d'avant 4.9.0 ne sait pas montrer les conditions : elle passe,
- * en attendant la mise à jour obligatoire (voir /api/app-version).
+ * application d'avant 4.9.0 ne sait pas montrer les conditions : elle est
+ * refusée aussi (MISE_A_JOUR_REQUISE), avec le lien du Play Store.
  */
 class ExigeConditions
 {
@@ -33,8 +33,15 @@ class ExigeConditions
         }
 
         if ($request->is('api/*')) {
+            // Une application d'avant 4.9.0 (ou sans version) ne sait pas montrer
+            // les conditions : refusée aussi, avec de quoi se mettre à jour.
+            // Sécurité : personne n'utilise le Service sans les avoir acceptées.
             if (! ConditionsUtilisation::clientSaitAccepter($request)) {
-                return $next($request);
+                return response()->json([
+                    'message' => 'Mettez à jour Ngoni Caisse (Play Store), puis acceptez les conditions d’utilisation pour continuer.',
+                    'code' => 'MISE_A_JOUR_REQUISE',
+                    'store_url' => config('mobile.store_url'),
+                ], 403);
             }
 
             return response()->json([

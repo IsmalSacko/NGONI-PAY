@@ -121,7 +121,7 @@ class ConditionsUtilisationTest extends TestCase
         $this->get('/conditions/archives/2020-01-01/conditions')->assertNotFound();
     }
 
-    public function test_sans_acceptation_l_api_refuse_l_application_recente_et_laisse_l_ancienne(): void
+    public function test_sans_acceptation_l_api_refuse_l_application_recente_comme_l_ancienne(): void
     {
         $jeton = $this->inscription()->json('token');
 
@@ -129,9 +129,16 @@ class ConditionsUtilisationTest extends TestCase
             ->assertForbidden()->assertJsonPath('code', 'CONDITIONS_A_ACCEPTER');
         // Toujours ouverts : lire son compte, accepter.
         $this->withToken($jeton)->withHeaders(self::APPLICATION)->getJson('/api/moi')->assertOk();
-        // Une application d'avant 4.9.0 ne sait pas montrer les conditions : elle passe, en attendant la mise à jour obligatoire.
+        // Une application d'avant 4.9.0 ne sait pas montrer les conditions : refusée aussi, avec le lien de mise à jour.
         $this->flushHeaders();
-        $this->withToken($jeton)->withHeaders([...self::APPLICATION, 'X-App-Version' => '4.8.0'])->getJson('/api/ventes')->assertOk();
+        $this->withToken($jeton)->withHeaders([...self::APPLICATION, 'X-App-Version' => '4.8.0'])->getJson('/api/ventes')
+            ->assertForbidden()->assertJsonPath('code', 'MISE_A_JOUR_REQUISE')->assertJsonPath('store_url', config('mobile.store_url'));
+        // Sans version annoncée non plus.
+        $this->flushHeaders();
+        $this->withToken($jeton)->getJson('/api/ventes')->assertForbidden()->assertJsonPath('code', 'MISE_A_JOUR_REQUISE');
+        // Lire son compte reste possible.
+        $this->flushHeaders();
+        $this->withToken($jeton)->withHeaders([...self::APPLICATION, 'X-App-Version' => '4.8.0'])->getJson('/api/moi')->assertOk();
 
         $this->flushHeaders();
         $this->withToken($jeton)->withHeaders(self::APPLICATION)
